@@ -1,0 +1,24 @@
+# Core
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-dotenv==1.0.1
+
+# Data Validation
+pydantic==2.10.5
+pydantic-settings==2.7.1
+
+# Async HTTP
+httpx==0.28.1
+
+# AI
+google-genai>=1.0.0
+
+# Database & Storage
+supabase==2.11.0
+
+# File Handling
+python-multipart==0.0.20
+Pillow==11.1.0
+
+# Utilities
+orjson==3.10.14

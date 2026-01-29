@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find:*)",
+      "Bash(npx create-next-app@14:*)",
+      "Bash(npm install @supabase/supabase-js zustand html-to-image react-dropzone lucide-react date-fns sonner)",
+      "Bash(npx next build:*)",
+      "Bash(python:*)",
+      "Bash(python3 -m venv:*)",
+      "Bash(/Users/jungdain/Desktop/POP_maker/backend/venv/bin/pip install -r /Users/jungdain/Desktop/POP_maker/backend/requirements.txt)",
+      "Bash(./venv/bin/python3 -c \"\nimport httpx, json\n\nSUPABASE_URL = ''https://vphfowdnhjvefahkzkmg.supabase.co''\nSERVICE_KEY = ''eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwaGZvd2RuaGp2ZWZhaGt6a21nIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2OTU4NjkyMCwiZXhwIjoyMDg1MTYyOTIwfQ.JTZ2VRNtJO9nkD8H3AkJADr9DShsmXXKqotbsxjKqZo''\n\n# Test connection by querying templates\nheaders = {\n    ''apikey'': SERVICE_KEY,\n    ''Authorization'': f''Bearer {SERVICE_KEY}'',\n    ''Content-Type'': ''application/json''\n}\n\nresp = httpx.get\\(f''{SUPABASE_URL}/rest/v1/'', headers=headers, timeout=10\\)\nprint\\(f''Connection test status: {resp.status_code}''\\)\nprint\\(f''Response: {resp.text[:500]}''\\)\n\")",
+      "Bash(./venv/bin/python3:*)",
+      "Bash(brew install:*)",
+      "Bash(npx supabase:*)",
+      "Bash(npm run build:*)",
+      "mcp__claude_ai_Context_7__resolve-library-id",
+      "mcp__claude_ai_Context_7__query-docs",
+      "Bash(./venv/bin/pip install:*)",
+      "Bash(./venv/bin/pip:*)",
+      "Bash(tree:*)",
+      "Bash(curl -s -I http://localhost:8000/health)",
+      "Bash(curl:*)",
+      "Bash(python3:*)",
+      "Bash(psql:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
+    ]
+  }
+}

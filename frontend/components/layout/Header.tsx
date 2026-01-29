@@ -1,12 +1,16 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 
 export function Header() {
   return (
     <header className="h-14 border-b border-border flex items-center justify-between px-10">
-      <Link href="/" className="text-lg font-semibold tracking-widest">
-        SHINSEGAE POP MAKER
+      <Link href="/" className="flex items-center gap-2">
+        <Image src="/logo.png" alt="SHINSEGAE" width={28} height={28} />
+        <span className="text-lg font-semibold tracking-widest">
+          SHINSEGAE POP MAKER
+        </span>
       </Link>
       <Link
         href="/"

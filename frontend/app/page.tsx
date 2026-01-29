@@ -7,6 +7,7 @@ import { projectsApi } from "@/lib/api";
 import type { Project } from "@/types";
 import { Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import Image from "next/image";
 
 const STATUS_LABEL: Record<string, { text: string; className: string }> = {
   draft: { text: "초안", className: "bg-gray-100 text-gray-600" },
@@ -51,9 +52,12 @@ export default function HomePage() {
     <div className="min-h-screen flex flex-col">
       {/* Header */}
       <header className="h-14 border-b border-border flex items-center px-10">
-        <h1 className="text-lg font-semibold tracking-widest">
-          SHINSEGAE POP MAKER
-        </h1>
+        <div className="flex items-center gap-2">
+          <Image src="/logo.png" alt="SHINSEGAE" width={28} height={28} />
+          <h1 className="text-lg font-semibold tracking-widest">
+            SHINSEGAE POP MAKER
+          </h1>
+        </div>
       </header>
 
       {/* Main */}

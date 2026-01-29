@@ -10,6 +10,7 @@ import { projectsApi, templatesApi } from "@/lib/api";
 import { exportImage } from "@/lib/export";
 import { Undo2, Download, Save } from "lucide-react";
 import { toast } from "sonner";
+import Image from "next/image";
 import type { Project, Template } from "@/types";
 import { useRef } from "react";
 
@@ -101,9 +102,12 @@ export default function EditPage() {
     <div className="min-h-screen flex flex-col">
       {/* Header with actions */}
       <header className="h-14 border-b border-border flex items-center justify-between px-6">
-        <h1 className="text-lg font-semibold tracking-widest">
-          SHINSEGAE POP MAKER
-        </h1>
+        <div className="flex items-center">
+          <Image src="/logo.png" alt="SHINSEGAE" width={28} height={28} />
+          <h1 className="text-lg font-semibold tracking-widest">
+            SHINSEGAE POP MAKER
+          </h1>
+        </div>
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="sm" onClick={handleSave} loading={saving}>
             <Save size={16} className="mr-1.5" />

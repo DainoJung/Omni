@@ -23,10 +23,11 @@ class StorageService:
 
         storage_path = f"{project_id}/{image_type}/{filename}"
 
+        # upsert: 기존 파일이 있으면 덮어쓰기
         self.supabase.storage.from_(self.bucket_projects).upload(
             path=storage_path,
             file=file_bytes,
-            file_options={"content-type": content_type},
+            file_options={"content-type": content_type, "upsert": "true"},
         )
 
         return storage_path

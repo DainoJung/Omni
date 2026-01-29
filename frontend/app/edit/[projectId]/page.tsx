@@ -266,8 +266,16 @@ export default function EditPage() {
                     className="border rounded-sm p-4 text-center"
                     style={{ borderColor: template.styles.divider_color }}
                   >
-                    <div className="w-full aspect-square bg-bg-tertiary rounded-sm mb-3 flex items-center justify-center">
-                      <p className="text-xs text-text-tertiary">상품 {i + 1}</p>
+                    <div className="w-full aspect-square bg-bg-tertiary rounded-sm mb-3 flex items-center justify-center overflow-hidden">
+                      {content.images.products?.[i] ? (
+                        <img
+                          src={content.images.products[i]}
+                          alt={prod.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <p className="text-xs text-text-tertiary">상품 {i + 1}</p>
+                      )}
                     </div>
                     <p
                       className="font-semibold text-sm"

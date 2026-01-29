@@ -45,9 +45,9 @@ class GenerateOrchestrator:
                 project, template, color_preset, effective_tone_manner
             )
 
-            # 이미지 생성
+            # 이미지 생성 (텍스트 결과의 상품명을 활용)
             images = await self._generate_images(
-                project, template, color_preset, effective_tone_manner
+                project, template, texts, color_preset, effective_tone_manner
             )
 
             # 결과 저장
@@ -122,12 +122,17 @@ class GenerateOrchestrator:
         self,
         project: dict,
         template: dict,
+        texts: "GeneratedTexts",
         color_preset: dict = None,
         tone_manner: dict = None,
     ) -> GeneratedImages:
+        import logging
+        logger = logging.getLogger(__name__)
+
         style_map = {
             "food": ["warm", "appetizing", "premium"],
             "fashion": ["editorial", "luxury", "minimal"],
+            "beauty": ["elegant", "soft", "feminine"],
         }
         keywords = style_map.get(template["category"], ["modern", "clean"])
 
@@ -142,8 +147,13 @@ class GenerateOrchestrator:
             for kw in tone_manner.get("keywords", [])[:2]:
                 keywords.append(kw)
 
+        project_id = str(project["id"])
+        banner_url = None
+        product_urls = []
+
+        # 1) 배너 이미지 생성
         try:
-            banner_result = await self.image.generate_banner(
+            banner_bytes = await self.image.generate_banner(
                 brand_name=project["brand_name"],
                 category=template["category"],
                 style_keywords=keywords,
@@ -151,22 +161,41 @@ class GenerateOrchestrator:
                 height=400,
             )
 
-            # Imagen API는 PIL Image 객체를 반환 → PNG bytes로 변환 후 Storage 업로드
-            pil_image = banner_result["pil_image"]
-            import io
-            buf = io.BytesIO()
-            pil_image.save(buf, format="PNG")
-            image_bytes = buf.getvalue()
-
             banner_path = await self.storage.upload_image(
-                file_bytes=image_bytes,
-                project_id=str(project["id"]),
+                file_bytes=banner_bytes,
+                project_id=project_id,
                 image_type="generated",
                 filename="banner.png",
             )
+            banner_url = self.storage.get_public_url(banner_path)
+            logger.info(f"배너 이미지 생성 완료: {banner_url}")
 
-            return GeneratedImages(banner=banner_path, products=[])
+        except Exception as e:
+            logger.warning(f"배너 이미지 생성 실패 (텍스트만 진행): {e}")
 
-        except Exception:
-            # 이미지 생성 실패 시 텍스트만으로 진행
-            return GeneratedImages(banner=None, products=[])
+        # 2) 상품 이미지 생성
+        product_descs = texts.product_descriptions if texts else []
+        for idx, prod in enumerate(product_descs):
+            try:
+                prod_name = prod.get("name", f"product_{idx+1}")
+                prod_bytes = await self.image.generate_product_image(
+                    product_name=prod_name,
+                    brand_name=project["brand_name"],
+                    category=template["category"],
+                    style_keywords=keywords,
+                )
+
+                prod_path = await self.storage.upload_image(
+                    file_bytes=prod_bytes,
+                    project_id=project_id,
+                    image_type="generated",
+                    filename=f"product_{idx+1}.png",
+                )
+                prod_url = self.storage.get_public_url(prod_path)
+                product_urls.append(prod_url)
+                logger.info(f"상품 이미지 {idx+1} 생성 완료: {prod_url}")
+
+            except Exception as e:
+                logger.warning(f"상품 이미지 {idx+1} 생성 실패: {e}")
+
+        return GeneratedImages(banner=banner_url, products=product_urls)

@@ -9,7 +9,7 @@ export function Header() {
       <Link href="/" className="flex items-center gap-2">
         <Image src="/logo.png" alt="SHINSEGAE" width={28} height={28} />
         <span className="text-lg font-semibold tracking-widest">
-          SHINSEGAE POP MAKER
+          SHINSEGAE PDP MAKER
         </span>
       </Link>
       <Link

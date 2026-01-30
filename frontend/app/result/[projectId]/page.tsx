@@ -49,7 +49,7 @@ export default function ResultPage() {
       await exportImage(previewRef.current, {
         format: "png",
         quality: 2,
-        filename: `${project?.brand_name || "pop"}_${Date.now()}`,
+        filename: `${project?.brand_name || "PDP"}_${Date.now()}`,
       });
       toast.success("이미지가 다운로드되었습니다.");
     } catch {

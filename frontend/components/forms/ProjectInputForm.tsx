@@ -166,7 +166,7 @@ export function ProjectInputForm() {
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="space-y-1">
-        <h2 className="text-2xl font-bold">POP 상세페이지 만들기</h2>
+        <h2 className="text-2xl font-bold">PDP 만들기</h2>
         <p className="text-text-secondary text-sm">
           상품 정보를 입력하면 AI가 레이아웃을 자동으로 생성합니다.
         </p>

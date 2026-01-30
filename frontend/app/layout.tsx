@@ -70,7 +70,7 @@ const bebasNeue = Bebas_Neue({
 
 export const metadata: Metadata = {
   title: "PDP Maker - 신세계백화점 PDP 자동 생성",
-  description: "AI 기반 PDP 상세페이지 자동 생성 시스템",
+  description: "AI 기반 PDP 자동 생성 시스템",
 };
 
 export default function RootLayout({

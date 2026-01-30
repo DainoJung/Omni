@@ -54,7 +54,7 @@ export default function HomePage() {
         <div className="flex items-center gap-2">
           <Image src="/logo.png" alt="SHINSEGAE" width={28} height={28} />
           <h1 className="text-lg font-semibold tracking-widest">
-            SHINSEGAE POP MAKER
+            SHINSEGAE PDP MAKER
           </h1>
         </div>
       </header>
@@ -64,9 +64,9 @@ export default function HomePage() {
         <div className="w-full max-w-[960px] space-y-10">
           {/* Hero */}
           <div className="text-center space-y-4">
-            <h2 className="text-3xl font-bold">POP 상세페이지 자동 생성</h2>
+            <h2 className="text-3xl font-bold">PDP 자동 생성</h2>
             <p className="text-text-secondary text-lg">
-              브랜드 정보를 입력하면 AI가 상세페이지를 만들어 드립니다.
+              상품 정보를 입력하면 AI가 상세페이지를 만들어 드립니다.
             </p>
             <Link
               href="/create"

@@ -58,6 +58,11 @@ export interface TextArea {
   recommended_font_color: string;
   max_font_size?: number;
   suitable_for: "headline" | "subtext" | "label" | "description";
+  recommended_text?: string;
+  text_align?: "left" | "center" | "right";
+  font_weight?: number;
+  letter_spacing?: string;
+  font_size_vw?: number;
 }
 
 // === Multi-Section Types ===

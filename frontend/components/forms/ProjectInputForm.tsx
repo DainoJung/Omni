@@ -60,11 +60,10 @@ function ProductImageUploader({
   return (
     <div
       {...getRootProps()}
-      className={`w-20 h-20 border-2 border-dashed rounded-sm flex flex-col items-center justify-center cursor-pointer transition-colors ${
-        isDragActive
-          ? "border-accent bg-bg-secondary"
-          : "border-border hover:border-text-secondary"
-      }`}
+      className={`w-20 h-20 border-2 border-dashed rounded-sm flex flex-col items-center justify-center cursor-pointer transition-colors ${isDragActive
+        ? "border-accent bg-bg-secondary"
+        : "border-border hover:border-text-secondary"
+        }`}
     >
       <input {...getInputProps()} />
       <Upload size={16} className="text-text-tertiary" />
@@ -241,11 +240,10 @@ export function ProjectInputForm() {
                   onChange={(e) =>
                     updateProduct(index, "name", e.target.value)
                   }
-                  className={`w-full h-9 px-3 border rounded-sm text-sm focus:border-border-focus ${
-                    errors[`product_${index}_name`]
-                      ? "border-error"
-                      : "border-border"
-                  }`}
+                  className={`w-full h-9 px-3 border rounded-sm text-sm focus:border-border-focus ${errors[`product_${index}_name`]
+                    ? "border-error"
+                    : "border-border"
+                    }`}
                 />
                 <input
                   placeholder="가격 (필수, 예: 39,000원)"
@@ -253,11 +251,10 @@ export function ProjectInputForm() {
                   onChange={(e) =>
                     updateProduct(index, "price", e.target.value)
                   }
-                  className={`w-full h-9 px-3 border rounded-sm text-sm focus:border-border-focus ${
-                    errors[`product_${index}_price`]
-                      ? "border-error"
-                      : "border-border"
-                  }`}
+                  className={`w-full h-9 px-3 border rounded-sm text-sm focus:border-border-focus ${errors[`product_${index}_price`]
+                    ? "border-error"
+                    : "border-border"
+                    }`}
                 />
               </div>
             </div>
@@ -278,7 +275,7 @@ export function ProjectInputForm() {
 
       <div className="pt-4">
         <Button type="submit" size="lg" loading={loading} className="w-full">
-          AI 레이아웃 생성하기
+          AI 상세페이지 생성하기
         </Button>
       </div>
     </form>

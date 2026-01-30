@@ -195,11 +195,31 @@ class LayoutPipelineService:
         layout_image_bytes: bytes,
         section_key: str = "unknown",
         section_description: str = "",
+        products: list[dict] | None = None,
+        brand_name: str | None = None,
     ) -> dict:
         """Vision 모델로 레이아웃 이미지에서 텍스트 배치 가능 영역을 추출한다."""
+        products_info = "No product information available."
+        if products:
+            info_lines = []
+            for i, p in enumerate(products):
+                raw_price = p.get("price", "")
+                # 가격 포맷팅: 숫자만 있으면 ₩ 포맷 적용
+                formatted_price = raw_price
+                price_digits = "".join(c for c in raw_price if c.isdigit())
+                if price_digits:
+                    formatted_price = f"₩{int(price_digits):,}"
+                line = f"  [{i}] {p['name']} (Price: {formatted_price})"
+                if p.get("description"):
+                    line += f" - {p['description']}"
+                info_lines.append(line)
+            products_info = "\n".join(info_lines)
+
         prompt = TEXT_ANALYSIS_PROMPT.format(
             section_key=section_key,
             section_description=section_description or section_key,
+            products_info=products_info,
+            brand_name=brand_name or "Premium Brand",
         )
 
         contents = [
@@ -325,11 +345,13 @@ class LayoutPipelineService:
                 section_context=section_context,
             )
 
-            # 2b. 텍스트 영역 추출
+            # 2b. 텍스트 영역 추출 (상품 정보 포함)
             text_positions = await self.extract_text_positions(
                 layout_image_bytes=layout_image_bytes,
                 section_key=section_key,
                 section_description=section_context,
+                products=section_products,
+                brand_name=brand_name,
             )
 
             section_results.append({

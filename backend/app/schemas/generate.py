@@ -33,6 +33,11 @@ class TextArea(BaseModel):
     recommended_font_color: str = "#000000"
     max_font_size: Optional[int] = None
     suitable_for: str  # "headline" | "subtext" | "label" | "description"
+    recommended_text: Optional[str] = None
+    text_align: str = "center"
+    font_weight: int = 500
+    letter_spacing: str = "0em"
+    font_size_vw: Optional[float] = None
 
 
 class SectionPlan(BaseModel):

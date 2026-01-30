@@ -44,16 +44,14 @@ This is a HERO BANNER layout for a luxury Korean department store (Shinsegae sty
 Section context: {section_context}
 
 Requirements:
-- Create a wide, cinematic composition featuring the product(s)
-- Strong visual impact with elegant styling
-- Leave LARGE clear areas for text overlay:
-  - Center or left-aligned area for main headline (large text)
-  - Sub-area for supporting copy
-  - Bottom strip for details/CTA
+- Create a wide, cinematic full-bleed composition featuring the product(s)
+- Strong visual impact with dramatic, editorial photography feel
+- The product should be the hero — place it boldly with natural breathing room around it
+- Use elegant negative space that naturally frames the product without feeling empty
+- Composition should feel like a high-end fashion magazine spread
 - DO NOT include any text, letters, numbers, or watermarks in the image
-- Style: dramatic, luxurious, editorial photography feel
 - Wide aspect ratio composition (16:9)
-- At least 40% of image area should be clean space for text overlay
+- Color palette: sophisticated tones that complement the product
 
 Product context: {product_info}
 Brand: {brand_name}
@@ -65,14 +63,14 @@ This is a SINGLE PRODUCT FEATURE layout for a luxury Korean department store (Sh
 Section context: {section_context}
 
 Requirements:
-- Place the provided product image prominently in the center or slightly off-center
-- Create an elegant, premium background that complements the product
-- Leave clear EMPTY SPACE areas for text overlay (top area for headline, bottom for price/details)
+- Place the product prominently — it is the star of this composition
+- Create an elegant, premium background that naturally complements the product
+- Use balanced composition with the product slightly off-center for visual interest
+- Natural negative space should flow around the product organically
 - DO NOT include any text, letters, numbers, or watermarks in the image
 - Style: clean, luxurious, minimal, high-end retail aesthetic
 - Color palette: sophisticated, muted tones with subtle gradients
 - Aspect ratio: 3:4 (portrait)
-- Ensure at least 30% of the image area is clean space suitable for text placement
 
 Product context: {product_info}
 Brand: {brand_name}
@@ -84,17 +82,14 @@ This is a PRODUCT GRID layout for a luxury Korean department store (Shinsegae st
 Section context: {section_context}
 
 Requirements:
-- Arrange product spaces in an elegant grid or balanced layout
-- Create a cohesive, premium background connecting all product areas
-- Leave clear EMPTY SPACE areas for text overlay:
-  - Top area for brand/headline text
-  - Near each product for product name and price
-  - Bottom area for additional information
+- Arrange products in an elegant, balanced layout with natural spacing between them
+- Create a cohesive, premium background that connects all product areas harmoniously
+- Products should feel curated — like a carefully styled editorial flat-lay or display
+- Allow natural breathing room between and around products
 - DO NOT include any text, letters, numbers, or watermarks
 - Style: clean, luxurious, balanced composition, high-end retail aesthetic
 - Aspect ratio: 4:3 (landscape)
 - Ensure harmonious visual flow between product areas
-- At least 25% of image area should be clean space for text
 
 Product context: {product_info}
 Brand: {brand_name}
@@ -106,16 +101,13 @@ This is a DETAIL INFO section for a luxury Korean department store (Shinsegae st
 Section context: {section_context}
 
 Requirements:
-- Show the product from a detailed angle or close-up view
-- Create elegant space for detailed product information
-- Leave MULTIPLE clear areas for text overlay:
-  - Title area for product name
-  - Multiple smaller areas for specifications, materials, features
-  - Description area for longer text
+- Show the product from a detailed angle or close-up view highlighting craftsmanship
+- Create an editorial-style composition that draws attention to product details
+- Use natural composition with the product positioned to allow informational space nearby
+- Background should be clean and premium, complementing the product's materials and colors
 - DO NOT include any text, letters, numbers, or watermarks
 - Style: informative yet luxurious, editorial product photography
 - Aspect ratio: 3:4 (portrait)
-- At least 35% of image area should be clean space for text placement
 
 Product context: {product_info}
 Brand: {brand_name}
@@ -127,16 +119,13 @@ This is a CTA FOOTER section for a luxury Korean department store (Shinsegae sty
 Section context: {section_context}
 
 Requirements:
-- Create a visually compelling footer that encourages action
-- Elegant, brand-consistent design with warm, inviting feel
-- Leave clear areas for text overlay:
-  - Central area for call-to-action message
-  - Sub-area for store/brand information
-  - Optional area for promotional details
+- Create a visually compelling footer with an elegant, brand-consistent aesthetic
+- Warm, inviting atmosphere that feels like the closing note of a luxury catalog
+- Use soft, sophisticated background with gentle gradients or textures
+- Composition should feel open and welcoming — like an invitation
 - DO NOT include any text, letters, numbers, or watermarks
 - Style: warm, inviting, premium retail aesthetic with strong visual closure
 - Wide aspect ratio (16:9)
-- At least 50% of image area should be clean space for text
 
 Product context: {product_info}
 Brand: {brand_name}

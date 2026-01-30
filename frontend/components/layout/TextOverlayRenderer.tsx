@@ -12,19 +12,28 @@ interface TextOverlayRendererProps {
   onTextChange?: (areaId: string, newText: string) => void;
 }
 
+function formatPrice(raw: string): string {
+  const digits = raw.replace(/[^\d]/g, "");
+  if (!digits) return raw;
+  return `₩${Number(digits).toLocaleString()}`;
+}
+
 function getTextForArea(
   area: TextArea,
   products: ProductInput[],
   brandName?: string
 ): string {
+  // AI가 생성한 텍스트가 있으면 우선 사용
+  if (area.recommended_text) return area.recommended_text;
+
+  // fallback: 기존 로직 + 가격 포맷팅
   switch (area.suitable_for) {
     case "headline":
       return brandName || "브랜드명";
     case "subtext":
-      // 첫 번째 매칭되는 상품명
-      return products[area.position - 2]?.name || products[0]?.name || "상품명";
+      return products[0]?.name || "상품명";
     case "label":
-      return products[area.position - 3]?.price || products[0]?.price || "가격";
+      return formatPrice(products[0]?.price || "가격");
     case "description":
       return products[0]?.description || "";
     default:
@@ -32,9 +41,18 @@ function getTextForArea(
   }
 }
 
-function getFontSize(area: TextArea): number {
-  if (area.max_font_size) return Math.min(area.max_font_size, 48);
-  switch (area.suitable_for) {
+function getFontSizeStyle(area: TextArea): string {
+  // AI가 vw 단위 크기를 지정한 경우 사용
+  if (area.font_size_vw) {
+    return `${area.font_size_vw}vw`;
+  }
+  // fallback: max_font_size 기반 clamp
+  const base = area.max_font_size || getFallbackFontSize(area.suitable_for);
+  return `clamp(10px, ${base * 0.5}px, ${base}px)`;
+}
+
+function getFallbackFontSize(suitableFor: string): number {
+  switch (suitableFor) {
     case "headline":
       return 36;
     case "subtext":
@@ -86,13 +104,24 @@ export function TextOverlayRenderer({
       {textAreas.map((area) => {
         const defaultText = getTextForArea(area, products, brandName);
         const displayText = textOverrides[area.id] || defaultText;
-        const fontSize = getFontSize(area);
+        const fontSize = getFontSizeStyle(area);
         const isEditing = editingId === area.id;
+
+        const textAlign = area.text_align || "center";
+        const fontWeight = area.font_weight || (area.suitable_for === "headline" ? 700 : 500);
+        const letterSpacing = area.letter_spacing || "0em";
+
+        const alignmentClass =
+          textAlign === "left"
+            ? "items-center justify-start text-left"
+            : textAlign === "right"
+              ? "items-center justify-end text-right"
+              : "items-center justify-center text-center";
 
         return (
           <div
             key={area.id}
-            className="absolute flex items-center justify-center"
+            className={`absolute flex ${alignmentClass}`}
             style={{
               left: `${area.bounds.x}%`,
               top: `${area.bounds.y}%`,
@@ -111,25 +140,31 @@ export function TextOverlayRenderer({
                     handleBlur(area.id, (e.target as HTMLInputElement).value);
                   }
                 }}
-                className="w-full h-full bg-white/80 text-center border border-accent rounded px-2 outline-none"
+                className="w-full h-full bg-white/80 border border-accent rounded px-2 outline-none"
                 style={{
-                  fontSize: `clamp(10px, ${fontSize * 0.5}px, ${fontSize}px)`,
+                  fontSize,
                   color: area.recommended_font_color,
+                  textAlign,
+                  fontWeight,
+                  letterSpacing,
                 }}
               />
             ) : (
               <span
-                className={`text-center leading-tight font-semibold ${
+                className={`leading-tight ${
                   editable ? "cursor-text hover:bg-white/20 rounded px-1 transition-colors" : ""
                 }`}
                 style={{
-                  fontSize: `clamp(10px, ${fontSize * 0.5}px, ${fontSize}px)`,
+                  fontSize,
                   color: area.recommended_font_color,
                   textShadow:
                     area.background_brightness === "dark"
                       ? "none"
                       : "0 1px 3px rgba(0,0,0,0.1)",
-                  fontWeight: area.suitable_for === "headline" ? 700 : 500,
+                  fontWeight,
+                  letterSpacing,
+                  textAlign,
+                  width: "100%",
                 }}
               >
                 {displayText}

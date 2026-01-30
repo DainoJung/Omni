@@ -23,7 +23,11 @@
       "Bash(python3:*)",
       "Bash(psql:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(lsof:*)",
+      "Bash(/Users/jungdain/Desktop/POP_maker/backend/.venv/bin/pip:*)",
+      "Bash(kill:*)"
     ]
   }
 }

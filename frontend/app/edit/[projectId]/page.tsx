@@ -183,26 +183,24 @@ export default function EditPage() {
             className="shadow-lg"
             style={{
               width: template.width,
-              minHeight: template.height,
               backgroundColor: template.styles.background_color,
               fontFamily: template.styles.font_family_body,
             }}
           >
             {/* Header section */}
             <div className="px-10 pt-10">
-              {/* Banner placeholder */}
-              <div
-                className="w-full bg-bg-tertiary rounded-sm flex items-center justify-center"
-                style={{ height: 400 }}
-              >
+              {/* Banner */}
+              <div className="w-full bg-bg-tertiary rounded-sm flex items-center justify-center overflow-hidden">
                 {content.images.banner ? (
                   <img
                     src={content.images.banner}
                     alt="배너"
-                    className="w-full h-full object-cover"
+                    className="w-full h-auto block"
                   />
                 ) : (
-                  <p className="text-text-tertiary text-sm">배너 이미지</p>
+                  <div className="w-full flex items-center justify-center" style={{ height: 400 }}>
+                    <p className="text-text-tertiary text-sm">배너 이미지</p>
+                  </div>
                 )}
               </div>
 
@@ -271,7 +269,7 @@ export default function EditPage() {
                         <img
                           src={content.images.products[i]}
                           alt={prod.name}
-                          className="w-full h-full object-cover"
+                          className="w-full h-full object-contain"
                         />
                       ) : (
                         <p className="text-xs text-text-tertiary">상품 {i + 1}</p>

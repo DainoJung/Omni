@@ -62,7 +62,8 @@ class ImageGenService:
         height: int = 400,
     ) -> bytes:
         """배너 이미지를 생성하고 PNG bytes를 반환한다."""
-        prompt = self._build_banner_prompt(brand_name, category, style_keywords)
+        aspect = self._describe_aspect_ratio(width, height)
+        prompt = self._build_banner_prompt(brand_name, category, style_keywords, aspect)
         return await self.generate_image(prompt)
 
     async def generate_product_image(
@@ -78,8 +79,24 @@ class ImageGenService:
         )
         return await self.generate_image(prompt)
 
+    def _describe_aspect_ratio(self, width: int, height: int) -> str:
+        """너비/높이로부터 프롬프트용 비율 설명을 생성한다."""
+        ratio = width / height
+        if ratio >= 2.0:
+            return "ultra-wide landscape (approximately 2:1 ratio)"
+        elif ratio >= 1.5:
+            return "wide landscape (approximately 16:9 ratio)"
+        elif ratio >= 1.2:
+            return "landscape (approximately 4:3 ratio)"
+        elif ratio >= 0.8:
+            return "square (1:1 ratio)"
+        elif ratio >= 0.6:
+            return "portrait (approximately 3:4 ratio)"
+        else:
+            return "tall portrait (approximately 9:16 ratio)"
+
     def _build_banner_prompt(
-        self, brand_name: str, category: str, keywords: list[str]
+        self, brand_name: str, category: str, keywords: list[str], aspect: str = ""
     ) -> str:
         category_styles = {
             "food": "warm lighting, appetizing, clean background, premium food photography",
@@ -90,10 +107,12 @@ class ImageGenService:
             category, "professional, clean, modern"
         )
         keyword_str = ", ".join(keywords) if keywords else ""
+        aspect_instruction = f" The image must be {aspect}." if aspect else ""
         return (
-            f"Create a wide promotional banner image for {brand_name} ({category}). "
-            f"Style: {base_style}, {keyword_str}. "
-            f"The image should be photorealistic, high quality, and contain absolutely no text or letters."
+            f"Create a promotional banner image for {brand_name} ({category}). "
+            f"Style: {base_style}, {keyword_str}.{aspect_instruction} "
+            f"The image should be photorealistic, high quality, fill the entire frame, "
+            f"and contain absolutely no text, letters, or watermarks."
         )
 
     def _build_product_prompt(
@@ -114,7 +133,9 @@ class ImageGenService:
         )
         keyword_str = ", ".join(keywords) if keywords else ""
         return (
-            f"Create a square product image of {product_name} by {brand_name}. "
+            f"Create a square (1:1 ratio) product image of {product_name} by {brand_name}. "
+            f"The product must be centered in a perfect square frame. "
             f"Style: {base_style}, {keyword_str}. "
-            f"The image should be photorealistic, centered, high quality, and contain absolutely no text or letters."
+            f"The image should be photorealistic, high quality, "
+            f"and contain absolutely no text, letters, or watermarks."
         )

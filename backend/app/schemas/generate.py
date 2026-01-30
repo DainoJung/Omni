@@ -38,6 +38,7 @@ class TextArea(BaseModel):
     font_weight: int = 500
     letter_spacing: str = "0em"
     font_size_vw: Optional[float] = None
+    font_family: Optional[str] = None
 
 
 class SectionPlan(BaseModel):

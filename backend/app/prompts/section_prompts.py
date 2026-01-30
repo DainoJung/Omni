@@ -17,6 +17,15 @@ Rules:
 - Each product should appear in at least one section
 - product_indices are 0-based indices into the products array
 
+For EACH section, also decide text overlay strategy:
+- "has_text_overlay": true or false — Some sections look better as pure visual imagery without text (e.g., a beautifully styled product_grid or atmospheric hero). Use false when the image alone conveys the message. Use true when text (brand name, price, CTA, description) adds value.
+- "typography_mood": When has_text_overlay is true, specify the typographic mood. Choose one:
+  - "luxury-serif": Elegant serif fonts (playfair, cormorant, libre-baskerville) — best for premium fashion, jewelry, beauty
+  - "modern-sans": Clean sans-serif fonts (montserrat, raleway) — best for contemporary, tech, lifestyle
+  - "impact-display": Bold display fonts (bebas-neue) — best for sales, bold headlines, CTA
+  - "classic-korean": Korean-optimized fonts (noto-sans-kr, noto-serif-kr) — best for Korean body text, traditional feel
+- "typography_mood" can be omitted or null when has_text_overlay is false.
+
 Input:
 - Product count: {product_count}
 - Brand name: {brand_name}
@@ -31,7 +40,18 @@ Respond ONLY with valid JSON:
       "title": "Section title for internal reference",
       "description": "Brief description of what this section should convey",
       "product_indices": [0],
-      "order": 0
+      "order": 0,
+      "has_text_overlay": true,
+      "typography_mood": "luxury-serif"
+    }},
+    {{
+      "section_key": "product_grid",
+      "title": "Product showcase",
+      "description": "Products displayed in elegant grid",
+      "product_indices": [0, 1],
+      "order": 1,
+      "has_text_overlay": false,
+      "typography_mood": null
     }}
   ]
 }}

@@ -63,6 +63,7 @@ export interface TextArea {
   font_weight?: number;
   letter_spacing?: string;
   font_size_vw?: number;
+  font_family?: string;
 }
 
 // === Multi-Section Types ===

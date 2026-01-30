@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import type { TextArea, ProductInput } from "@/types";
+import { resolveFontFamily, loadGoogleFont } from "@/lib/fonts";
 
 interface TextOverlayRendererProps {
   layoutImageUrl: string;
@@ -66,6 +67,57 @@ function getFallbackFontSize(suitableFor: string): number {
   }
 }
 
+/** 숨겨진 span으로 실제 텍스트 너비를 측정하여 input 크기를 맞추는 컴포넌트 */
+function AutoSizeInput({
+  defaultValue,
+  onCommit,
+  style,
+}: {
+  defaultValue: string;
+  onCommit: (text: string) => void;
+  style: React.CSSProperties;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const mirrorRef = useRef<HTMLSpanElement>(null);
+
+  const syncWidth = useCallback(() => {
+    if (inputRef.current && mirrorRef.current) {
+      mirrorRef.current.textContent = inputRef.current.value || "\u00A0";
+      inputRef.current.style.width = `${mirrorRef.current.offsetWidth + 4}px`;
+    }
+  }, []);
+
+  useEffect(() => {
+    syncWidth();
+    inputRef.current?.focus();
+    inputRef.current?.select();
+  }, [syncWidth]);
+
+  return (
+    <span className="relative inline-block">
+      {/* 측정용 숨겨진 span — input과 동일한 폰트 스타일 적용 */}
+      <span
+        ref={mirrorRef}
+        aria-hidden
+        className="invisible absolute whitespace-pre px-1"
+        style={style}
+      />
+      <input
+        ref={inputRef}
+        defaultValue={defaultValue}
+        onInput={syncWidth}
+        onBlur={(e) => onCommit(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") onCommit((e.target as HTMLInputElement).value);
+          if (e.key === "Escape") onCommit(defaultValue);
+        }}
+        className="bg-white/90 border border-accent/50 rounded px-1 outline-none"
+        style={{ ...style, maxWidth: "100%" }}
+      />
+    </span>
+  );
+}
+
 export function TextOverlayRenderer({
   layoutImageUrl,
   textAreas,
@@ -78,6 +130,18 @@ export function TextOverlayRenderer({
   const [textOverrides, setTextOverrides] = useState<Record<string, string>>(
     {}
   );
+
+  // 비큐레이션 폰트를 런타임에 로드
+  useEffect(() => {
+    textAreas.forEach((area) => {
+      if (area.font_family) {
+        const { needsLoad } = resolveFontFamily(area.font_family);
+        if (needsLoad) {
+          loadGoogleFont(area.font_family);
+        }
+      }
+    });
+  }, [textAreas]);
 
   const handleDoubleClick = (areaId: string) => {
     if (!editable) return;
@@ -110,6 +174,7 @@ export function TextOverlayRenderer({
         const textAlign = area.text_align || "center";
         const fontWeight = area.font_weight || (area.suitable_for === "headline" ? 700 : 500);
         const letterSpacing = area.letter_spacing || "0em";
+        const { css: fontFamily } = resolveFontFamily(area.font_family);
 
         const alignmentClass =
           textAlign === "left"
@@ -131,28 +196,22 @@ export function TextOverlayRenderer({
             onDoubleClick={() => handleDoubleClick(area.id)}
           >
             {isEditing ? (
-              <input
-                autoFocus
+              <AutoSizeInput
                 defaultValue={displayText}
-                onBlur={(e) => handleBlur(area.id, e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    handleBlur(area.id, (e.target as HTMLInputElement).value);
-                  }
-                }}
-                className="w-full h-full bg-white/80 border border-accent rounded px-2 outline-none"
+                onCommit={(text) => handleBlur(area.id, text)}
                 style={{
                   fontSize,
                   color: area.recommended_font_color,
                   textAlign,
                   fontWeight,
                   letterSpacing,
+                  fontFamily,
                 }}
               />
             ) : (
               <span
                 className={`leading-tight ${
-                  editable ? "cursor-text hover:bg-white/20 rounded px-1 transition-colors" : ""
+                  editable ? "cursor-text hover:outline hover:outline-1 hover:outline-white/50 rounded px-1 transition-all" : ""
                 }`}
                 style={{
                   fontSize,
@@ -163,8 +222,7 @@ export function TextOverlayRenderer({
                       : "0 1px 3px rgba(0,0,0,0.1)",
                   fontWeight,
                   letterSpacing,
-                  textAlign,
-                  width: "100%",
+                  fontFamily,
                 }}
               >
                 {displayText}

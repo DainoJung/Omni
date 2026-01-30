@@ -1,3 +1,4 @@
+import asyncio
 import json
 import base64
 import logging
@@ -82,6 +83,8 @@ class LayoutPipelineService:
                 "description": "브랜드와 대표 상품을 보여주는 히어로 배너",
                 "product_indices": [0],
                 "order": 0,
+                "has_text_overlay": True,
+                "typography_mood": "luxury-serif",
             },
         ]
 
@@ -92,6 +95,8 @@ class LayoutPipelineService:
                 "description": "상품을 집중 조명하는 피처 섹션",
                 "product_indices": [0],
                 "order": 1,
+                "has_text_overlay": True,
+                "typography_mood": "modern-sans",
             })
         elif product_count <= 3:
             sections.append({
@@ -100,6 +105,8 @@ class LayoutPipelineService:
                 "description": "전체 상품을 보여주는 그리드 레이아웃",
                 "product_indices": list(range(product_count)),
                 "order": 1,
+                "has_text_overlay": False,
+                "typography_mood": None,
             })
         else:
             sections.append({
@@ -108,6 +115,8 @@ class LayoutPipelineService:
                 "description": "주요 상품을 보여주는 그리드 레이아웃",
                 "product_indices": list(range(min(3, product_count))),
                 "order": 1,
+                "has_text_overlay": False,
+                "typography_mood": None,
             })
             sections.append({
                 "section_key": "detail_info",
@@ -115,6 +124,8 @@ class LayoutPipelineService:
                 "description": "대표 상품의 상세 정보",
                 "product_indices": [0],
                 "order": 2,
+                "has_text_overlay": True,
+                "typography_mood": "classic-korean",
             })
 
         sections.append({
@@ -123,6 +134,8 @@ class LayoutPipelineService:
             "description": "구매를 유도하는 CTA 푸터",
             "product_indices": [],
             "order": len(sections),
+            "has_text_overlay": True,
+            "typography_mood": "impact-display",
         })
 
         return sections
@@ -197,6 +210,7 @@ class LayoutPipelineService:
         section_description: str = "",
         products: list[dict] | None = None,
         brand_name: str | None = None,
+        typography_mood: str = "classic-korean",
     ) -> dict:
         """Vision 모델로 레이아웃 이미지에서 텍스트 배치 가능 영역을 추출한다."""
         products_info = "No product information available."
@@ -220,6 +234,7 @@ class LayoutPipelineService:
             section_description=section_description or section_key,
             products_info=products_info,
             brand_name=brand_name or "Premium Brand",
+            typography_mood=typography_mood,
         )
 
         contents = [
@@ -305,14 +320,12 @@ class LayoutPipelineService:
         page_plan = await self.plan_page_structure(products, brand_name, category)
         logger.info(f"페이지 구조 기획 완료: {len(page_plan)}개 섹션")
 
-        # 2. 각 섹션별 이미지 생성 + 텍스트 영역 추출
-        section_results = []
-        for plan in sorted(page_plan, key=lambda s: s["order"]):
+        # 2. 모든 섹션을 병렬로 이미지 생성 + 텍스트 영역 추출
+        async def _process_section(plan: dict) -> dict:
             section_key = plan["section_key"]
             metadata = SECTION_METADATA.get(section_key, {})
             aspect_ratio = metadata.get("aspect_ratio", "3:4")
 
-            # 해당 섹션에 배정된 상품 이미지 선택
             section_product_indices = plan.get("product_indices", [])
             section_products = [
                 products[i] for i in section_product_indices if i < len(products)
@@ -323,7 +336,6 @@ class LayoutPipelineService:
                 if i < len(product_image_bytes_list)
             ]
 
-            # 상품이 없으면 전체 상품/이미지 사용 (hero_banner, cta_footer 등)
             if not section_products:
                 section_products = products
             if not section_images:
@@ -332,11 +344,9 @@ class LayoutPipelineService:
             section_context = plan.get("description", "")
 
             logger.info(
-                f"섹션 {plan['order']}/{len(page_plan) - 1} 생성 중: {section_key} "
-                f"(상품 {len(section_products)}개)"
+                f"섹션 생성 시작: {section_key} (상품 {len(section_products)}개)"
             )
 
-            # 2a. 레이아웃 이미지 생성
             layout_image_bytes = await self.generate_layout_image(
                 section_key=section_key,
                 products=section_products,
@@ -345,25 +355,41 @@ class LayoutPipelineService:
                 section_context=section_context,
             )
 
-            # 2b. 텍스트 영역 추출 (상품 정보 포함)
-            text_positions = await self.extract_text_positions(
-                layout_image_bytes=layout_image_bytes,
-                section_key=section_key,
-                section_description=section_context,
-                products=section_products,
-                brand_name=brand_name,
-            )
+            # 기획 단계에서 텍스트 없음으로 결정된 섹션은 텍스트 추출 건너뜀
+            has_text = plan.get("has_text_overlay", True)
+            text_areas = []
+            if has_text:
+                typography_mood = plan.get("typography_mood") or "classic-korean"
+                text_positions = await self.extract_text_positions(
+                    layout_image_bytes=layout_image_bytes,
+                    section_key=section_key,
+                    section_description=section_context,
+                    products=section_products,
+                    brand_name=brand_name,
+                    typography_mood=typography_mood,
+                )
+                text_areas = text_positions.get("text_areas", [])
+            else:
+                logger.info(f"섹션 {section_key}: 텍스트 오버레이 없음 (기획 결정)")
 
-            section_results.append({
+            logger.info(f"섹션 생성 완료: {section_key}")
+            return {
                 "section_key": section_key,
                 "order": plan["order"],
                 "layout_image_bytes": layout_image_bytes,
-                "text_areas": text_positions.get("text_areas", []),
+                "text_areas": text_areas,
                 "aspect_ratio": aspect_ratio,
-            })
+            }
+
+        sorted_plans = sorted(page_plan, key=lambda s: s["order"])
+        section_results = await asyncio.gather(
+            *[_process_section(plan) for plan in sorted_plans]
+        )
+        # gather 결과를 order 순으로 정렬
+        section_results = sorted(section_results, key=lambda s: s["order"])
 
         return {
             "page_plan": page_plan,
-            "sections": section_results,
+            "sections": list(section_results),
             "products": products,
         }

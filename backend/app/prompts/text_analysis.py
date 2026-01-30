@@ -9,6 +9,14 @@ Product information:
 
 Brand: {brand_name}
 
+Typography mood for this section: {typography_mood}
+Use fonts that match this mood:
+- "luxury-serif": prefer playfair, cormorant, libre-baskerville
+- "modern-sans": prefer montserrat, raleway
+- "impact-display": prefer bebas-neue
+- "classic-korean": prefer noto-sans-kr, noto-serif-kr
+You may mix fonts within a section (e.g., headline in playfair + body in noto-sans-kr) for contrast.
+
 Analyze this promotional layout image and identify ALL areas where text can be placed.
 For each area, you must also GENERATE the actual display text and recommend typography styles.
 
@@ -36,6 +44,16 @@ For each text area, determine:
    - Headlines/brand names: wider (0.1em-0.2em) for luxury feel
    - Body text: normal (0em-0.02em)
 9. **font_size_vw**: Responsive font size in viewport width units (e.g., 3.5 for large headlines, 1.8 for subtext, 1.2 for labels)
+10. **font_family**: Font key for this text area. Choose from these curated fonts first:
+   - "noto-sans-kr": Clean Korean sans-serif (default body/UI)
+   - "noto-serif-kr": Korean serif (elegant body)
+   - "playfair": Luxury serif headlines
+   - "cormorant": Elegant serif headlines
+   - "montserrat": Modern sans-serif
+   - "raleway": Fashion/beauty sans-serif
+   - "libre-baskerville": Classic serif
+   - "bebas-neue": Bold impact display (all-caps)
+   Pick the font that best matches the section mood and text role. You may also specify any other Google Fonts name if none of the above fits.
 
 IMPORTANT RULES:
 - All coordinates are in PERCENTAGE (0-100), not pixels
@@ -62,7 +80,8 @@ Respond ONLY with valid JSON in this exact format:
       "text_align": "center",
       "font_weight": 700,
       "letter_spacing": "0.15em",
-      "font_size_vw": 3.5
+      "font_size_vw": 3.5,
+      "font_family": "playfair"
     }},
     {{
       "id": "area_2",
@@ -76,7 +95,8 @@ Respond ONLY with valid JSON in this exact format:
       "text_align": "left",
       "font_weight": 500,
       "letter_spacing": "0.05em",
-      "font_size_vw": 1.4
+      "font_size_vw": 1.4,
+      "font_family": "montserrat"
     }}
   ],
   "total_areas_found": 2,

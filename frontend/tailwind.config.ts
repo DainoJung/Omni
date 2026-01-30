@@ -45,6 +45,12 @@ const config: Config = {
       fontFamily: {
         serif: ["var(--font-noto-serif-kr)", "serif"],
         sans: ["var(--font-noto-sans-kr)", "sans-serif"],
+        playfair: ["var(--font-playfair)", "serif"],
+        cormorant: ["var(--font-cormorant)", "serif"],
+        montserrat: ["var(--font-montserrat)", "sans-serif"],
+        raleway: ["var(--font-raleway)", "sans-serif"],
+        "libre-baskerville": ["var(--font-libre-baskerville)", "serif"],
+        "bebas-neue": ["var(--font-bebas-neue)", "sans-serif"],
       },
       borderRadius: {
         sm: "6px",

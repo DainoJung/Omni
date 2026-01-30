@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from datetime import datetime
 
@@ -51,11 +52,8 @@ class GenerateOrchestrator:
                 category=category or project.get("category"),
             )
 
-            # 각 섹션 이미지를 개별적으로 Storage 업로드
-            section_results = []
-            sections_for_db = []
-
-            for section in result["sections"]:
+            # 각 섹션 이미지를 병렬로 Storage 업로드
+            async def _upload_section(section: dict) -> tuple[SectionResult, dict]:
                 section_key = section["section_key"]
                 order = section["order"]
 
@@ -67,7 +65,6 @@ class GenerateOrchestrator:
                 )
                 layout_image_url = self.storage.get_public_url(layout_path)
 
-                # SectionResult 구성
                 text_areas = [
                     TextArea(
                         id=ta["id"],
@@ -77,28 +74,34 @@ class GenerateOrchestrator:
                         recommended_font_color=ta.get("recommended_font_color", "#000000"),
                         max_font_size=ta.get("max_font_size"),
                         suitable_for=ta["suitable_for"],
+                        font_family=ta.get("font_family"),
                     )
                     for ta in section["text_areas"]
                 ]
 
-                section_results.append(
-                    SectionResult(
-                        section_key=section_key,
-                        order=order,
-                        layout_image_url=layout_image_url,
-                        text_areas=text_areas,
-                        aspect_ratio=section.get("aspect_ratio", "3:4"),
-                    )
+                sr = SectionResult(
+                    section_key=section_key,
+                    order=order,
+                    layout_image_url=layout_image_url,
+                    text_areas=text_areas,
+                    aspect_ratio=section.get("aspect_ratio", "3:4"),
                 )
 
-                # DB 저장용 dict
-                sections_for_db.append({
+                db_dict = {
                     "section_key": section_key,
                     "order": order,
                     "layout_image_url": layout_image_url,
                     "text_areas": [ta.model_dump() for ta in text_areas],
                     "aspect_ratio": section.get("aspect_ratio", "3:4"),
-                })
+                }
+
+                return sr, db_dict
+
+            upload_results = await asyncio.gather(
+                *[_upload_section(s) for s in result["sections"]]
+            )
+            section_results = [r[0] for r in upload_results]
+            sections_for_db = [r[1] for r in upload_results]
 
             # page_plan 구성
             page_plan = [
@@ -143,18 +146,21 @@ class GenerateOrchestrator:
             .execute()
         )
 
-        images_bytes = []
-        for record in result.data or []:
+        async def _download_one(record: dict) -> bytes | None:
             try:
                 public_url = self.storage.get_public_url(record["storage_path"])
                 async with httpx.AsyncClient(timeout=15.0) as client:
                     response = await client.get(public_url)
                     response.raise_for_status()
-                    images_bytes.append(response.content)
+                    return response.content
             except Exception as e:
                 logger.warning(f"상품 이미지 다운로드 실패: {e}")
+                return None
 
-        return images_bytes
+        results = await asyncio.gather(
+            *[_download_one(r) for r in (result.data or [])]
+        )
+        return [b for b in results if b is not None]
 
     def _get_project(self, project_id: str) -> dict:
         result = self.db.table("projects").select("*").eq("id", project_id).single().execute()

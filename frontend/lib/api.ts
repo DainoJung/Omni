@@ -2,13 +2,10 @@ import type {
   Project,
   ProjectCreate,
   ProjectUpdate,
-  Template,
-  GenerateResult,
+  LayoutGenerateResponse,
   ListResponse,
   ErrorResponse,
-  ColorPreset,
-  ToneMannerRequest,
-  ToneMannerResponse,
+  ProductInput,
 } from "@/types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -67,47 +64,21 @@ export const projectsApi = {
     request<void>(`/api/projects/${id}`, { method: "DELETE" }),
 };
 
-// === Templates ===
-export const templatesApi = {
-  list: (category?: string) => {
-    const query = category ? `?category=${category}` : "";
-    return request<ListResponse<Template>>(`/api/templates${query}`);
-  },
-
-  get: (id: string) => request<Template>(`/api/templates/${id}`),
-};
-
-// === Colors ===
-export const colorsApi = {
-  list: () => request<ListResponse<ColorPreset>>("/api/colors"),
-
-  get: (id: string) => request<ColorPreset>(`/api/colors/${id}`),
-};
-
-// === Tone & Manner ===
-export const toneMannerApi = {
-  recommend: (data: ToneMannerRequest) =>
-    request<ToneMannerResponse>("/api/tone-manner/recommend", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
-};
-
 // === Generate ===
 export const generateApi = {
-  generate: (
+  generateLayout: (
     projectId: string,
-    templateId: string,
-    colorPresetId?: string,
-    toneManner?: Record<string, unknown>
+    products: ProductInput[],
+    brandName?: string,
+    category?: string
   ) =>
-    request<GenerateResult>("/api/generate", {
+    request<LayoutGenerateResponse>("/api/generate/layout", {
       method: "POST",
       body: JSON.stringify({
         project_id: projectId,
-        template_id: templateId,
-        color_preset_id: colorPresetId || undefined,
-        tone_manner: toneManner || undefined,
+        products,
+        brand_name: brandName || undefined,
+        category: category || undefined,
       }),
     }),
 };

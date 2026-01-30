@@ -2,7 +2,6 @@
 export type ProjectStatus =
   | "draft"
   | "generating"
-  | "editing"
   | "completed"
   | "failed";
 
@@ -10,16 +9,11 @@ export interface Project {
   id: string;
   status: ProjectStatus;
   brand_name: string;
-  description: string;
+  description?: string;
   category?: string;
-  event_period_start?: string;
-  event_period_end?: string;
-  price_info?: string;
-  template_id?: string;
-  color_preset_id?: string;
-  tone_manner?: ToneManner;
-  generated_content?: GeneratedContent;
-  edit_history?: EditHistoryEntry[];
+  products?: ProductInput[];
+  input_data?: Record<string, unknown>;
+  pipeline_result?: PipelineResult;
   output_url?: string;
   created_at: string;
   updated_at: string;
@@ -27,98 +21,73 @@ export interface Project {
 
 export interface ProjectCreate {
   brand_name: string;
-  description: string;
+  description?: string;
   category?: string;
-  event_period_start?: string;
-  event_period_end?: string;
-  price_info?: string;
+  products?: ProductInput[];
 }
 
 export interface ProjectUpdate {
-  template_id?: string;
-  color_preset_id?: string;
-  tone_manner?: ToneManner;
-  generated_content?: GeneratedContent;
-  edit_history?: EditHistoryEntry[];
+  pipeline_result?: PipelineResult;
   status?: ProjectStatus;
   brand_name?: string;
   description?: string;
 }
 
-// === Template ===
-export interface Template {
-  id: string;
+// === Product ===
+export interface ProductInput {
   name: string;
-  category: string;
+  price: string;
+  description?: string;
+  image_id?: string;
+  image_url?: string;
+}
+
+// === Layout & Text Areas ===
+export interface TextAreaBounds {
+  x: number;
+  y: number;
   width: number;
   height: number;
-  thumbnail_url?: string;
-  structure: TemplateSection[];
-  styles: TemplateStyles;
-  is_active: boolean;
 }
 
-export interface TemplateSection {
+export interface TextArea {
   id: string;
-  type: string;
-  position: { y: number; height: number };
-  elements: TemplateElement[];
-  grid?: { columns: number; gap: number; padding: number };
+  position: number;
+  bounds: TextAreaBounds;
+  background_brightness?: string;
+  recommended_font_color: string;
+  max_font_size?: number;
+  suitable_for: "headline" | "subtext" | "label" | "description";
 }
 
-export interface TemplateElement {
-  type: string;
-  id: string;
-  editable: boolean;
-  position?: { x: number; y: number; w?: number; h?: number };
-  value?: string;
+// === Multi-Section Types ===
+export interface SectionPlan {
+  section_key: string;
+  title: string;
+  description: string;
+  product_indices: number[];
+  order: number;
 }
 
-export interface TemplateStyles {
-  background_color: string;
-  primary_color: string;
-  secondary_color: string;
-  accent_color: string;
-  text_color: string;
-  divider_color: string;
-  font_family_title: string;
-  font_family_body: string;
-  font_sizes: Record<string, number>;
-  letter_spacing?: Record<string, string>;
+export interface SectionResult {
+  section_key: string;
+  order: number;
+  layout_image_url: string;
+  text_areas: TextArea[];
+  aspect_ratio: string;
 }
 
-// === Generate ===
-export interface GeneratedContent {
-  texts: GeneratedTexts;
-  images: GeneratedImages;
+export interface PipelineResult {
+  sections: SectionResult[];
+  page_plan: SectionPlan[];
   generated_at: string;
 }
 
-export interface GeneratedTexts {
-  main_copy: string;
-  sub_copy: string;
-  body_texts: string[];
-  product_descriptions: ProductDescription[];
-  cta_text: string;
-  hashtags: string[];
-  benefits?: string[];
-}
-
-export interface ProductDescription {
-  name: string;
-  desc: string;
-}
-
-export interface GeneratedImages {
-  banner?: string;
-  background?: string;
-  products: string[];
-}
-
-export interface GenerateResult {
+export interface LayoutGenerateResponse {
   project_id: string;
-  texts: GeneratedTexts;
-  images: GeneratedImages;
+  sections: SectionResult[];
+  page_plan: SectionPlan[];
+  products: ProductInput[];
   generated_at: string;
 }
 
@@ -151,36 +120,4 @@ export interface ErrorResponse {
   error: string;
   message: string;
   detail?: string;
-}
-
-// === Color Presets ===
-export interface ColorPreset {
-  id: string;
-  name: string;
-  primary_color: string;
-  secondary_color: string;
-  accent_color: string;
-  background_color: string;
-  text_color: string;
-  category: string;
-  created_at: string;
-}
-
-// === Tone & Manner ===
-export interface ToneManner {
-  style: string;
-  mood: string;
-  description: string;
-  keywords: string[];
-}
-
-export interface ToneMannerRequest {
-  brand_name: string;
-  category?: string;
-  product_name?: string;
-  color_preset_id?: string;
-}
-
-export interface ToneMannerResponse {
-  recommendations: ToneManner[];
 }

@@ -12,7 +12,8 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str = ""
     GEMINI_MODEL: str = "gemini-2.5-flash"
     GEMINI_MAX_TOKENS: int = 2048
-    IMAGE_GEN_MODEL: str = "gemini-2.5-flash-image"
+    IMAGE_GEN_MODEL: str = "gemini-2.0-flash-preview-image-generation"
+    VISION_MODEL: str = "gemini-2.5-pro"
 
     # App
     BACKEND_HOST: str = "0.0.0.0"

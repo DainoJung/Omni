@@ -8,6 +8,7 @@ import { ProgressBar } from "@/components/ui/ProgressBar";
 import { Check, Loader2, Clock } from "lucide-react";
 import { generateApi, projectsApi } from "@/lib/api";
 import { toast } from "sonner";
+import type { ProductInput } from "@/types";
 
 type StepStatus = "pending" | "running" | "done";
 
@@ -19,63 +20,67 @@ export default function GeneratePage() {
   const [steps, setSteps] = useState<
     { label: string; status: StepStatus }[]
   >([
-    { label: "텍스트 생성", status: "pending" },
-    { label: "이미지 생성", status: "pending" },
-    { label: "레이아웃 합성", status: "pending" },
+    { label: "입력 분석", status: "pending" },
+    { label: "페이지 구조 기획", status: "pending" },
+    { label: "섹션별 이미지 생성", status: "pending" },
+    { label: "텍스트 영역 분석", status: "pending" },
   ]);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
+  const updateStep = (index: number, status: StepStatus) => {
+    setSteps((s) =>
+      s.map((st, i) => (i === index ? { ...st, status } : st))
+    );
+  };
+
   useEffect(() => {
     async function run() {
       try {
-        // 프로젝트 조회하여 template_id 가져오기
+        // 프로젝트 조회
         const project = await projectsApi.get(projectId);
-        if (!project.template_id) {
-          toast.error("템플릿이 선택되지 않았습니다.");
-          router.push(`/create/template?projectId=${projectId}`);
-          return;
-        }
 
-        // Step 1: 텍스트 생성
-        setSteps((s) =>
-          s.map((st, i) => (i === 0 ? { ...st, status: "running" } : st))
-        );
+        // 상품 정보 구성
+        const products: ProductInput[] = project.products || [
+          { name: project.brand_name, price: "" },
+        ];
+
+        // Step 1: 입력 분석
+        updateStep(0, "running");
+        setProgress(10);
+        await new Promise((r) => setTimeout(r, 500));
+        updateStep(0, "done");
         setProgress(15);
 
-        // 실제 생성 호출 (스타일 정보 포함)
-        await generateApi.generate(
+        // Step 2: 페이지 구조 기획
+        updateStep(1, "running");
+        setProgress(20);
+
+        // Step 3 & 4: 실제 API 호출 (서버에서 기획 + 생성 + 분석 모두 처리)
+        updateStep(2, "running");
+        setProgress(30);
+
+        const result = await generateApi.generateLayout(
           projectId,
-          project.template_id,
-          project.color_preset_id || undefined,
-          project.tone_manner || undefined
+          products,
+          project.brand_name,
+          project.category || undefined
         );
 
-        // Step 1 완료
-        setSteps((s) =>
-          s.map((st, i) => (i === 0 ? { ...st, status: "done" } : st))
-        );
-        setProgress(40);
+        updateStep(1, "done");
+        updateStep(2, "done");
+        setProgress(85);
 
-        // Step 2: 이미지 생성 (서버에서 함께 처리됨)
-        setSteps((s) =>
-          s.map((st, i) =>
-            i === 1 ? { ...st, status: "done" } : st
-          )
-        );
-        setProgress(75);
-
-        // Step 3: 레이아웃 합성
-        setSteps((s) =>
-          s.map((st, i) =>
-            i === 2 ? { ...st, status: "done" } : st
-          )
-        );
+        // Step 4: 텍스트 영역 분석 완료
+        updateStep(3, "running");
+        setProgress(90);
+        await new Promise((r) => setTimeout(r, 500));
+        updateStep(3, "done");
         setProgress(100);
 
-        // 편집 페이지로 이동
+        // 결과 페이지로 이동
         setTimeout(() => {
-          router.push(`/edit/${projectId}`);
+          router.push(`/result/${projectId}`);
         }, 800);
       } catch (err) {
         setError(
@@ -102,12 +107,12 @@ export default function GeneratePage() {
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
-      <StepIndicator currentStep={4} />
+      <StepIndicator currentStep={2} />
 
       <main className="flex-1 flex items-center justify-center">
         <div className="w-full max-w-[400px] text-center space-y-8">
           <h2 className="text-xl font-bold">
-            {error ? "생성 실패" : "AI가 상세페이지를 만들고 있습니다"}
+            {error ? "생성 실패" : "AI가 멀티 섹션 페이지를 만들고 있습니다"}
           </h2>
 
           {!error && (

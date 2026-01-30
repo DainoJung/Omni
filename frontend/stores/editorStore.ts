@@ -1,15 +1,14 @@
 import { create } from "zustand";
-import type { GeneratedContent, EditHistoryEntry } from "@/types";
+import type { PipelineResult, TextArea } from "@/types";
 
 interface EditorState {
-  content: GeneratedContent | null;
-  history: GeneratedContent[];
+  result: PipelineResult | null;
+  history: PipelineResult[];
   historyIndex: number;
 
   // Actions
-  setContent: (content: GeneratedContent) => void;
-  updateText: (field: string, value: string) => void;
-  updateImage: (field: string, storagePath: string) => void;
+  setResult: (result: PipelineResult) => void;
+  updateTextArea: (sectionOrder: number, areaId: string, updates: Partial<TextArea>) => void;
   undo: () => void;
   redo: () => void;
   canUndo: () => boolean;
@@ -17,53 +16,42 @@ interface EditorState {
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
-  content: null,
+  result: null,
   history: [],
   historyIndex: -1,
 
-  setContent: (content) => {
+  setResult: (result) => {
     set({
-      content,
-      history: [content],
+      result,
+      history: [result],
       historyIndex: 0,
     });
   },
 
-  updateText: (field, value) => {
-    const { content, history, historyIndex } = get();
-    if (!content) return;
+  updateTextArea: (sectionOrder, areaId, updates) => {
+    const { result, history, historyIndex } = get();
+    if (!result) return;
 
-    const newTexts = { ...content.texts, [field]: value };
-    const newContent: GeneratedContent = {
-      ...content,
-      texts: newTexts,
-    };
-
-    const newHistory = history.slice(0, historyIndex + 1);
-    newHistory.push(newContent);
-
-    set({
-      content: newContent,
-      history: newHistory,
-      historyIndex: newHistory.length - 1,
+    const newSections = result.sections.map((section) => {
+      if (section.order !== sectionOrder) return section;
+      return {
+        ...section,
+        text_areas: section.text_areas.map((ta) =>
+          ta.id === areaId ? { ...ta, ...updates } : ta
+        ),
+      };
     });
-  },
 
-  updateImage: (field, storagePath) => {
-    const { content, history, historyIndex } = get();
-    if (!content) return;
-
-    const newImages = { ...content.images, [field]: storagePath };
-    const newContent: GeneratedContent = {
-      ...content,
-      images: newImages,
+    const newResult: PipelineResult = {
+      ...result,
+      sections: newSections,
     };
 
     const newHistory = history.slice(0, historyIndex + 1);
-    newHistory.push(newContent);
+    newHistory.push(newResult);
 
     set({
-      content: newContent,
+      result: newResult,
       history: newHistory,
       historyIndex: newHistory.length - 1,
     });
@@ -75,7 +63,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
     const newIndex = historyIndex - 1;
     set({
-      content: history[newIndex],
+      result: history[newIndex],
       historyIndex: newIndex,
     });
   },
@@ -86,7 +74,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
     const newIndex = historyIndex + 1;
     set({
-      content: history[newIndex],
+      result: history[newIndex],
       historyIndex: newIndex,
     });
   },

@@ -1,69 +1,62 @@
-from pydantic import BaseModel
-from typing import Optional, List, Dict
+from pydantic import BaseModel, Field
+from typing import Optional, List
 from uuid import UUID
 from datetime import datetime
 
 
-class GenerateRequest(BaseModel):
+class ProductInput(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+    price: str = Field(..., min_length=1, max_length=50)
+    description: Optional[str] = Field(None, max_length=500)
+    image_id: Optional[str] = None
+
+
+class LayoutGenerateRequest(BaseModel):
     project_id: UUID
-    template_id: UUID
-    color_preset_id: Optional[UUID] = None
-    tone_manner: Optional[Dict] = None
-
-
-class GeneratedTexts(BaseModel):
-    main_copy: str
-    sub_copy: str
-    body_texts: List[str]
-    product_descriptions: List[Dict[str, str]]
-    cta_text: str
-    hashtags: List[str]
-    benefits: Optional[List[str]] = None
-
-
-class GeneratedImages(BaseModel):
-    banner: Optional[str] = None
-    background: Optional[str] = None
-    products: List[str] = []
-
-
-class GenerateResult(BaseModel):
-    project_id: UUID
-    texts: GeneratedTexts
-    images: GeneratedImages
-    generated_at: datetime
-
-
-class TextGenRequest(BaseModel):
-    project_id: UUID
-    template_id: UUID
-    brand_name: str
-    description: str
+    products: List[ProductInput] = Field(..., min_length=1, max_length=6)
+    brand_name: Optional[str] = None
     category: Optional[str] = None
-    event_period: Optional[str] = None
 
 
-class TextGenResult(BaseModel):
+class TextAreaBounds(BaseModel):
+    x: float = Field(..., ge=0, le=100, description="X position in %")
+    y: float = Field(..., ge=0, le=100, description="Y position in %")
+    width: float = Field(..., gt=0, le=100, description="Width in %")
+    height: float = Field(..., gt=0, le=100, description="Height in %")
+
+
+class TextArea(BaseModel):
+    id: str
+    position: int
+    bounds: TextAreaBounds
+    background_brightness: Optional[str] = None  # "light" | "dark"
+    recommended_font_color: str = "#000000"
+    max_font_size: Optional[int] = None
+    suitable_for: str  # "headline" | "subtext" | "label" | "description"
+
+
+class SectionPlan(BaseModel):
+    section_key: str
+    title: str
+    description: str
+    product_indices: List[int] = Field(default_factory=list)
+    order: int
+
+
+class SectionResult(BaseModel):
+    section_key: str
+    order: int
+    layout_image_url: str
+    text_areas: List[TextArea]
+    aspect_ratio: str = "3:4"
+
+
+class LayoutGenerateResponse(BaseModel):
     project_id: UUID
-    texts: GeneratedTexts
-    model_used: str
-    token_usage: dict
-
-
-class ImageGenRequest(BaseModel):
-    project_id: UUID
-    prompt: str
-    width: int = 860
-    height: int = 400
-    style: str = "commercial"
-
-
-class ImageGenResult(BaseModel):
-    project_id: UUID
-    storage_path: str
-    width: int
-    height: int
-    file_size_bytes: int
+    sections: List[SectionResult]
+    page_plan: List[SectionPlan]
+    products: List[ProductInput]
+    generated_at: datetime
 
 
 class UploadResult(BaseModel):

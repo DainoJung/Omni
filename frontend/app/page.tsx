@@ -18,9 +18,8 @@ const STATUS_LABEL: Record<string, { text: string; className: string }> = {
 };
 
 function getNextPath(project: Project): string {
-  if (project.generated_content) return `/edit/${project.id}`;
-  if (project.template_id) return `/style/${project.id}`;
-  return `/create/template?projectId=${project.id}`;
+  if (project.pipeline_result) return `/result/${project.id}`;
+  return `/generate/${project.id}`;
 }
 
 export default function HomePage() {

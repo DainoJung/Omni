@@ -27,7 +27,14 @@
       "Bash(git push:*)",
       "Bash(lsof:*)",
       "Bash(/Users/jungdain/Desktop/POP_maker/backend/.venv/bin/pip:*)",
-      "Bash(kill:*)"
+      "Bash(kill:*)",
+      "Bash(wc:*)",
+      "Bash(ls:*)",
+      "Bash(pip install \"google-genai>=1.0.0\")",
+      "mcp__supabase__list_projects",
+      "mcp__supabase__list_tables",
+      "mcp__supabase__apply_migration",
+      "Bash(npx tsc:*)"
     ]
   }
 }

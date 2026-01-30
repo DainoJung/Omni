@@ -16,12 +16,6 @@ router = APIRouter()
 async def create_project(data: ProjectCreate):
     db = get_supabase()
     insert_data = data.model_dump(exclude_none=True)
-
-    # date → string 변환
-    for key in ("event_period_start", "event_period_end"):
-        if key in insert_data and insert_data[key] is not None:
-            insert_data[key] = insert_data[key].isoformat()
-
     result = db.table("projects").insert(insert_data).execute()
     if not result.data:
         raise HTTPException(status_code=500, detail="프로젝트 생성 실패")
@@ -49,12 +43,6 @@ async def get_project(project_id: UUID):
 async def update_project(project_id: UUID, data: ProjectUpdate):
     db = get_supabase()
     update_data = data.model_dump(exclude_none=True)
-
-    # UUID → string 변환 (JSON 직렬화 호환)
-    for key in ("template_id", "color_preset_id"):
-        if key in update_data and update_data[key] is not None:
-            update_data[key] = str(update_data[key])
-
     result = (
         db.table("projects")
         .update(update_data)

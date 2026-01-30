@@ -4,10 +4,8 @@ import { Check } from "lucide-react";
 
 const STEPS = [
   { id: 1, label: "입력" },
-  { id: 2, label: "템플릿" },
-  { id: 3, label: "스타일" },
-  { id: 4, label: "생성" },
-  { id: 5, label: "편집" },
+  { id: 2, label: "생성" },
+  { id: 3, label: "결과" },
 ];
 
 interface StepIndicatorProps {

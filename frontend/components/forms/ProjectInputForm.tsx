@@ -4,10 +4,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { ThemeSelector } from "./ThemeSelector";
+import { TemplateSelector } from "./TemplateSelector";
 import { projectsApi, uploadApi } from "@/lib/api";
 import { toast } from "sonner";
 import { Plus, Trash2, Upload, X } from "lucide-react";
 import { useDropzone } from "react-dropzone";
+import type { SectionType } from "@/types";
 
 interface ProductEntry {
   name: string;
@@ -76,6 +78,12 @@ export function ProjectInputForm() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [theme, setTheme] = useState("");
+  const [selectedSections, setSelectedSections] = useState<SectionType[]>([
+    "hero_banner",
+    "feature_badges",
+    "description",
+    "feature_point",
+  ]);
   const [products, setProducts] = useState<ProductEntry[]>([
     { name: "", price: "", image: null, imagePreview: null },
   ]);
@@ -117,6 +125,7 @@ export function ProjectInputForm() {
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
     if (!theme) newErrors.theme = "테마를 선택하세요.";
+    if (selectedSections.length === 0) newErrors.template = "최소 1개 섹션을 선택하세요.";
 
     products.forEach((p, i) => {
       if (!p.name.trim()) newErrors[`product_${i}_name`] = "제품명을 입력하세요.";
@@ -141,6 +150,7 @@ export function ProjectInputForm() {
           price: p.price,
         })),
         theme,
+        selected_sections: selectedSections,
       });
 
       // 2. 각 상품 이미지 업로드
@@ -265,6 +275,13 @@ export function ProjectInputForm() {
           </button>
         )}
       </div>
+
+      {/* 템플릿 & 섹션 구성 */}
+      <TemplateSelector
+        selectedSections={selectedSections}
+        onChange={setSelectedSections}
+        error={errors.template}
+      />
 
       <div className="pt-4">
         <Button type="submit" size="lg" loading={loading} className="w-full">

@@ -117,31 +117,78 @@ async def generate_section_image(
     raise RuntimeError(f"섹션 이미지 생성 실패 ({section_type}): {max_retries + 1}회 시도 후 실패")
 
 
+_SECTION_TEXT_KEYS: dict[str, list[tuple[str, str]]] = {
+    "hero_banner": [
+        ("category", "10자 이내 카테고리명, 예: Premium, Best Choice"),
+        ("title", "15자 이내 임팩트 있는 메인 타이틀"),
+        ("subtitle", "25자 이내 보조 문구"),
+    ],
+    "feature_badges": [
+        ("badge_1", "4자 이내 줄바꿈 포함, 예: 최상급\\n한우"),
+        ("badge_2", "4자 이내 줄바꿈 포함, 예: 특수진공\\n포장"),
+        ("badge_3", "4자 이내 줄바꿈 포함, 예: 이력추적\\n가능"),
+    ],
+    "description": [
+        ("desc_title_main", "10자 이내 설명 제목 첫째줄"),
+        ("desc_title_accent", "15자 이내 설명 제목 강조"),
+        ("desc_body", "80자 이내 상세 설명, 줄바꿈 가능"),
+        ("hashtags", '["#태그1", "#태그2", "#태그3", "#태그4"]'),
+    ],
+    "feature_point": [
+        ("point_label", "8자 이내, 예: Point 1"),
+        ("point_title_main", "10자 이내 포인트 제목"),
+        ("point_title_accent", "10자 이내 포인트 강조"),
+        ("point_body", "60자 이내 포인트 설명"),
+    ],
+}
+
+
+def _build_text_prompt_schema(section_counts: dict[str, int] | None) -> str:
+    """section_counts를 기반으로 JSON 스키마 문자열을 생성한다.
+
+    중복 섹션이 있으면 인덱스 접미사를 붙인다:
+    - 1개: "point_label": "..."
+    - 3개: "point_label__0": "...", "point_label__1": "...", "point_label__2": "..."
+    """
+    counts = section_counts or {k: 1 for k in _SECTION_TEXT_KEYS}
+    lines = []
+    for sec_type, keys in _SECTION_TEXT_KEYS.items():
+        n = counts.get(sec_type, 0)
+        if n == 0:
+            continue
+        if n == 1:
+            for key, desc in keys:
+                if key == "hashtags":
+                    lines.append(f'  "hashtags": {desc}')
+                else:
+                    lines.append(f'  "{key}": "({desc})"')
+        else:
+            for idx in range(n):
+                for key, desc in keys:
+                    suffixed = f"{key}__{idx}"
+                    if key == "hashtags":
+                        lines.append(f'  "{suffixed}": {desc}')
+                    else:
+                        lines.append(
+                            f'  "{suffixed}": "({desc} — {idx + 1}번째, 서로 다른 내용)"'
+                        )
+    return "{\n" + ",\n".join(lines) + "\n}"
+
+
 async def generate_section_texts(
     product_names: list[str],
     theme_name: str,
     copy_keywords: list[str],
+    section_counts: dict[str, int] | None = None,
 ) -> dict:
     """Gemini 1회 호출로 전 섹션 텍스트를 JSON으로 생성한다.
 
-    v5.2 placeholder 이름 기준 반환:
-    {
-        "category": "...",
-        "title": "...",
-        "subtitle": "...",
-        "badge_1": "...", "badge_2": "...", "badge_3": "...",
-        "desc_title_main": "...",
-        "desc_title_accent": "...",
-        "desc_body": "...",
-        "hashtags": ["#태그1", "#태그2", ...],
-        "point_label": "...",
-        "point_title_main": "...",
-        "point_title_accent": "...",
-        "point_body": "..."
-    }
+    section_counts가 주어지면 중복 섹션에 대해 인덱스된 키를 생성한다.
+    예: feature_point 3개 → point_label__0, point_label__1, point_label__2
     """
     products_str = ", ".join(product_names)
     keywords_str = ", ".join(copy_keywords)
+    schema = _build_text_prompt_schema(section_counts)
 
     prompt = (
         f"당신은 한국 이커머스 PDP(상품 상세 페이지) 카피라이터입니다.\n"
@@ -150,23 +197,9 @@ async def generate_section_texts(
         f"- 상품: {products_str}\n"
         f"- 테마: {theme_name}\n"
         f"- 키워드: {keywords_str}\n\n"
+        f"중요: 같은 섹션이 여러 개인 경우 각각 서로 다른 관점/내용으로 작성하세요.\n\n"
         f"반드시 아래 JSON 형식으로만 출력하세요 (설명 없이 JSON만):\n"
-        f'{{\n'
-        f'  "category": "(10자 이내 카테고리명, 예: Premium, Best Choice)",\n'
-        f'  "title": "(15자 이내 임팩트 있는 메인 타이틀)",\n'
-        f'  "subtitle": "(25자 이내 보조 문구)",\n'
-        f'  "badge_1": "(4자 이내 줄바꿈 포함, 예: 최상급\\n한우)",\n'
-        f'  "badge_2": "(4자 이내 줄바꿈 포함, 예: 특수진공\\n포장)",\n'
-        f'  "badge_3": "(4자 이내 줄바꿈 포함, 예: 이력추적\\n가능)",\n'
-        f'  "desc_title_main": "(10자 이내 설명 제목 첫째줄)",\n'
-        f'  "desc_title_accent": "(15자 이내 설명 제목 강조)",\n'
-        f'  "desc_body": "(80자 이내 상세 설명, 줄바꿈 가능)",\n'
-        f'  "hashtags": ["#태그1", "#태그2", "#태그3", "#태그4"],\n'
-        f'  "point_label": "(8자 이내, 예: Point 1)",\n'
-        f'  "point_title_main": "(10자 이내 포인트 제목)",\n'
-        f'  "point_title_accent": "(10자 이내 포인트 강조)",\n'
-        f'  "point_body": "(60자 이내 포인트 설명)"\n'
-        f'}}'
+        f"{schema}"
     )
 
     max_retries = 2

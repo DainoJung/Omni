@@ -17,6 +17,7 @@ class ProjectStatus(str, Enum):
 class ProjectCreate(BaseModel):
     products: List[ProductInput] = Field(..., min_length=1, max_length=6)
     theme: str = Field(..., min_length=1, max_length=50)
+    selected_sections: Optional[List[str]] = None
 
 
 class ProjectUpdate(BaseModel):
@@ -36,6 +37,7 @@ class ProjectResponse(BaseModel):
     theme_id: Optional[str] = None
     template_used: Optional[str] = None
     products: Optional[List[dict]] = None
+    selected_sections: Optional[List[str]] = None
     rendered_sections: Optional[List[dict]] = None
     generated_data: Optional[dict] = None
     input_data: Optional[dict] = None

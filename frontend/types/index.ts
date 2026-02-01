@@ -40,6 +40,7 @@ export interface Project {
   theme_id?: string;
   template_used?: string;
   products?: ProductInput[];
+  selected_sections?: SectionType[];
   rendered_sections?: RenderedSection[];
   generated_data?: GeneratedData;
   input_data?: Record<string, unknown>;
@@ -60,6 +61,7 @@ export interface GeneratedData {
 export interface ProjectCreate {
   products: ProductInput[];
   theme: string;
+  selected_sections?: SectionType[];
 }
 
 export interface ProjectUpdate {

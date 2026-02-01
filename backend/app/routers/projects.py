@@ -19,6 +19,7 @@ async def create_project(data: ProjectCreate):
     insert_data = {
         "products": [p.model_dump() for p in data.products],
         "theme_id": data.theme,
+        "selected_sections": data.selected_sections,
     }
     result = db.table("projects").insert(insert_data).execute()
     if not result.data:

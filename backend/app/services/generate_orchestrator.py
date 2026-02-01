@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+from collections import Counter
 from datetime import datetime
 
 import httpx
@@ -40,8 +41,9 @@ class GenerateOrchestrator:
             # 1. 테마 정보 조회
             theme = get_theme(theme_id)
 
-            # 2. 4개 섹션 템플릿 조회
-            section_templates = compose_sections()
+            # 2. 선택된 섹션 템플릿 조회
+            selected_sections = self._get_selected_sections(project_id)
+            section_templates = compose_sections(selected_sections)
 
             # 3. 상품 이미지 URL 수집 + 참조 이미지 다운로드
             product_image_urls = await self._get_product_image_urls(project_id)
@@ -50,22 +52,40 @@ class GenerateOrchestrator:
             # 4. 텍스트 생성 (이미지와 병렬 불가 — rate limit)
             product_names = [p["name"] for p in products]
 
+            # 섹션 타입별 인스턴스 수 집계 (중복 섹션 지원)
+            section_counts = dict(Counter(
+                st["section_type"] for st in section_templates
+            ))
+
             section_texts = await generate_section_texts(
                 product_names=product_names,
                 theme_name=theme["name"],
                 copy_keywords=theme["copy_keywords"],
+                section_counts=section_counts,
             )
 
-            # 5. 섹션 이미지 3장 순차 생성 (rate limit 방지)
-            image_specs = [
-                ("hero_banner", 860, 1400, "hero_image.png"),
-                ("description", 600, 600, "desc_section_image.png"),
-                ("feature_point", 860, 957, "point_section_image.png"),
-            ]
+            # 5. 섹션 이미지 순차 생성 (인스턴스별 개별 이미지)
+            image_size_map = {
+                "hero_banner": (860, 1400),
+                "description": (600, 600),
+                "feature_point": (860, 957),
+            }
 
+            # 키: "타입__인스턴스인덱스" (중복) 또는 "타입" (단일)
             section_image_urls: dict[str, str] = {}
-            for sec_type, w, h, filename in image_specs:
-                logger.info(f"{sec_type} 이미지 생성 시작")
+            image_instance_counter: dict[str, int] = {}
+            for st in section_templates:
+                sec_type = st["section_type"]
+                if sec_type not in image_size_map:
+                    continue
+                inst_idx = image_instance_counter.get(sec_type, 0)
+                image_instance_counter[sec_type] = inst_idx + 1
+
+                is_duplicate = section_counts.get(sec_type, 1) > 1
+                w, h = image_size_map[sec_type]
+                filename = f"{sec_type}_{inst_idx}.png" if is_duplicate else f"{sec_type}.png"
+
+                logger.info(f"{sec_type} 이미지 생성 시작 (인스턴스 {inst_idx})")
                 image_bytes = await generate_section_image(
                     product_names=product_names,
                     section_type=sec_type,
@@ -80,17 +100,27 @@ class GenerateOrchestrator:
                     image_type="generated",
                     filename=filename,
                 )
-                section_image_urls[sec_type] = self.storage.get_public_url(path)
+                url = self.storage.get_public_url(path)
+                if is_duplicate:
+                    section_image_urls[f"{sec_type}__{inst_idx}"] = url
+                else:
+                    section_image_urls[sec_type] = url
 
             # 6. 각 섹션 데이터 바인딩 + 렌더링
             rendered_sections = []
+            instance_counter: dict[str, int] = {}
             for i, st in enumerate(section_templates):
+                sec_type = st["section_type"]
+                inst_idx = instance_counter.get(sec_type, 0)
+                instance_counter[sec_type] = inst_idx + 1
+
                 data = bind_section_data(
                     section_template=st,
                     section_texts=section_texts,
                     theme=theme,
                     product_image_urls=product_image_urls,
                     section_image_urls=section_image_urls,
+                    instance_index=inst_idx if section_counts.get(sec_type, 1) > 1 else None,
                 )
                 section = render_section(
                     section_template=st,
@@ -169,6 +199,19 @@ class GenerateOrchestrator:
         except Exception as e:
             logger.warning(f"참조 이미지 다운로드 실패, 텍스트 기반 생성으로 대체: {e}")
             return None, None
+
+    def _get_selected_sections(self, project_id: str) -> list[str] | None:
+        """프로젝트에 저장된 selected_sections를 반환한다."""
+        result = (
+            self.db.table("projects")
+            .select("selected_sections")
+            .eq("id", project_id)
+            .single()
+            .execute()
+        )
+        if result.data:
+            return result.data.get("selected_sections")
+        return None
 
     def _update_status(self, project_id: str, status: str) -> None:
         self.db.table("projects").update({"status": status}).eq("id", project_id).execute()

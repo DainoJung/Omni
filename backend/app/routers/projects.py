@@ -1,5 +1,8 @@
+import logging
 from fastapi import APIRouter, HTTPException
 from uuid import UUID
+
+logger = logging.getLogger(__name__)
 
 from app.database import get_supabase
 from app.schemas.project import (
@@ -8,7 +11,10 @@ from app.schemas.project import (
     ProjectResponse,
     ProjectListResponse,
     SectionDataUpdateRequest,
+    ImageRegenerateRequest,
 )
+from app.services.template_ai_service import generate_section_image
+from app.services.storage_service import StorageService
 
 router = APIRouter()
 
@@ -62,6 +68,7 @@ async def update_project(project_id: UUID, data: ProjectUpdate):
 @router.put("/{project_id}/sections/{section_id}/data", response_model=ProjectResponse)
 async def update_section_data(project_id: UUID, section_id: str, data: SectionDataUpdateRequest):
     """특정 섹션의 데이터(placeholder 값)를 수정한다."""
+    logger.info(f"[update_section_data] project={project_id}, section={section_id}, data_keys={list(data.data.keys())}")
     db = get_supabase()
 
     # 현재 rendered_sections 가져오기
@@ -76,6 +83,8 @@ async def update_section_data(project_id: UUID, section_id: str, data: SectionDa
     for section in sections:
         if section.get("section_id") == section_id:
             section["data"] = data.data
+            if data.style_overrides is not None:
+                section["style_overrides"] = data.style_overrides
             updated = True
             break
 
@@ -90,6 +99,103 @@ async def update_section_data(project_id: UUID, section_id: str, data: SectionDa
     )
     if not result.data:
         raise HTTPException(status_code=500, detail="섹션 데이터 업데이트 실패")
+    return result.data[0]
+
+
+@router.post("/{project_id}/sections/{section_id}/regenerate-image", response_model=ProjectResponse)
+async def regenerate_section_image(project_id: UUID, section_id: str, body: ImageRegenerateRequest):
+    """특정 섹션의 이미지를 수정된 프롬프트로 재생성한다."""
+    db = get_supabase()
+    storage = StorageService()
+
+    project = db.table("projects").select("*").eq("id", str(project_id)).single().execute()
+    if not project.data:
+        raise HTTPException(status_code=404, detail="PROJECT_NOT_FOUND")
+
+    sections = project.data.get("rendered_sections") or []
+    generated_data = project.data.get("generated_data") or {}
+    products = project.data.get("products") or []
+    product_names = [p["name"] for p in products]
+
+    # 해당 섹션 찾기
+    target_section = None
+    target_idx = -1
+    for i, section in enumerate(sections):
+        if section.get("section_id") == section_id:
+            target_section = section
+            target_idx = i
+            break
+
+    if target_section is None:
+        raise HTTPException(status_code=404, detail="SECTION_NOT_FOUND")
+
+    sec_type = target_section["section_type"]
+
+    # 이미지 크기 매핑
+    image_size_map = {
+        "hero_banner": (860, 1400),
+        "description": (600, 600),
+        "feature_point": (860, 957),
+    }
+
+    if sec_type not in image_size_map:
+        raise HTTPException(status_code=400, detail="이미지가 없는 섹션 타입입니다.")
+
+    w, h = image_size_map[sec_type]
+
+    # 이미지 재생성
+    image_bytes, prompt_used = await generate_section_image(
+        product_names=product_names,
+        section_type=sec_type,
+        width=w,
+        height=h,
+        custom_prompt=body.prompt,
+    )
+
+    # 업로드
+    filename = f"{sec_type}_regen_{section_id[:8]}.png"
+    path = await storage.upload_image(
+        file_bytes=image_bytes,
+        project_id=str(project_id),
+        image_type="generated",
+        filename=filename,
+    )
+    new_url = storage.get_public_url(path)
+
+    # 섹션 data에서 이미지 URL 키 찾아서 교체
+    for key, value in target_section["data"].items():
+        if key.endswith("_image") and isinstance(value, str) and value.startswith("http"):
+            target_section["data"][key] = new_url
+            break
+
+    sections[target_idx] = target_section
+
+    # image_prompts 업데이트
+    image_prompts = generated_data.get("image_prompts") or {}
+    # section_id에서 prompt key 결정: section_type 또는 section_type__index
+    # 기존 키에서 매칭 시도
+    prompt_key = None
+    for k in image_prompts:
+        if k == sec_type or k.startswith(f"{sec_type}__"):
+            # section_id 기반으로 매칭 — order 기반으로 찾기
+            prompt_key = k
+            break
+    if prompt_key is None:
+        prompt_key = sec_type
+    image_prompts[prompt_key] = prompt_used
+    generated_data["image_prompts"] = image_prompts
+
+    result = (
+        db.table("projects")
+        .update({
+            "rendered_sections": sections,
+            "generated_data": generated_data,
+        })
+        .eq("id", str(project_id))
+        .execute()
+    )
+    if not result.data:
+        raise HTTPException(status_code=500, detail="이미지 재생성 업데이트 실패")
     return result.data[0]
 
 

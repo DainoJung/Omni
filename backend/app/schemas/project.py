@@ -28,6 +28,11 @@ class ProjectUpdate(BaseModel):
 
 class SectionDataUpdateRequest(BaseModel):
     data: dict[str, str]
+    style_overrides: Optional[dict[str, dict[str, str]]] = None
+
+
+class ImageRegenerateRequest(BaseModel):
+    prompt: str
 
 
 class ProjectResponse(BaseModel):

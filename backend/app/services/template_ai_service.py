@@ -47,18 +47,24 @@ async def generate_section_image(
     height: int = 860,
     reference_image: bytes | None = None,
     reference_mime_type: str | None = None,
-) -> bytes:
+    custom_prompt: str | None = None,
+) -> tuple[bytes, str]:
     """섹션별 상품 컨텍스트 AI 이미지를 생성한다.
 
     reference_image가 있으면 Gemini에 참조 이미지로 전달하여
     동일한 상품의 새로운 연출 이미지를 생성한다.
+
+    Returns:
+        (image_bytes, prompt_used) 튜플
     """
     products_str = ", ".join(product_names)
     style_hint = _SECTION_IMAGE_HINTS.get(section_type, _SECTION_IMAGE_HINTS["feature_point"])
 
     aspect_ratio = _SECTION_ASPECT_RATIO.get(section_type, "1:1")
 
-    if reference_image:
+    if custom_prompt:
+        text_prompt = custom_prompt
+    elif reference_image:
         text_prompt = (
             f"첨부한 사진 속 상품과 동일한 상품의 새로운 연출 사진을 만들어줘. "
             f"반드시 첨부 이미지의 상품 외형, 색상, 디자인을 그대로 유지해야 해. "
@@ -66,11 +72,6 @@ async def generate_section_image(
             f"연출 스타일: {style_hint}, "
             f"4K 품질, 상업 사진"
         )
-        mime = reference_mime_type or "image/jpeg"
-        contents_with_ref = [
-            types.Part.from_bytes(data=reference_image, mime_type=mime),
-            text_prompt,
-        ]
     else:
         text_prompt = (
             f"이커머스 상세페이지용 고퀄리티 상품 사진. "
@@ -78,43 +79,80 @@ async def generate_section_image(
             f"{style_hint}, "
             f"4K 품질, 상업 사진 스타일"
         )
+
+    if reference_image:
+        mime = reference_mime_type or "image/jpeg"
+        contents_with_ref = [
+            types.Part.from_bytes(data=reference_image, mime_type=mime),
+            text_prompt,
+        ]
+    else:
         contents_with_ref = None
 
-    max_retries = 2
-    for attempt in range(max_retries + 1):
-        # 모든 시도에서 참조 이미지 포함 (있으면)
-        contents = contents_with_ref if contents_with_ref else text_prompt
+    # 참조 이미지 포함 → 참조 이미지 없이 텍스트만 순서로 시도
+    # 참조 이미지가 있으면 2단계: (1) ref 포함 시도 (2) ref 없이 폴백
+    strategies: list[tuple[str | list, str]] = []
+    if contents_with_ref:
+        strategies.append((contents_with_ref, "ref"))
+        # 폴백: 참조 이미지 없이 텍스트 전용 프롬프트
+        fallback_prompt = (
+            f"이커머스 상세페이지용 고퀄리티 상품 사진. "
+            f"상품: {products_str}. "
+            f"{style_hint}, "
+            f"4K 품질, 상업 사진 스타일"
+        )
+        strategies.append((fallback_prompt, "text-only"))
+    else:
+        strategies.append((text_prompt, "text-only"))
 
-        try:
-            response = await client.aio.models.generate_content(
-                model=settings.IMAGE_GEN_MODEL,
-                contents=contents,
-                config=types.GenerateContentConfig(
-                    response_modalities=["IMAGE"],
-                    image_config=types.ImageConfig(
-                        aspect_ratio=aspect_ratio,
+    max_retries = 2
+    for contents, strategy_label in strategies:
+        # 참조 이미지 포함 시 Text+Image 모달리티 사용 (문서 권장)
+        # 텍스트 전용 시 Image 전용 모달리티 사용
+        use_text_and_image = strategy_label == "ref"
+        modalities = ["Text", "Image"] if use_text_and_image else ["Image"]
+
+        for attempt in range(max_retries + 1):
+            try:
+                response = await client.aio.models.generate_content(
+                    model=settings.IMAGE_GEN_MODEL,
+                    contents=contents,
+                    config=types.GenerateContentConfig(
+                        response_modalities=modalities,
+                        image_config=types.ImageConfig(
+                            aspect_ratio=aspect_ratio,
+                        ),
                     ),
-                ),
+                )
+
+                if not response.candidates or not response.candidates[0].content:
+                    logger.warning(
+                        f"이미지 생성 빈 응답 ({strategy_label}, 시도 {attempt + 1}): "
+                        f"candidates={response.candidates}"
+                    )
+                    continue
+
+                for part in response.candidates[0].content.parts:
+                    if part.inline_data and part.inline_data.mime_type.startswith("image/"):
+                        logger.info(
+                            f"섹션 이미지 생성 완료: {section_type} "
+                            f"({strategy_label}, 시도 {attempt + 1})"
+                        )
+                        return part.inline_data.data, text_prompt
+
+                logger.warning(f"이미지 파트 없음 ({strategy_label}, 시도 {attempt + 1})")
+
+            except Exception as e:
+                logger.warning(
+                    f"이미지 생성 예외 ({strategy_label}, 시도 {attempt + 1}): {e}"
+                )
+
+        if strategy_label == "ref":
+            logger.info(
+                f"참조 이미지 방식 실패, 텍스트 전용 폴백으로 전환: {section_type}"
             )
 
-            if not response.candidates or not response.candidates[0].content:
-                logger.warning(
-                    f"이미지 생성 빈 응답 (시도 {attempt + 1}, ref={reference_image is not None}): "
-                    f"candidates={response.candidates}"
-                )
-                continue
-
-            for part in response.candidates[0].content.parts:
-                if part.inline_data and part.inline_data.mime_type.startswith("image/"):
-                    logger.info(f"섹션 이미지 생성 완료: {section_type} (시도 {attempt + 1})")
-                    return part.inline_data.data
-
-            logger.warning(f"이미지 파트 없음 (시도 {attempt + 1})")
-
-        except Exception as e:
-            logger.warning(f"이미지 생성 예외 (시도 {attempt + 1}, ref={reference_image is not None}): {e}")
-
-    raise RuntimeError(f"섹션 이미지 생성 실패 ({section_type}): {max_retries + 1}회 시도 후 실패")
+    raise RuntimeError(f"섹션 이미지 생성 실패 ({section_type}): 모든 전략 시도 후 실패")
 
 
 _SECTION_TEXT_KEYS: dict[str, list[tuple[str, str]]] = {
@@ -175,6 +213,21 @@ def _build_text_prompt_schema(section_counts: dict[str, int] | None) -> str:
     return "{\n" + ",\n".join(lines) + "\n}"
 
 
+def _ensure_dict(result) -> dict:
+    """Gemini가 list를 반환하는 경우 첫 번째 dict 요소를 추출한다."""
+    if isinstance(result, dict):
+        return result
+    if isinstance(result, list):
+        # [{...}] → {...} 또는 [{k:v}, {k:v}] → 병합
+        merged = {}
+        for item in result:
+            if isinstance(item, dict):
+                merged.update(item)
+        if merged:
+            return merged
+    raise ValueError(f"예상치 못한 응답 타입: {type(result)}")
+
+
 async def generate_section_texts(
     product_names: list[str],
     theme_name: str,
@@ -219,16 +272,18 @@ async def generate_section_texts(
         raw = response.text.strip()
         try:
             result = json.loads(raw)
+            result = _ensure_dict(result)
             logger.info(f"섹션 텍스트 생성 완료: {list(result.keys())}")
             return result
-        except json.JSONDecodeError as e:
+        except (json.JSONDecodeError, ValueError) as e:
             # 코드블록 래핑 제거 후 재시도
             try:
                 cleaned = raw.strip("`").removeprefix("json").strip()
                 result = json.loads(cleaned)
+                result = _ensure_dict(result)
                 logger.info(f"섹션 텍스트 생성 완료 (정리 후): {list(result.keys())}")
                 return result
-            except json.JSONDecodeError:
+            except (json.JSONDecodeError, ValueError):
                 last_error = e
                 logger.warning(
                     f"텍스트 생성 JSON 파싱 실패 (시도 {attempt + 1}/{max_retries + 1}): {e}\n"

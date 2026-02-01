@@ -1,16 +1,19 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { StepIndicator } from "@/components/layout/StepIndicator";
 import { SectionRenderer } from "@/components/editor/SectionRenderer";
+import { PropertyPanel } from "@/components/editor/PropertyPanel";
+import { ImagePanel } from "@/components/editor/ImagePanel";
 import { Button } from "@/components/ui/Button";
 import { projectsApi, sectionsApi } from "@/lib/api";
 import { exportImage } from "@/lib/export";
-import { Download, RefreshCw, Info, Layers } from "lucide-react";
+import { Download, RefreshCw, Info } from "lucide-react";
 import { toast } from "sonner";
 import type { Project, RenderedSection } from "@/types";
+import type { SelectedElement } from "@/components/editor/SectionBlock";
 
 const SECTION_LABELS: Record<string, string> = {
   hero_banner: "히어로 배너",
@@ -27,7 +30,16 @@ export default function ResultPage() {
   const [project, setProject] = useState<Project | null>(null);
   const [sections, setSections] = useState<RenderedSection[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedElement, setSelectedElement] = useState<SelectedElement | null>(null);
   const previewRef = useRef<HTMLDivElement>(null);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingSaveRef = useRef<{ sectionId: string } | null>(null);
+  const sectionsRef = useRef<RenderedSection[]>([]);
+
+  // sectionsRef를 항상 최신 상태로 유지
+  useEffect(() => {
+    sectionsRef.current = sections;
+  }, [sections]);
 
   useEffect(() => {
     async function load() {
@@ -47,34 +59,133 @@ export default function ResultPage() {
     load();
   }, [projectId]);
 
-  // 섹션 데이터 변경 핸들러
-  const handleDataChange = async (
-    sectionId: string,
-    placeholderId: string,
-    newValue: string
-  ) => {
-    const updated = sections.map((sec) => {
-      if (sec.section_id !== sectionId) return sec;
-      return {
-        ...sec,
-        data: { ...sec.data, [placeholderId]: newValue },
-      };
-    });
-    setSections(updated);
+  // 빈 영역 클릭 시 선택 해제
+  const handlePreviewClick = useCallback((e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (!target.closest("[data-placeholder]")) {
+      setSelectedElement(null);
+    }
+  }, []);
 
-    try {
-      const targetSection = updated.find((s) => s.section_id === sectionId);
-      if (targetSection) {
+  // 디바운스된 API 저장 — 최신 sectionsRef에서 읽어서 저장
+  const flushSave = useCallback(
+    async (sectionId: string) => {
+      const allSections = sectionsRef.current;
+      const target = allSections.find((s) => s.section_id === sectionId);
+      if (!target) return;
+      try {
         await sectionsApi.updateData(
           projectId,
           sectionId,
-          targetSection.data
+          target.data,
+          target.style_overrides || {}
         );
+      } catch (err) {
+        console.error("[save] 실패:", sectionId, err);
+        toast.error("변경사항 저장에 실패했습니다.");
       }
-    } catch {
-      // 조용히 실패
-    }
-  };
+    },
+    [projectId]
+  );
+
+  const debouncedSave = useCallback(
+    (sectionId: string) => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      pendingSaveRef.current = { sectionId };
+      saveTimerRef.current = setTimeout(() => {
+        saveTimerRef.current = null;
+        pendingSaveRef.current = null;
+        flushSave(sectionId);
+      }, 500);
+    },
+    [flushSave]
+  );
+
+  // 컴포넌트 언마운트 시 대기 중인 저장 즉시 실행
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+        if (pendingSaveRef.current) {
+          flushSave(pendingSaveRef.current.sectionId);
+        }
+      }
+    };
+  }, [flushSave]);
+
+  // 섹션 데이터 변경 핸들러 (텍스트 인라인 편집)
+  const handleDataChange = useCallback(
+    (sectionId: string, placeholderId: string, newValue: string) => {
+      setSections((prev) =>
+        prev.map((sec) => {
+          if (sec.section_id !== sectionId) return sec;
+          return { ...sec, data: { ...sec.data, [placeholderId]: newValue } };
+        })
+      );
+      // 텍스트 편집은 즉시 저장 (blur 1회만 발생하므로 디바운스 불필요)
+      // flushSave는 sectionsRef에서 읽으므로, setState 후 다음 틱에 실행
+      setTimeout(() => flushSave(sectionId), 0);
+    },
+    [flushSave]
+  );
+
+  // 스타일 오버라이드 변경 핸들러 (슬라이더/컬러피커 — 빈번하게 호출됨)
+  const handleStyleChange = useCallback(
+    (placeholderId: string, styles: Record<string, string>) => {
+      if (!selectedElement) return;
+      const sectionId = selectedElement.sectionId;
+
+      setSections((prev) =>
+        prev.map((sec) => {
+          if (sec.section_id !== sectionId) return sec;
+          const overrides = { ...(sec.style_overrides || {}), [placeholderId]: styles };
+          return { ...sec, style_overrides: overrides };
+        })
+      );
+      debouncedSave(sectionId);
+    },
+    [selectedElement, debouncedSave]
+  );
+
+  // 스타일 초기화 핸들러
+  const handleStyleReset = useCallback(
+    (placeholderId: string) => {
+      if (!selectedElement) return;
+      const sectionId = selectedElement.sectionId;
+
+      setSections((prev) =>
+        prev.map((sec) => {
+          if (sec.section_id !== sectionId) return sec;
+          const overrides = { ...(sec.style_overrides || {}) };
+          delete overrides[placeholderId];
+          return { ...sec, style_overrides: Object.keys(overrides).length > 0 ? overrides : undefined };
+        })
+      );
+      debouncedSave(sectionId);
+    },
+    [selectedElement, debouncedSave]
+  );
+
+  // 이미지 재생성 핸들러
+  const handleImageRegenerate = useCallback(
+    async (sectionId: string, prompt: string) => {
+      try {
+        const updatedProject = await sectionsApi.regenerateImage(
+          projectId,
+          sectionId,
+          prompt
+        );
+        if (updatedProject.rendered_sections) {
+          setSections(updatedProject.rendered_sections);
+        }
+        setProject(updatedProject);
+        toast.success("이미지가 재생성되었습니다.");
+      } catch {
+        toast.error("이미지 재생성에 실패했습니다.");
+      }
+    },
+    [projectId]
+  );
 
   const handleExport = async () => {
     if (!previewRef.current) return;
@@ -94,9 +205,30 @@ export default function ResultPage() {
     router.push(`/generate/${projectId}`);
   };
 
+  // 선택된 섹션의 이미지 프롬프트 가져오기
+  const getImagePrompt = (): string => {
+    if (!selectedElement || !project?.generated_data?.image_prompts) return "";
+    const sec = sections.find((s) => s.section_id === selectedElement.sectionId);
+    if (!sec) return "";
+
+    const prompts = project.generated_data.image_prompts;
+    // sec_type 또는 sec_type__index로 매칭
+    return prompts[sec.section_type] || Object.values(prompts).find((_, i) => {
+      const key = Object.keys(prompts)[i];
+      return key.startsWith(sec.section_type);
+    }) || "";
+  };
+
+  // 현재 선택된 섹션의 style_overrides
+  const getSelectedStyleOverrides = (): Record<string, Record<string, string>> => {
+    if (!selectedElement) return {};
+    const sec = sections.find((s) => s.section_id === selectedElement.sectionId);
+    return sec?.style_overrides || {};
+  };
+
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col">
+      <div className="h-screen flex flex-col overflow-hidden">
         <Header />
         <div className="flex-1 flex items-center justify-center text-text-secondary">
           불러오는 중...
@@ -107,7 +239,7 @@ export default function ResultPage() {
 
   if (sections.length === 0) {
     return (
-      <div className="min-h-screen flex flex-col">
+      <div className="h-screen flex flex-col overflow-hidden">
         <Header />
         <div className="flex-1 flex items-center justify-center text-text-secondary">
           생성된 콘텐츠가 없습니다.
@@ -120,140 +252,124 @@ export default function ResultPage() {
   const generatedData = project?.generated_data;
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="h-screen flex flex-col overflow-hidden">
       <Header />
       <StepIndicator currentStep={3} />
 
-      <div className="flex-1 flex overflow-hidden">
-        {/* Left: Info panel */}
-        <aside className="w-[300px] border-r border-border overflow-y-auto p-6 space-y-6">
-          <div>
-            <h3 className="text-lg font-bold mb-1">생성 결과</h3>
-            <p className="text-sm text-text-secondary">
-              텍스트를 더블클릭하여 편집할 수 있습니다.
-            </p>
-          </div>
+      <div className="flex-1 flex min-h-0 overflow-hidden">
+        {/* Left: Context-aware panel (sticky) */}
+        <aside className="w-[300px] shrink-0 border-r border-border overflow-y-auto p-6 space-y-6">
+          {selectedElement?.type === "text" ? (
+            <PropertyPanel
+              selected={selectedElement}
+              styleOverrides={getSelectedStyleOverrides()}
+              onStyleChange={handleStyleChange}
+              onReset={handleStyleReset}
+            />
+          ) : selectedElement?.type === "image" ? (
+            <ImagePanel
+              selected={selectedElement}
+              imagePrompt={getImagePrompt()}
+              onRegenerate={handleImageRegenerate}
+            />
+          ) : (
+            <>
+              <div>
+                <h3 className="text-lg font-bold mb-1">생성 결과</h3>
+                <p className="text-sm text-text-secondary">
+                  요소를 클릭하여 스타일을 편집하세요.
+                  <br />
+                  텍스트를 더블클릭하면 내용을 수정합니다.
+                </p>
+              </div>
 
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 text-sm">
-              <Info size={14} className="text-text-tertiary" />
-              <span className="text-text-secondary">생성 정보</span>
-            </div>
-            <div className="space-y-2 text-sm">
-              {generatedData?.theme && (
-                <div className="flex justify-between">
-                  <span className="text-text-secondary">테마</span>
-                  <span className="font-medium">
-                    {generatedData.theme.icon} {generatedData.theme.name}
-                  </span>
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-sm">
+                  <Info size={14} className="text-text-tertiary" />
+                  <span className="text-text-secondary">생성 정보</span>
                 </div>
-              )}
-              <div className="flex justify-between">
-                <span className="text-text-secondary">템플릿</span>
-                <span className="font-medium">
-                  {project?.template_used || "-"}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-text-secondary">상품 수</span>
-                <span className="font-medium">{products.length}개</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-text-secondary">섹션 수</span>
-                <span className="font-medium">{sections.length}개</span>
-              </div>
-            </div>
-          </div>
-
-          <hr className="border-border" />
-
-          {/* 상품 목록 */}
-          <div className="space-y-3">
-            <span className="text-sm font-medium text-text-secondary">
-              상품 목록
-            </span>
-            {products.map((prod, i) => (
-              <div
-                key={i}
-                className="border border-border rounded-sm p-3 space-y-1"
-              >
-                <p className="text-sm font-medium">{prod.name}</p>
-                <p className="text-xs text-text-secondary">{prod.price}</p>
-              </div>
-            ))}
-          </div>
-
-          <hr className="border-border" />
-
-          {/* 섹션별 editable 데이터 항목 */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 text-sm">
-              <Layers size={14} className="text-text-tertiary" />
-              <span className="font-medium text-text-secondary">
-                섹션별 편집
-              </span>
-            </div>
-            {[...sections]
-              .sort((a, b) => a.order - b.order)
-              .map((sec) => {
-                // editable 데이터 항목 필터링 (data-editable="true" 속성이 있는 것들)
-                const editableKeys = Object.keys(sec.data).filter((key) => {
-                  return sec.html_template.includes(
-                    `data-placeholder="${key}" data-editable="true"`
-                  );
-                });
-                if (editableKeys.length === 0) return null;
-
-                return (
-                  <div key={sec.section_id} className="space-y-2">
-                    <p className="text-xs font-medium text-text-tertiary uppercase">
-                      {SECTION_LABELS[sec.section_type] || sec.section_type}
-                    </p>
-                    {editableKeys.map((key) => (
-                      <div
-                        key={key}
-                        className="border border-border rounded-sm p-2 space-y-1"
-                      >
-                        <p className="text-xs text-text-tertiary">{key}</p>
-                        <p className="text-sm font-medium truncate">
-                          {sec.data[key] || "(비어있음)"}
-                        </p>
-                      </div>
-                    ))}
+                <div className="space-y-2 text-sm">
+                  {generatedData?.theme && (
+                    <div className="flex justify-between">
+                      <span className="text-text-secondary">테마</span>
+                      <span className="font-medium">
+                        {generatedData.theme.icon} {generatedData.theme.name}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span className="text-text-secondary">템플릿</span>
+                    <span className="font-medium">
+                      {project?.template_used || "-"}
+                    </span>
                   </div>
-                );
-              })}
-          </div>
+                  <div className="flex justify-between">
+                    <span className="text-text-secondary">상품 수</span>
+                    <span className="font-medium">{products.length}개</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-text-secondary">섹션 수</span>
+                    <span className="font-medium">{sections.length}개</span>
+                  </div>
+                </div>
+              </div>
 
-          <hr className="border-border" />
+              <hr className="border-border" />
 
-          {/* 액션 버튼 */}
-          <div className="space-y-3">
-            <Button size="sm" className="w-full" onClick={handleExport}>
-              <Download size={16} className="mr-1.5" />
-              이미지 다운로드
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-full"
-              onClick={handleRegenerate}
-            >
-              <RefreshCw size={16} className="mr-1.5" />
-              다시 생성
-            </Button>
-          </div>
+              {/* 상품 목록 */}
+              <div className="space-y-3">
+                <span className="text-sm font-medium text-text-secondary">
+                  상품 목록
+                </span>
+                {products.map((prod, i) => (
+                  <div
+                    key={i}
+                    className="border border-border rounded-sm p-3 space-y-1"
+                  >
+                    <p className="text-sm font-medium">{prod.name}</p>
+                    <p className="text-xs text-text-secondary">{prod.price}</p>
+                  </div>
+                ))}
+              </div>
+
+              <hr className="border-border" />
+
+              {/* 액션 버튼 */}
+              <div className="space-y-3">
+                <Button size="sm" className="w-full" onClick={handleExport}>
+                  <Download size={16} className="mr-1.5" />
+                  이미지 다운로드
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full"
+                  onClick={handleRegenerate}
+                >
+                  <RefreshCw size={16} className="mr-1.5" />
+                  다시 생성
+                </Button>
+              </div>
+            </>
+          )}
         </aside>
 
         {/* Right: Preview */}
-        <main className="flex-1 bg-bg-secondary overflow-auto p-8 flex justify-center">
-          <div className="max-w-[860px] w-full">
-            <div className="bg-bg-primary shadow-lg rounded-sm overflow-hidden">
-              <SectionRenderer
-                ref={previewRef}
-                sections={sections}
-                onDataChange={handleDataChange}
-              />
+        <main
+          className="flex-1 bg-bg-secondary overflow-auto p-6 flex justify-center items-start"
+          onClick={handlePreviewClick}
+        >
+          <div className="w-full flex justify-center" style={{ transform: "scale(0.55)", transformOrigin: "top center" }}>
+            <div className="max-w-[860px] w-full">
+              <div className="bg-bg-primary shadow-lg rounded-sm overflow-hidden">
+                <SectionRenderer
+                  ref={previewRef}
+                  sections={sections}
+                  onDataChange={handleDataChange}
+                  onElementSelect={setSelectedElement}
+                  selectedPlaceholderId={selectedElement?.placeholderId}
+                />
+              </div>
             </div>
           </div>
         </main>

@@ -73,6 +73,7 @@ class GenerateOrchestrator:
 
             # 키: "타입__인스턴스인덱스" (중복) 또는 "타입" (단일)
             section_image_urls: dict[str, str] = {}
+            image_prompts: dict[str, str] = {}
             image_instance_counter: dict[str, int] = {}
             for st in section_templates:
                 sec_type = st["section_type"]
@@ -86,7 +87,7 @@ class GenerateOrchestrator:
                 filename = f"{sec_type}_{inst_idx}.png" if is_duplicate else f"{sec_type}.png"
 
                 logger.info(f"{sec_type} 이미지 생성 시작 (인스턴스 {inst_idx})")
-                image_bytes = await generate_section_image(
+                image_bytes, prompt_used = await generate_section_image(
                     product_names=product_names,
                     section_type=sec_type,
                     width=w,
@@ -101,10 +102,9 @@ class GenerateOrchestrator:
                     filename=filename,
                 )
                 url = self.storage.get_public_url(path)
-                if is_duplicate:
-                    section_image_urls[f"{sec_type}__{inst_idx}"] = url
-                else:
-                    section_image_urls[sec_type] = url
+                key = f"{sec_type}__{inst_idx}" if is_duplicate else sec_type
+                section_image_urls[key] = url
+                image_prompts[key] = prompt_used
 
             # 6. 각 섹션 데이터 바인딩 + 렌더링
             rendered_sections = []
@@ -135,6 +135,7 @@ class GenerateOrchestrator:
             generated_data = {
                 "section_texts": section_texts,
                 "section_image_urls": section_image_urls,
+                "image_prompts": image_prompts,
                 "theme": theme,
                 "template_used": template_used,
                 "generated_at": datetime.now().isoformat(),

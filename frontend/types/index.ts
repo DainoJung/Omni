@@ -24,6 +24,7 @@ export interface RenderedSection {
   html_template: string;
   css: string;
   data: Record<string, string>;
+  style_overrides?: Record<string, Record<string, string>>;
 }
 
 // === Project ===
@@ -52,6 +53,8 @@ export interface Project {
 
 export interface GeneratedData {
   section_texts?: Record<string, string>;
+  section_image_urls?: Record<string, string>;
+  image_prompts?: Record<string, string>;
   hero_background_url?: string;
   theme: Theme;
   template_used?: string;

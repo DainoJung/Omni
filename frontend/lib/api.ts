@@ -81,12 +81,29 @@ export const themesApi = {
 
 // === Sections ===
 export const sectionsApi = {
-  updateData: (projectId: string, sectionId: string, data: Record<string, string>) =>
+  updateData: (
+    projectId: string,
+    sectionId: string,
+    data: Record<string, string>,
+    styleOverrides?: Record<string, Record<string, string>>
+  ) =>
     request<Project>(
       `/api/projects/${projectId}/sections/${sectionId}/data`,
       {
         method: "PUT",
-        body: JSON.stringify({ data }),
+        body: JSON.stringify({
+          data,
+          ...(styleOverrides !== undefined && { style_overrides: styleOverrides }),
+        }),
+      }
+    ),
+
+  regenerateImage: (projectId: string, sectionId: string, prompt: string) =>
+    request<Project>(
+      `/api/projects/${projectId}/sections/${sectionId}/regenerate-image`,
+      {
+        method: "POST",
+        body: JSON.stringify({ prompt }),
       }
     ),
 };

@@ -1,20 +1,19 @@
 from fastapi import APIRouter, HTTPException
 
-from app.schemas.generate import LayoutGenerateRequest, LayoutGenerateResponse
+from app.schemas.generate import GenerateRequest, GenerateResponse
 from app.services.generate_orchestrator import GenerateOrchestrator
 
 router = APIRouter()
 
 
-@router.post("/layout", response_model=LayoutGenerateResponse)
-async def generate_layout(data: LayoutGenerateRequest):
+@router.post("", response_model=GenerateResponse)
+async def generate(data: GenerateRequest):
     orchestrator = GenerateOrchestrator()
     try:
-        result = await orchestrator.generate_layout(
+        result = await orchestrator.generate(
             project_id=str(data.project_id),
             products=[p.model_dump() for p in data.products],
-            brand_name=data.brand_name,
-            category=data.category,
+            theme_id=data.theme,
         )
         return result
     except ValueError as e:

@@ -7,61 +7,30 @@ from datetime import datetime
 class ProductInput(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     price: str = Field(..., min_length=1, max_length=50)
-    description: Optional[str] = Field(None, max_length=500)
     image_id: Optional[str] = None
 
 
-class LayoutGenerateRequest(BaseModel):
+class GenerateRequest(BaseModel):
     project_id: UUID
     products: List[ProductInput] = Field(..., min_length=1, max_length=6)
-    brand_name: Optional[str] = None
-    category: Optional[str] = None
+    theme: str = Field(..., min_length=1, max_length=50)
 
 
-class TextAreaBounds(BaseModel):
-    x: float = Field(..., ge=0, le=100, description="X position in %")
-    y: float = Field(..., ge=0, le=100, description="Y position in %")
-    width: float = Field(..., gt=0, le=100, description="Width in %")
-    height: float = Field(..., gt=0, le=100, description="Height in %")
-
-
-class TextArea(BaseModel):
-    id: str
-    position: int
-    bounds: TextAreaBounds
-    background_brightness: Optional[str] = None  # "light" | "dark"
-    recommended_font_color: str = "#000000"
-    max_font_size: Optional[int] = None
-    suitable_for: str  # "headline" | "subtext" | "label" | "description"
-    recommended_text: Optional[str] = None
-    text_align: str = "center"
-    font_weight: int = 500
-    letter_spacing: str = "0em"
-    font_size_vw: Optional[float] = None
-    font_family: Optional[str] = None
-
-
-class SectionPlan(BaseModel):
-    section_key: str
-    title: str
-    description: str
-    product_indices: List[int] = Field(default_factory=list)
+class RenderedSectionResponse(BaseModel):
+    section_id: str
+    section_type: str
     order: int
+    template_id: str
+    html_template: str
+    css: str
+    data: dict[str, str]
 
 
-class SectionResult(BaseModel):
-    section_key: str
-    order: int
-    layout_image_url: str
-    text_areas: List[TextArea]
-    aspect_ratio: str = "3:4"
-
-
-class LayoutGenerateResponse(BaseModel):
+class GenerateResponse(BaseModel):
     project_id: UUID
-    sections: List[SectionResult]
-    page_plan: List[SectionPlan]
-    products: List[ProductInput]
+    template_used: str
+    theme: str
+    rendered_sections: List[RenderedSectionResponse]
     generated_at: datetime
 
 

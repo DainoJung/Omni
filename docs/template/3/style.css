@@ -1,0 +1,197 @@
+._03,
+._03 * {
+  box-sizing: border-box;
+}
+._03 {
+  display: flex;
+  flex-direction: column;
+  gap: 0px;
+  align-items: center;
+  justify-content: flex-start;
+  align-self: stretch;
+  flex-shrink: 0;
+  position: relative;
+}
+.rectangle-19 {
+  background: rgba(217, 217, 217, 0);
+  align-self: stretch;
+  flex-shrink: 0;
+  height: 150px;
+  position: relative;
+}
+.div {
+  text-align: center;
+  font-family: "BmDoHyeonOtf-Regular", sans-serif;
+  font-size: 60px;
+  line-height: 140%;
+  letter-spacing: -0.02em;
+  font-weight: 400;
+  position: relative;
+}
+.div-span {
+  color: #000000;
+}
+.div-span2 {
+  color: #ff0000;
+}
+.rectangle-20 {
+  background: rgba(217, 217, 217, 0);
+  align-self: stretch;
+  flex-shrink: 0;
+  height: 40px;
+  position: relative;
+}
+.div2 {
+  color: #333333;
+  text-align: center;
+  font-family: "SCoreDream-5Medium", sans-serif;
+  font-size: 40px;
+  line-height: 160%;
+  letter-spacing: -0.02em;
+  font-weight: 400;
+  position: relative;
+}
+.rectangle-23 {
+  background: rgba(217, 217, 217, 0);
+  align-self: stretch;
+  flex-shrink: 0;
+  height: 40px;
+  position: relative;
+}
+.div3 {
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  align-content: center;
+  flex-shrink: 0;
+  width: 799px;
+  position: relative;
+}
+.frame-19 {
+  background: #ffffff;
+  border-radius: 50px;
+  border-style: solid;
+  border-color: #000000;
+  border-width: 2px;
+  padding: 24px;
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  position: relative;
+}
+.div4 {
+  color: #111111;
+  text-align: center;
+  font-family: "SCoreDream-5Medium", sans-serif;
+  font-size: 30px;
+  line-height: 160%;
+  letter-spacing: -0.02em;
+  font-weight: 400;
+  position: relative;
+}
+.frame-18 {
+  background: #ffffff;
+  border-radius: 50px;
+  border-style: solid;
+  border-color: #000000;
+  border-width: 2px;
+  padding: 24px;
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  position: relative;
+}
+.frame-20 {
+  background: #ffffff;
+  border-radius: 50px;
+  border-style: solid;
+  border-color: #000000;
+  border-width: 2px;
+  padding: 24px;
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  position: relative;
+}
+.frame-21 {
+  background: #ffffff;
+  border-radius: 50px;
+  border-style: solid;
+  border-color: #000000;
+  border-width: 2px;
+  padding: 24px;
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  position: relative;
+}
+.frame-22 {
+  background: #ffffff;
+  border-radius: 50px;
+  border-style: solid;
+  border-color: #000000;
+  border-width: 2px;
+  padding: 24px;
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  position: relative;
+}
+.frame-23 {
+  background: #ffffff;
+  border-radius: 50px;
+  border-style: solid;
+  border-color: #000000;
+  border-width: 2px;
+  padding: 24px;
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  position: relative;
+}
+.rectangle-21 {
+  background: rgba(217, 217, 217, 0);
+  align-self: stretch;
+  flex-shrink: 0;
+  height: 80px;
+  position: relative;
+}
+.the-image-of-a-natural-young-asian-female-model-washing-her-face-with-foam {
+  border-radius: 1000px;
+  border-style: solid;
+  border-color: #ff0000;
+  border-width: 20px;
+  flex-shrink: 0;
+  width: 600px;
+  height: 600px;
+  position: relative;
+  object-fit: cover;
+}
+.rectangle-22 {
+  background: rgba(217, 217, 217, 0);
+  align-self: stretch;
+  flex-shrink: 0;
+  height: 150px;
+  position: relative;
+}

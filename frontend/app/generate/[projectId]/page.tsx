@@ -21,9 +21,9 @@ export default function GeneratePage() {
     { label: string; status: StepStatus }[]
   >([
     { label: "입력 분석", status: "pending" },
-    { label: "페이지 구조 기획", status: "pending" },
-    { label: "섹션별 이미지 생성", status: "pending" },
-    { label: "텍스트 영역 분석", status: "pending" },
+    { label: "HTML 템플릿 조회", status: "pending" },
+    { label: "AI 배경 & 텍스트 생성", status: "pending" },
+    { label: "템플릿 데이터 바인딩", status: "pending" },
   ]);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -40,41 +40,38 @@ export default function GeneratePage() {
         // 프로젝트 조회
         const project = await projectsApi.get(projectId);
 
-        // 상품 정보 구성
-        const products: ProductInput[] = project.products || [
-          { name: project.brand_name, price: "" },
-        ];
+        const products: ProductInput[] = project.products || [];
+        const themeId = project.theme_id || "holiday";
 
         // Step 1: 입력 분석
         updateStep(0, "running");
         setProgress(10);
-        await new Promise((r) => setTimeout(r, 500));
+        await new Promise((r) => setTimeout(r, 400));
         updateStep(0, "done");
         setProgress(15);
 
-        // Step 2: 페이지 구조 기획
+        // Step 2: 템플릿 선택
         updateStep(1, "running");
         setProgress(20);
 
-        // Step 3 & 4: 실제 API 호출 (서버에서 기획 + 생성 + 분석 모두 처리)
+        // Step 3: AI 생성 (서버에서 템플릿 선택 + AI 생성 + 바인딩 모두 처리)
         updateStep(2, "running");
         setProgress(30);
 
-        const result = await generateApi.generateLayout(
-          projectId,
+        await generateApi.generate({
+          project_id: projectId,
           products,
-          project.brand_name,
-          project.category || undefined
-        );
+          theme: themeId,
+        });
 
         updateStep(1, "done");
         updateStep(2, "done");
         setProgress(85);
 
-        // Step 4: 텍스트 영역 분석 완료
+        // Step 4: 슬롯 바인딩 완료
         updateStep(3, "running");
         setProgress(90);
-        await new Promise((r) => setTimeout(r, 500));
+        await new Promise((r) => setTimeout(r, 400));
         updateStep(3, "done");
         setProgress(100);
 
@@ -112,7 +109,7 @@ export default function GeneratePage() {
       <main className="flex-1 flex items-center justify-center">
         <div className="w-full max-w-[400px] text-center space-y-8">
           <h2 className="text-xl font-bold">
-            {error ? "생성 실패" : "AI가 멀티 섹션 페이지를 만들고 있습니다"}
+            {error ? "생성 실패" : "AI가 멀티 섹션 PDP를 생성하고 있습니다"}
           </h2>
 
           {!error && (

@@ -1,0 +1,108 @@
+._02,
+._02 * {
+  box-sizing: border-box;
+}
+._02 {
+  background: #ffffff;
+  padding: 70px 49px 70px 49px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+  justify-content: flex-start;
+  align-self: stretch;
+  flex-shrink: 0;
+  height: 298px;
+  position: relative;
+}
+.frame-13 {
+  display: flex;
+  flex-direction: row;
+  gap: 0px;
+  align-items: center;
+  justify-content: flex-start;
+  flex-shrink: 0;
+  position: relative;
+}
+.frame-12 {
+  border-style: solid;
+  border-color: rgba(0, 0, 0, 0.5);
+  border-width: 0px 1px 0px 0px;
+  padding: 21px 75px 21px 75px;
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 254px;
+  height: 158px;
+  position: relative;
+}
+.frame-23 {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  position: relative;
+}
+.check {
+  flex-shrink: 0;
+  width: 72px;
+  height: 72px;
+  position: relative;
+  overflow: visible;
+}
+.small-foam-big-difference-pores-will-appreciate {
+  color: rgba(0, 0, 0, 0.7);
+  text-align: center;
+  font-family: "SCoreDream-5Medium", sans-serif;
+  font-size: 36px;
+  line-height: 160%;
+  letter-spacing: -0.02em;
+  font-weight: 400;
+  position: relative;
+}
+.frame-132 {
+  border-style: solid;
+  border-color: rgba(0, 0, 0, 0.5);
+  border-width: 0px 1px 0px 0px;
+  padding: 21px 75px 21px 75px;
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 254px;
+  height: 158px;
+  position: relative;
+}
+.check2 {
+  flex-shrink: 0;
+  width: 72px;
+  height: 72px;
+  position: relative;
+  overflow: visible;
+}
+.frame-14 {
+  padding: 21px 75px 21px 75px;
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 254px;
+  height: 158px;
+  position: relative;
+}
+.check3 {
+  flex-shrink: 0;
+  width: 72px;
+  height: 72px;
+  position: relative;
+  overflow: visible;
+}

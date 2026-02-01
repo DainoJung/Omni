@@ -2,9 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
-import { CategorySelector } from "./CategorySelector";
+import { ThemeSelector } from "./ThemeSelector";
 import { projectsApi, uploadApi } from "@/lib/api";
 import { toast } from "sonner";
 import { Plus, Trash2, Upload, X } from "lucide-react";
@@ -60,10 +59,11 @@ function ProductImageUploader({
   return (
     <div
       {...getRootProps()}
-      className={`w-20 h-20 border-2 border-dashed rounded-sm flex flex-col items-center justify-center cursor-pointer transition-colors ${isDragActive
-        ? "border-accent bg-bg-secondary"
-        : "border-border hover:border-text-secondary"
-        }`}
+      className={`w-20 h-20 border-2 border-dashed rounded-sm flex flex-col items-center justify-center cursor-pointer transition-colors ${
+        isDragActive
+          ? "border-accent bg-bg-secondary"
+          : "border-border hover:border-text-secondary"
+      }`}
     >
       <input {...getInputProps()} />
       <Upload size={16} className="text-text-tertiary" />
@@ -75,8 +75,7 @@ function ProductImageUploader({
 export function ProjectInputForm() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [brandName, setBrandName] = useState("");
-  const [category, setCategory] = useState("");
+  const [theme, setTheme] = useState("");
   const [products, setProducts] = useState<ProductEntry[]>([
     { name: "", price: "", image: null, imagePreview: null },
   ]);
@@ -117,7 +116,7 @@ export function ProjectInputForm() {
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
-    if (!brandName.trim()) newErrors.brand_name = "브랜드명을 입력하세요.";
+    if (!theme) newErrors.theme = "테마를 선택하세요.";
 
     products.forEach((p, i) => {
       if (!p.name.trim()) newErrors[`product_${i}_name`] = "제품명을 입력하세요.";
@@ -137,12 +136,11 @@ export function ProjectInputForm() {
     try {
       // 1. 프로젝트 생성
       const project = await projectsApi.create({
-        brand_name: brandName,
-        category: category || undefined,
         products: products.map((p) => ({
           name: p.name,
           price: p.price,
         })),
+        theme,
       });
 
       // 2. 각 상품 이미지 업로드
@@ -152,7 +150,7 @@ export function ProjectInputForm() {
         }
       }
 
-      // 3. 생성 페이지로 바로 이동 (템플릿/스타일 단계 건너뜀)
+      // 3. 생성 페이지로 이동
       router.push(`/generate/${project.id}`);
     } catch (err) {
       toast.error(
@@ -168,22 +166,15 @@ export function ProjectInputForm() {
       <div className="space-y-1">
         <h2 className="text-2xl font-bold">PDP 만들기</h2>
         <p className="text-text-secondary text-sm">
-          상품 정보를 입력하면 AI가 레이아웃을 자동으로 생성합니다.
+          상품 정보와 테마를 선택하면 AI가 배경과 카피를 자동 생성합니다.
         </p>
       </div>
 
-      <Input
-        label="브랜드명"
-        required
-        placeholder="브랜드명을 입력하세요"
-        value={brandName}
-        onChange={(e) => setBrandName(e.target.value)}
-        error={errors.brand_name}
-      />
-
-      <CategorySelector
-        value={category}
-        onChange={(v) => setCategory(v)}
+      {/* 테마 선택 */}
+      <ThemeSelector
+        value={theme}
+        onChange={setTheme}
+        error={errors.theme}
       />
 
       {/* 상품 목록 */}
@@ -240,10 +231,11 @@ export function ProjectInputForm() {
                   onChange={(e) =>
                     updateProduct(index, "name", e.target.value)
                   }
-                  className={`w-full h-9 px-3 border rounded-sm text-sm focus:border-border-focus ${errors[`product_${index}_name`]
-                    ? "border-error"
-                    : "border-border"
-                    }`}
+                  className={`w-full h-9 px-3 border rounded-sm text-sm focus:border-border-focus ${
+                    errors[`product_${index}_name`]
+                      ? "border-error"
+                      : "border-border"
+                  }`}
                 />
                 <input
                   placeholder="가격 (필수, 예: 39,000원)"
@@ -251,10 +243,11 @@ export function ProjectInputForm() {
                   onChange={(e) =>
                     updateProduct(index, "price", e.target.value)
                   }
-                  className={`w-full h-9 px-3 border rounded-sm text-sm focus:border-border-focus ${errors[`product_${index}_price`]
-                    ? "border-error"
-                    : "border-border"
-                    }`}
+                  className={`w-full h-9 px-3 border rounded-sm text-sm focus:border-border-focus ${
+                    errors[`product_${index}_price`]
+                      ? "border-error"
+                      : "border-border"
+                  }`}
                 />
               </div>
             </div>

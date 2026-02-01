@@ -2,10 +2,11 @@ import type {
   Project,
   ProjectCreate,
   ProjectUpdate,
-  LayoutGenerateResponse,
+  GenerateRequest,
+  GenerateResponse,
+  Theme,
   ListResponse,
   ErrorResponse,
-  ProductInput,
 } from "@/types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -66,21 +67,28 @@ export const projectsApi = {
 
 // === Generate ===
 export const generateApi = {
-  generateLayout: (
-    projectId: string,
-    products: ProductInput[],
-    brandName?: string,
-    category?: string
-  ) =>
-    request<LayoutGenerateResponse>("/api/generate/layout", {
+  generate: (data: GenerateRequest) =>
+    request<GenerateResponse>("/api/generate", {
       method: "POST",
-      body: JSON.stringify({
-        project_id: projectId,
-        products,
-        brand_name: brandName || undefined,
-        category: category || undefined,
-      }),
+      body: JSON.stringify(data),
     }),
+};
+
+// === Themes ===
+export const themesApi = {
+  list: () => request<Theme[]>("/api/themes"),
+};
+
+// === Sections ===
+export const sectionsApi = {
+  updateData: (projectId: string, sectionId: string, data: Record<string, string>) =>
+    request<Project>(
+      `/api/projects/${projectId}/sections/${sectionId}/data`,
+      {
+        method: "PUT",
+        body: JSON.stringify({ data }),
+      }
+    ),
 };
 
 // === Upload ===

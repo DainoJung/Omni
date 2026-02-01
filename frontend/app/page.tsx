@@ -18,7 +18,7 @@ const STATUS_LABEL: Record<string, { text: string; className: string }> = {
 };
 
 function getNextPath(project: Project): string {
-  if (project.pipeline_result) return `/result/${project.id}`;
+  if (project.rendered_sections?.length) return `/result/${project.id}`;
   return `/generate/${project.id}`;
 }
 
@@ -99,11 +99,11 @@ export default function HomePage() {
                         </span>
                         <div className="min-w-0">
                           <p className="font-medium truncate">
-                            {project.brand_name}
+                            {project.products?.[0]?.name || project.brand_name || "프로젝트"}
                           </p>
                           <p className="text-xs text-text-tertiary">
                             {new Date(project.created_at).toLocaleDateString("ko-KR")}
-                            {project.category && ` · ${project.category}`}
+                            {project.theme_id && ` · ${project.theme_id}`}
                           </p>
                         </div>
                       </div>

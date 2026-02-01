@@ -4,20 +4,19 @@ import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { StepIndicator } from "@/components/layout/StepIndicator";
-import { TextOverlayRenderer } from "@/components/layout/TextOverlayRenderer";
+import { SectionRenderer } from "@/components/editor/SectionRenderer";
 import { Button } from "@/components/ui/Button";
-import { projectsApi } from "@/lib/api";
+import { projectsApi, sectionsApi } from "@/lib/api";
 import { exportImage } from "@/lib/export";
-import { Download, RefreshCw, Info } from "lucide-react";
+import { Download, RefreshCw, Info, Layers } from "lucide-react";
 import { toast } from "sonner";
-import type { Project, SectionResult, ProductInput } from "@/types";
+import type { Project, RenderedSection } from "@/types";
 
 const SECTION_LABELS: Record<string, string> = {
   hero_banner: "히어로 배너",
-  single_feature: "단일 상품 피처",
-  product_grid: "상품 그리드",
-  detail_info: "상세 정보",
-  cta_footer: "CTA 푸터",
+  feature_badges: "특징 뱃지",
+  description: "상세 설명",
+  feature_point: "특징 포인트",
 };
 
 export default function ResultPage() {
@@ -26,6 +25,7 @@ export default function ResultPage() {
   const projectId = params.projectId as string;
 
   const [project, setProject] = useState<Project | null>(null);
+  const [sections, setSections] = useState<RenderedSection[]>([]);
   const [loading, setLoading] = useState(true);
   const previewRef = useRef<HTMLDivElement>(null);
 
@@ -34,6 +34,10 @@ export default function ResultPage() {
       try {
         const proj = await projectsApi.get(projectId);
         setProject(proj);
+
+        if (proj.rendered_sections?.length) {
+          setSections(proj.rendered_sections);
+        }
       } catch {
         toast.error("프로젝트를 불러올 수 없습니다.");
       } finally {
@@ -43,13 +47,42 @@ export default function ResultPage() {
     load();
   }, [projectId]);
 
+  // 섹션 데이터 변경 핸들러
+  const handleDataChange = async (
+    sectionId: string,
+    placeholderId: string,
+    newValue: string
+  ) => {
+    const updated = sections.map((sec) => {
+      if (sec.section_id !== sectionId) return sec;
+      return {
+        ...sec,
+        data: { ...sec.data, [placeholderId]: newValue },
+      };
+    });
+    setSections(updated);
+
+    try {
+      const targetSection = updated.find((s) => s.section_id === sectionId);
+      if (targetSection) {
+        await sectionsApi.updateData(
+          projectId,
+          sectionId,
+          targetSection.data
+        );
+      }
+    } catch {
+      // 조용히 실패
+    }
+  };
+
   const handleExport = async () => {
     if (!previewRef.current) return;
     try {
       await exportImage(previewRef.current, {
         format: "png",
         quality: 2,
-        filename: `${project?.brand_name || "PDP"}_${Date.now()}`,
+        filename: `PDP_${Date.now()}`,
       });
       toast.success("이미지가 다운로드되었습니다.");
     } catch {
@@ -59,34 +92,6 @@ export default function ResultPage() {
 
   const handleRegenerate = () => {
     router.push(`/generate/${projectId}`);
-  };
-
-  const handleTextChange = async (
-    sectionOrder: number,
-    areaId: string,
-    newText: string
-  ) => {
-    if (!project?.pipeline_result) return;
-    const updatedSections = project.pipeline_result.sections.map((section) => {
-      if (section.order !== sectionOrder) return section;
-      return {
-        ...section,
-        text_areas: section.text_areas.map((ta) =>
-          ta.id === areaId ? { ...ta, override_text: newText } : ta
-        ),
-      };
-    });
-    const updatedResult = {
-      ...project.pipeline_result,
-      sections: updatedSections,
-    };
-    try {
-      await projectsApi.update(projectId, {
-        pipeline_result: updatedResult,
-      });
-    } catch {
-      // 조용히 실패
-    }
   };
 
   if (loading) {
@@ -100,7 +105,7 @@ export default function ResultPage() {
     );
   }
 
-  if (!project?.pipeline_result?.sections?.length) {
+  if (sections.length === 0) {
     return (
       <div className="min-h-screen flex flex-col">
         <Header />
@@ -111,15 +116,8 @@ export default function ResultPage() {
     );
   }
 
-  const { pipeline_result } = project;
-  const sections: SectionResult[] = pipeline_result.sections.sort(
-    (a, b) => a.order - b.order
-  );
-  const products: ProductInput[] = project.products || [];
-  const totalTextAreas = sections.reduce(
-    (sum, s) => sum + s.text_areas.length,
-    0
-  );
+  const products = project?.products || [];
+  const generatedData = project?.generated_data;
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -142,46 +140,29 @@ export default function ResultPage() {
               <span className="text-text-secondary">생성 정보</span>
             </div>
             <div className="space-y-2 text-sm">
+              {generatedData?.theme && (
+                <div className="flex justify-between">
+                  <span className="text-text-secondary">테마</span>
+                  <span className="font-medium">
+                    {generatedData.theme.icon} {generatedData.theme.name}
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between">
-                <span className="text-text-secondary">브랜드</span>
-                <span className="font-medium">{project.brand_name}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-text-secondary">총 섹션</span>
-                <span className="font-medium">{sections.length}개</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-text-secondary">텍스트 영역</span>
-                <span className="font-medium">{totalTextAreas}개</span>
+                <span className="text-text-secondary">템플릿</span>
+                <span className="font-medium">
+                  {project?.template_used || "-"}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-text-secondary">상품 수</span>
                 <span className="font-medium">{products.length}개</span>
               </div>
-            </div>
-          </div>
-
-          <hr className="border-border" />
-
-          {/* 섹션 목록 */}
-          <div className="space-y-3">
-            <span className="text-sm font-medium text-text-secondary">
-              섹션 구성
-            </span>
-            {sections.map((section) => (
-              <div
-                key={section.order}
-                className="border border-border rounded-sm p-3 space-y-1"
-              >
-                <p className="text-sm font-medium">
-                  {section.order + 1}.{" "}
-                  {SECTION_LABELS[section.section_key] || section.section_key}
-                </p>
-                <p className="text-xs text-text-secondary">
-                  텍스트 영역 {section.text_areas.length}개
-                </p>
+              <div className="flex justify-between">
+                <span className="text-text-secondary">섹션 수</span>
+                <span className="font-medium">{sections.length}개</span>
               </div>
-            ))}
+            </div>
           </div>
 
           <hr className="border-border" />
@@ -204,13 +185,51 @@ export default function ResultPage() {
 
           <hr className="border-border" />
 
+          {/* 섹션별 editable 데이터 항목 */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-sm">
+              <Layers size={14} className="text-text-tertiary" />
+              <span className="font-medium text-text-secondary">
+                섹션별 편집
+              </span>
+            </div>
+            {[...sections]
+              .sort((a, b) => a.order - b.order)
+              .map((sec) => {
+                // editable 데이터 항목 필터링 (data-editable="true" 속성이 있는 것들)
+                const editableKeys = Object.keys(sec.data).filter((key) => {
+                  return sec.html_template.includes(
+                    `data-placeholder="${key}" data-editable="true"`
+                  );
+                });
+                if (editableKeys.length === 0) return null;
+
+                return (
+                  <div key={sec.section_id} className="space-y-2">
+                    <p className="text-xs font-medium text-text-tertiary uppercase">
+                      {SECTION_LABELS[sec.section_type] || sec.section_type}
+                    </p>
+                    {editableKeys.map((key) => (
+                      <div
+                        key={key}
+                        className="border border-border rounded-sm p-2 space-y-1"
+                      >
+                        <p className="text-xs text-text-tertiary">{key}</p>
+                        <p className="text-sm font-medium truncate">
+                          {sec.data[key] || "(비어있음)"}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+          </div>
+
+          <hr className="border-border" />
+
           {/* 액션 버튼 */}
           <div className="space-y-3">
-            <Button
-              size="sm"
-              className="w-full"
-              onClick={handleExport}
-            >
+            <Button size="sm" className="w-full" onClick={handleExport}>
               <Download size={16} className="mr-1.5" />
               이미지 다운로드
             </Button>
@@ -226,25 +245,16 @@ export default function ResultPage() {
           </div>
         </aside>
 
-        {/* Right: Preview - vertical stack of sections */}
+        {/* Right: Preview */}
         <main className="flex-1 bg-bg-secondary overflow-auto p-8 flex justify-center">
-          <div ref={previewRef} className="max-w-[860px] w-full space-y-0">
-            {sections.map((section) => (
-              <div key={section.order}>
-                <div className="bg-bg-primary shadow-lg">
-                  <TextOverlayRenderer
-                    layoutImageUrl={section.layout_image_url}
-                    textAreas={section.text_areas}
-                    products={products}
-                    brandName={project.brand_name}
-                    editable
-                    onTextChange={(areaId, newText) =>
-                      handleTextChange(section.order, areaId, newText)
-                    }
-                  />
-                </div>
-              </div>
-            ))}
+          <div className="max-w-[860px] w-full">
+            <div className="bg-bg-primary shadow-lg rounded-sm overflow-hidden">
+              <SectionRenderer
+                ref={previewRef}
+                sections={sections}
+                onDataChange={handleDataChange}
+              />
+            </div>
           </div>
         </main>
       </div>

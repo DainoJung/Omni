@@ -1,8 +1,10 @@
 from pydantic import BaseModel, Field
 from typing import Optional, List
-from datetime import date, datetime
+from datetime import datetime
 from uuid import UUID
 from enum import Enum
+
+from app.schemas.generate import ProductInput
 
 
 class ProjectStatus(str, Enum):
@@ -13,27 +15,29 @@ class ProjectStatus(str, Enum):
 
 
 class ProjectCreate(BaseModel):
-    brand_name: str = Field(..., min_length=1, max_length=100)
-    description: Optional[str] = Field(None, max_length=2000)
-    category: Optional[str] = None
-    products: Optional[List[dict]] = None
+    products: List[ProductInput] = Field(..., min_length=1, max_length=6)
+    theme: str = Field(..., min_length=1, max_length=50)
 
 
 class ProjectUpdate(BaseModel):
-    input_data: Optional[dict] = None
-    pipeline_result: Optional[dict] = None
     status: Optional[ProjectStatus] = None
-    brand_name: Optional[str] = None
-    description: Optional[str] = None
+    rendered_sections: Optional[List[dict]] = None
+    generated_data: Optional[dict] = None
+
+
+class SectionDataUpdateRequest(BaseModel):
+    data: dict[str, str]
 
 
 class ProjectResponse(BaseModel):
     id: UUID
     status: ProjectStatus
-    brand_name: str
-    description: Optional[str] = None
-    category: Optional[str] = None
+    brand_name: Optional[str] = None
+    theme_id: Optional[str] = None
+    template_used: Optional[str] = None
     products: Optional[List[dict]] = None
+    rendered_sections: Optional[List[dict]] = None
+    generated_data: Optional[dict] = None
     input_data: Optional[dict] = None
     pipeline_result: Optional[dict] = None
     output_url: Optional[str] = None

@@ -1,3 +1,5 @@
+"""v5.2 생성 오케스트레이터: HTML 템플릿 기반 PDP 파이프라인"""
+
 import asyncio
 import logging
 from datetime import datetime
@@ -5,166 +7,168 @@ from datetime import datetime
 import httpx
 
 from app.database import get_supabase
-from app.services.layout_pipeline_service import LayoutPipelineService
-from app.services.storage_service import StorageService
-from app.schemas.generate import (
-    LayoutGenerateResponse,
-    SectionPlan,
-    SectionResult,
-    TextArea,
-    TextAreaBounds,
-    ProductInput,
+from app.constants.themes import get_theme
+from app.services.template_ai_service import (
+    generate_section_texts,
+    generate_section_image,
 )
+from app.services.section_compose_service import compose_sections
+from app.services.template_render_service import render_section, bind_section_data
+from app.services.storage_service import StorageService
+from app.schemas.generate import GenerateResponse, RenderedSectionResponse
 
 logger = logging.getLogger(__name__)
 
 
 class GenerateOrchestrator:
-    """v5.0 멀티 섹션 레이아웃 파이프라인 오케스트레이터."""
+    """v5.2 HTML 템플릿 기반 PDP 생성 파이프라인 오케스트레이터."""
 
     def __init__(self):
-        self.pipeline = LayoutPipelineService()
         self.storage = StorageService()
         self.db = get_supabase()
 
-    async def generate_layout(
+    async def generate(
         self,
         project_id: str,
         products: list[dict],
-        brand_name: str | None = None,
-        category: str | None = None,
-    ) -> LayoutGenerateResponse:
-        # 프로젝트 조회
-        project = self._get_project(project_id)
-        effective_brand = brand_name or project.get("brand_name", "")
-
+        theme_id: str,
+    ) -> GenerateResponse:
+        """HTML 템플릿 기반 PDP 생성 파이프라인을 실행한다."""
         self._update_status(project_id, "generating")
 
         try:
-            # 업로드된 상품 이미지 다운로드
-            product_image_bytes_list = await self._download_product_images(project_id)
+            # 1. 테마 정보 조회
+            theme = get_theme(theme_id)
 
-            # 멀티 섹션 파이프라인 실행
-            result = await self.pipeline.run_pipeline(
-                products=products,
-                product_image_bytes_list=product_image_bytes_list,
-                brand_name=effective_brand,
-                category=category or project.get("category"),
+            # 2. 4개 섹션 템플릿 조회
+            section_templates = compose_sections()
+
+            # 3. 상품 이미지 URL 수집 + 참조 이미지 다운로드
+            product_image_urls = await self._get_product_image_urls(project_id)
+            reference_image, ref_mime_type = await self._download_reference_image(product_image_urls)
+
+            # 4. 텍스트 생성 (이미지와 병렬 불가 — rate limit)
+            product_names = [p["name"] for p in products]
+
+            section_texts = await generate_section_texts(
+                product_names=product_names,
+                theme_name=theme["name"],
+                copy_keywords=theme["copy_keywords"],
             )
 
-            # 각 섹션 이미지를 병렬로 Storage 업로드
-            async def _upload_section(section: dict) -> tuple[SectionResult, dict]:
-                section_key = section["section_key"]
-                order = section["order"]
-
-                layout_path = await self.storage.upload_image(
-                    file_bytes=section["layout_image_bytes"],
-                    project_id=project_id,
-                    image_type="generated",
-                    filename=f"section_{order}_{section_key}.png",
-                )
-                layout_image_url = self.storage.get_public_url(layout_path)
-
-                text_areas = [
-                    TextArea(
-                        id=ta["id"],
-                        position=ta["position"],
-                        bounds=TextAreaBounds(**ta["bounds"]),
-                        background_brightness=ta.get("background_brightness"),
-                        recommended_font_color=ta.get("recommended_font_color", "#000000"),
-                        max_font_size=ta.get("max_font_size"),
-                        suitable_for=ta["suitable_for"],
-                        font_family=ta.get("font_family"),
-                    )
-                    for ta in section["text_areas"]
-                ]
-
-                sr = SectionResult(
-                    section_key=section_key,
-                    order=order,
-                    layout_image_url=layout_image_url,
-                    text_areas=text_areas,
-                    aspect_ratio=section.get("aspect_ratio", "3:4"),
-                )
-
-                db_dict = {
-                    "section_key": section_key,
-                    "order": order,
-                    "layout_image_url": layout_image_url,
-                    "text_areas": [ta.model_dump() for ta in text_areas],
-                    "aspect_ratio": section.get("aspect_ratio", "3:4"),
-                }
-
-                return sr, db_dict
-
-            upload_results = await asyncio.gather(
-                *[_upload_section(s) for s in result["sections"]]
-            )
-            section_results = [r[0] for r in upload_results]
-            sections_for_db = [r[1] for r in upload_results]
-
-            # page_plan 구성
-            page_plan = [
-                SectionPlan(**plan) for plan in result["page_plan"]
+            # 5. 섹션 이미지 3장 순차 생성 (rate limit 방지)
+            image_specs = [
+                ("hero_banner", 860, 1400, "hero_image.png"),
+                ("description", 600, 600, "desc_section_image.png"),
+                ("feature_point", 860, 957, "point_section_image.png"),
             ]
 
-            # pipeline_result DB 저장
-            pipeline_result = {
-                "sections": sections_for_db,
-                "page_plan": [p.model_dump() for p in page_plan],
+            section_image_urls: dict[str, str] = {}
+            for sec_type, w, h, filename in image_specs:
+                logger.info(f"{sec_type} 이미지 생성 시작")
+                image_bytes = await generate_section_image(
+                    product_names=product_names,
+                    section_type=sec_type,
+                    width=w,
+                    height=h,
+                    reference_image=reference_image,
+                    reference_mime_type=ref_mime_type,
+                )
+                path = await self.storage.upload_image(
+                    file_bytes=image_bytes,
+                    project_id=project_id,
+                    image_type="generated",
+                    filename=filename,
+                )
+                section_image_urls[sec_type] = self.storage.get_public_url(path)
+
+            # 6. 각 섹션 데이터 바인딩 + 렌더링
+            rendered_sections = []
+            for i, st in enumerate(section_templates):
+                data = bind_section_data(
+                    section_template=st,
+                    section_texts=section_texts,
+                    theme=theme,
+                    product_image_urls=product_image_urls,
+                    section_image_urls=section_image_urls,
+                )
+                section = render_section(
+                    section_template=st,
+                    order=i,
+                    data=data,
+                )
+                rendered_sections.append(section)
+
+            # 7. DB 저장
+            template_used = "html_template_v5.2"
+
+            generated_data = {
+                "section_texts": section_texts,
+                "section_image_urls": section_image_urls,
+                "theme": theme,
+                "template_used": template_used,
                 "generated_at": datetime.now().isoformat(),
             }
 
-            self.db.table("projects").update(
-                {
-                    "pipeline_result": pipeline_result,
-                    "status": "completed",
-                }
-            ).eq("id", project_id).execute()
+            self.db.table("projects").update({
+                "status": "completed",
+                "theme_id": theme_id,
+                "template_used": template_used,
+                "generated_data": generated_data,
+                "rendered_sections": rendered_sections,
+                "products": products,
+            }).eq("id", project_id).execute()
 
-            product_inputs = [ProductInput(**p) for p in products]
-
-            return LayoutGenerateResponse(
+            # 8. 응답 반환
+            return GenerateResponse(
                 project_id=project_id,
-                sections=section_results,
-                page_plan=page_plan,
-                products=product_inputs,
+                template_used=template_used,
+                theme=theme_id,
+                rendered_sections=[
+                    RenderedSectionResponse(**s) for s in rendered_sections
+                ],
                 generated_at=datetime.now(),
             )
 
-        except Exception:
+        except Exception as e:
+            logger.exception(f"PDP 생성 실패 (project={project_id}): {e}")
             self._update_status(project_id, "failed")
             raise
 
-    async def _download_product_images(self, project_id: str) -> list[bytes]:
-        """프로젝트에 업로드된 상품 이미지를 다운로드한다."""
+    async def _get_product_image_urls(self, project_id: str) -> list[str]:
+        """프로젝트에 업로드된 상품 이미지 public URL 목록을 반환한다."""
         result = (
             self.db.table("project_images")
             .select("*")
             .eq("project_id", project_id)
             .eq("image_type", "input")
+            .order("created_at")
             .execute()
         )
 
-        async def _download_one(record: dict) -> bytes | None:
-            try:
-                public_url = self.storage.get_public_url(record["storage_path"])
-                async with httpx.AsyncClient(timeout=15.0) as client:
-                    response = await client.get(public_url)
-                    response.raise_for_status()
-                    return response.content
-            except Exception as e:
-                logger.warning(f"상품 이미지 다운로드 실패: {e}")
-                return None
+        urls = []
+        for record in (result.data or []):
+            url = self.storage.get_public_url(record["storage_path"])
+            urls.append(url)
 
-        results = await asyncio.gather(
-            *[_download_one(r) for r in (result.data or [])]
-        )
-        return [b for b in results if b is not None]
+        return urls
 
-    def _get_project(self, project_id: str) -> dict:
-        result = self.db.table("projects").select("*").eq("id", project_id).single().execute()
-        return result.data
+    async def _download_reference_image(self, product_image_urls: list[str]) -> tuple[bytes, str] | tuple[None, None]:
+        """첫 번째 상품 이미지를 다운로드하여 (bytes, mime_type)을 반환한다."""
+        if not product_image_urls:
+            return None, None
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as http:
+                resp = await http.get(product_image_urls[0])
+                resp.raise_for_status()
+                content_type = resp.headers.get("content-type", "image/jpeg").split(";")[0].strip()
+                if content_type not in ("image/png", "image/jpeg", "image/webp"):
+                    content_type = "image/jpeg"
+                logger.info(f"참조 이미지 다운로드 완료: {len(resp.content)} bytes, {content_type}")
+                return resp.content, content_type
+        except Exception as e:
+            logger.warning(f"참조 이미지 다운로드 실패, 텍스트 기반 생성으로 대체: {e}")
+            return None, None
 
     def _update_status(self, project_id: str, status: str) -> None:
         self.db.table("projects").update({"status": status}).eq("id", project_id).execute()

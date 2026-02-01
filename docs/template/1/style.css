@@ -1,0 +1,88 @@
+._01,
+._01 * {
+  box-sizing: border-box;
+}
+._01 {
+  display: flex;
+  flex-direction: column;
+  gap: 0px;
+  align-items: center;
+  justify-content: flex-start;
+  flex-shrink: 0;
+  position: relative;
+}
+.image-7 {
+  background: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.8) 20.000000298023224%,
+    rgba(0, 0, 0, 0) 44.999998807907104%
+  );
+  flex-shrink: 0;
+  width: 860px;
+  height: 1400px;
+  position: absolute;
+  left: 0px;
+  top: 0px;
+  object-fit: cover;
+}
+.rectangle-14 {
+  background: rgba(217, 217, 217, 0);
+  align-self: stretch;
+  flex-shrink: 0;
+  height: 122px;
+  position: relative;
+}
+.premium {
+  color: #fff7f7;
+  text-align: center;
+  font-family: "SCoreDream-3Light", sans-serif;
+  font-size: 54px;
+  line-height: 140%;
+  letter-spacing: -0.02em;
+  font-weight: 400;
+  position: relative;
+  align-self: stretch;
+}
+.rectangle-15 {
+  background: rgba(217, 217, 217, 0);
+  align-self: stretch;
+  flex-shrink: 0;
+  height: 24px;
+  position: relative;
+}
+.div {
+  color: #ff0000;
+  text-align: center;
+  font-family: "BmDoHyeonOtf-Regular", sans-serif;
+  font-size: 86px;
+  line-height: 120%;
+  letter-spacing: -0.05em;
+  font-weight: 400;
+  position: relative;
+  width: 751px;
+}
+.rectangle-16 {
+  background: rgba(217, 217, 217, 0);
+  align-self: stretch;
+  flex-shrink: 0;
+  height: 32px;
+  position: relative;
+}
+.div2 {
+  color: #ffffff;
+  text-align: center;
+  font-family: "SCoreDream-5Medium", sans-serif;
+  font-size: 42px;
+  line-height: 140%;
+  letter-spacing: -0.02em;
+  font-weight: 400;
+  position: relative;
+  align-self: stretch;
+}
+.rectangle-17 {
+  background: rgba(217, 217, 217, 0);
+  align-self: stretch;
+  flex-shrink: 0;
+  height: 984px;
+  position: relative;
+}

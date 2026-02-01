@@ -1,14 +1,13 @@
 import { create } from "zustand";
-import type { PipelineResult, TextArea } from "@/types";
+import type { RenderedSection } from "@/types";
 
 interface EditorState {
-  result: PipelineResult | null;
-  history: PipelineResult[];
+  sections: RenderedSection[];
+  history: RenderedSection[][];
   historyIndex: number;
 
-  // Actions
-  setResult: (result: PipelineResult) => void;
-  updateTextArea: (sectionOrder: number, areaId: string, updates: Partial<TextArea>) => void;
+  setSections: (sections: RenderedSection[]) => void;
+  updateSectionData: (sectionId: string, placeholderId: string, value: string) => void;
   undo: () => void;
   redo: () => void;
   canUndo: () => boolean;
@@ -16,42 +15,32 @@ interface EditorState {
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
-  result: null,
+  sections: [],
   history: [],
   historyIndex: -1,
 
-  setResult: (result) => {
+  setSections: (sections) => {
     set({
-      result,
-      history: [result],
+      sections,
+      history: [sections],
       historyIndex: 0,
     });
   },
 
-  updateTextArea: (sectionOrder, areaId, updates) => {
-    const { result, history, historyIndex } = get();
-    if (!result) return;
+  updateSectionData: (sectionId, placeholderId, value) => {
+    const { sections, history, historyIndex } = get();
 
-    const newSections = result.sections.map((section) => {
-      if (section.order !== sectionOrder) return section;
-      return {
-        ...section,
-        text_areas: section.text_areas.map((ta) =>
-          ta.id === areaId ? { ...ta, ...updates } : ta
-        ),
-      };
-    });
-
-    const newResult: PipelineResult = {
-      ...result,
-      sections: newSections,
-    };
+    const newSections = sections.map((sec) =>
+      sec.section_id === sectionId
+        ? { ...sec, data: { ...sec.data, [placeholderId]: value } }
+        : sec
+    );
 
     const newHistory = history.slice(0, historyIndex + 1);
-    newHistory.push(newResult);
+    newHistory.push(newSections);
 
     set({
-      result: newResult,
+      sections: newSections,
       history: newHistory,
       historyIndex: newHistory.length - 1,
     });
@@ -63,7 +52,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
     const newIndex = historyIndex - 1;
     set({
-      result: history[newIndex],
+      sections: history[newIndex],
       historyIndex: newIndex,
     });
   },
@@ -74,7 +63,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
     const newIndex = historyIndex + 1;
     set({
-      result: history[newIndex],
+      sections: history[newIndex],
       historyIndex: newIndex,
     });
   },

@@ -1,3 +1,31 @@
+// === Theme ===
+export interface Theme {
+  id: string;
+  name: string;
+  icon?: string;
+  accent_color?: string;
+  background_prompt: string;
+  copy_keywords?: string[];
+  is_active?: boolean;
+}
+
+// === Section (v5.2 HTML Template) ===
+export type SectionType =
+  | "hero_banner"
+  | "feature_badges"
+  | "description"
+  | "feature_point";
+
+export interface RenderedSection {
+  section_id: string;
+  section_type: SectionType;
+  order: number;
+  template_id: string;
+  html_template: string;
+  css: string;
+  data: Record<string, string>;
+}
+
 // === Project ===
 export type ProjectStatus =
   | "draft"
@@ -8,92 +36,58 @@ export type ProjectStatus =
 export interface Project {
   id: string;
   status: ProjectStatus;
-  brand_name: string;
-  description?: string;
-  category?: string;
+  brand_name?: string;
+  theme_id?: string;
+  template_used?: string;
   products?: ProductInput[];
+  rendered_sections?: RenderedSection[];
+  generated_data?: GeneratedData;
   input_data?: Record<string, unknown>;
-  pipeline_result?: PipelineResult;
+  pipeline_result?: Record<string, unknown>;
   output_url?: string;
   created_at: string;
   updated_at: string;
 }
 
+export interface GeneratedData {
+  section_texts?: Record<string, string>;
+  hero_background_url?: string;
+  theme: Theme;
+  template_used?: string;
+  generated_at: string;
+}
+
 export interface ProjectCreate {
-  brand_name: string;
-  description?: string;
-  category?: string;
-  products?: ProductInput[];
+  products: ProductInput[];
+  theme: string;
 }
 
 export interface ProjectUpdate {
-  pipeline_result?: PipelineResult;
   status?: ProjectStatus;
-  brand_name?: string;
-  description?: string;
+  rendered_sections?: RenderedSection[];
+  generated_data?: Record<string, unknown>;
 }
 
 // === Product ===
 export interface ProductInput {
   name: string;
   price: string;
-  description?: string;
   image_id?: string;
   image_url?: string;
 }
 
-// === Layout & Text Areas ===
-export interface TextAreaBounds {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
-export interface TextArea {
-  id: string;
-  position: number;
-  bounds: TextAreaBounds;
-  background_brightness?: string;
-  recommended_font_color: string;
-  max_font_size?: number;
-  suitable_for: "headline" | "subtext" | "label" | "description";
-  recommended_text?: string;
-  text_align?: "left" | "center" | "right";
-  font_weight?: number;
-  letter_spacing?: string;
-  font_size_vw?: number;
-  font_family?: string;
-}
-
-// === Multi-Section Types ===
-export interface SectionPlan {
-  section_key: string;
-  title: string;
-  description: string;
-  product_indices: number[];
-  order: number;
-}
-
-export interface SectionResult {
-  section_key: string;
-  order: number;
-  layout_image_url: string;
-  text_areas: TextArea[];
-  aspect_ratio: string;
-}
-
-export interface PipelineResult {
-  sections: SectionResult[];
-  page_plan: SectionPlan[];
-  generated_at: string;
-}
-
-export interface LayoutGenerateResponse {
+// === Generate ===
+export interface GenerateRequest {
   project_id: string;
-  sections: SectionResult[];
-  page_plan: SectionPlan[];
   products: ProductInput[];
+  theme: string;
+}
+
+export interface GenerateResponse {
+  project_id: string;
+  template_used: string;
+  theme: string;
+  rendered_sections: RenderedSection[];
   generated_at: string;
 }
 

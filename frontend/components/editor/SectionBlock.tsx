@@ -26,7 +26,6 @@ function escapeHtml(text: string): string {
     .replace(/'/g, "&#039;");
 }
 
-/** camelCase → kebab-case */
 function toKebab(prop: string): string {
   return prop.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`);
 }
@@ -36,13 +35,26 @@ export function SectionBlock({ section, onDataChange, onElementSelect, selectedP
   const editingRef = useRef<HTMLElement | null>(null);
   const lastClickRef = useRef<{ time: number; phId: string }>({ time: 0, phId: "" });
 
-  // stable refs for callbacks (avoid re-attaching listeners)
   const propsRef = useRef({ onDataChange, onElementSelect, section });
   propsRef.current = { onDataChange, onElementSelect, section };
 
-  // 1. {{placeholder}} 치환
   const renderedHtml = useMemo(() => {
     let html = section.html_template;
+
+    // 이미지 태그에 data-placeholder 속성이 없으면 자동 주입
+    for (const [key, value] of Object.entries(section.data)) {
+      if (key.endsWith("_image") && typeof value === "string" && value.startsWith("http")) {
+        // src="{{key}}" 를 포함하는 <img> 태그에 data-placeholder 추가
+        const srcPattern = `src="{{${key}}}"`;
+        if (html.includes(srcPattern) && !html.includes(`data-placeholder="${key}"`)) {
+          html = html.replace(
+            new RegExp(`(<img\\b[^>]*?)${srcPattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'g'),
+            `$1data-placeholder="${key}" ${srcPattern}`
+          );
+        }
+      }
+    }
+
     for (const [key, value] of Object.entries(section.data)) {
       const skipEscape = key.endsWith("_html") || key.endsWith("_image") || key === "theme_accent";
       const escaped = skipEscape ? value : escapeHtml(value);
@@ -51,7 +63,6 @@ export function SectionBlock({ section, onDataChange, onElementSelect, selectedP
     return html;
   }, [section.html_template, section.data]);
 
-  // 1-b. style_overrides → CSS 규칙
   const overrideCss = useMemo(() => {
     if (!section.style_overrides) return "";
     return Object.entries(section.style_overrides)
@@ -64,7 +75,6 @@ export function SectionBlock({ section, onDataChange, onElementSelect, selectedP
       .join("\n");
   }, [section.style_overrides]);
 
-  // 2. CSS 치환
   const renderedCss = useMemo(() => {
     let css = section.css;
     for (const [key, value] of Object.entries(section.data)) {
@@ -73,7 +83,6 @@ export function SectionBlock({ section, onDataChange, onElementSelect, selectedP
     return css;
   }, [section.css, section.data]);
 
-  // 3. 선택 하이라이트
   useEffect(() => {
     if (!containerRef.current) return;
     containerRef.current.querySelectorAll("[data-placeholder]").forEach((el) => {
@@ -84,7 +93,6 @@ export function SectionBlock({ section, onDataChange, onElementSelect, selectedP
     });
   }, [selectedPlaceholderId, renderedHtml]);
 
-  // 4. 클릭/더블클릭 — 네이티브 리스너 (한 번만 등록, ref로 최신 props 참조)
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -101,11 +109,9 @@ export function SectionBlock({ section, onDataChange, onElementSelect, selectedP
 
     function startEditing(editableEl: HTMLElement) {
       const { section: sec, onDataChange: save } = propsRef.current;
-
       editableEl.contentEditable = "true";
       editingRef.current = editableEl;
 
-      // 커서를 텍스트 끝에 배치
       const range = document.createRange();
       const sel = window.getSelection();
       range.selectNodeContents(editableEl);
@@ -126,17 +132,13 @@ export function SectionBlock({ section, onDataChange, onElementSelect, selectedP
         editableEl.style.outlineOffset = "";
         editableEl.style.borderRadius = "";
         editingRef.current = null;
-        const newValue = editableEl.innerText.trim();
-        save(sec.section_id, placeholderId, newValue);
+        save(sec.section_id, placeholderId, editableEl.innerText.trim());
         editableEl.removeEventListener("blur", onBlur);
         editableEl.removeEventListener("keydown", onKey);
       };
 
       const onKey = (ke: KeyboardEvent) => {
-        if (ke.key === "Enter" && !ke.shiftKey) {
-          ke.preventDefault();
-          editableEl.blur();
-        }
+        if (ke.key === "Enter" && !ke.shiftKey) { ke.preventDefault(); editableEl.blur(); }
         if (ke.key === "Escape") {
           editableEl.innerText = propsRef.current.section.data[placeholderId] || "";
           editableEl.blur();
@@ -149,29 +151,29 @@ export function SectionBlock({ section, onDataChange, onElementSelect, selectedP
 
     function handleClick(e: MouseEvent) {
       const target = e.target as HTMLElement;
-
-      // 편집 중이면 무시 (blur가 처리)
       if (editingRef.current) return;
 
-      const placeholderEl = findPlaceholder(target);
+      let placeholderEl = findPlaceholder(target);
+
+      // placeholder가 없는 빈 영역 클릭 시 → 섹션 내 이미지 placeholder로 fallback
+      if (!placeholderEl) {
+        const imgEl = container.querySelector<HTMLElement>("[data-placeholder$='_image']");
+        if (imgEl) placeholderEl = imgEl;
+      }
+
       if (!placeholderEl || !placeholderEl.dataset.placeholder) return;
 
       const phId = placeholderEl.dataset.placeholder;
       const now = Date.now();
 
-      // 더블클릭 감지 (300ms 이내 같은 요소 재클릭)
       if (now - lastClickRef.current.time < 350 && lastClickRef.current.phId === phId) {
         lastClickRef.current = { time: 0, phId: "" };
         const editableEl = findEditable(target);
-        if (editableEl) {
-          startEditing(editableEl);
-          return;
-        }
+        if (editableEl) { startEditing(editableEl); return; }
       }
 
       lastClickRef.current = { time: now, phId };
 
-      // 단일 클릭 → 요소 선택
       const isImage = phId.endsWith("_image");
       const currentStyles: Record<string, string> = {};
       if (!isImage) {
@@ -191,10 +193,8 @@ export function SectionBlock({ section, onDataChange, onElementSelect, selectedP
     }
 
     container.addEventListener("click", handleClick);
-    return () => {
-      container.removeEventListener("click", handleClick);
-    };
-  }, []); // 빈 deps → 마운트 시 한 번만 등록
+    return () => { container.removeEventListener("click", handleClick); };
+  }, []);
 
   return (
     <div ref={containerRef} className="section-block">

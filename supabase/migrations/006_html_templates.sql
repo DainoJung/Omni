@@ -48,7 +48,7 @@ INSERT INTO section_templates (section_type, name, html_template, css_template, 
 .s-hero__bg {
   background: linear-gradient(180deg, rgba(0,0,0,0.8) 20%, rgba(0,0,0,0) 45%);
   width: 860px;
-  height: 1400px;
+  height: 100%;
   position: absolute;
   left: 0;
   top: 0;
@@ -269,7 +269,7 @@ INSERT INTO section_templates (section_type, name, html_template, css_template, 
   height: 600px;
   object-fit: cover;
 }
-.s-desc__spacer-bottom { align-self: stretch; height: 150px; }',
+.s-desc__spacer-bottom { align-self: stretch; height: 0; }',
 -- placeholders
 '[
   {"id": "desc_title_main", "type": "text", "label": "설명 제목 (메인)", "editable": true, "source": "ai"},
@@ -355,7 +355,7 @@ INSERT INTO section_templates (section_type, name, html_template, css_template, 
   height: 957px;
   object-fit: cover;
 }
-.s-point__spacer-bottom { align-self: stretch; height: 150px; }',
+.s-point__spacer-bottom { align-self: stretch; height: 0; }',
 -- placeholders
 '[
   {"id": "point_label", "type": "text", "label": "포인트 라벨", "editable": true, "source": "ai"},

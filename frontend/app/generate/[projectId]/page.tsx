@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
-import { StepIndicator } from "@/components/layout/StepIndicator";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { Check, Loader2, Clock } from "lucide-react";
 import { generateApi, projectsApi } from "@/lib/api";
@@ -104,7 +103,6 @@ export default function GeneratePage() {
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
-      <StepIndicator currentStep={2} />
 
       <main className="flex-1 flex items-center justify-center">
         <div className="w-full max-w-[400px] text-center space-y-8">

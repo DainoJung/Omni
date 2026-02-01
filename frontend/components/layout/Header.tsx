@@ -7,9 +7,9 @@ export function Header() {
   return (
     <header className="h-14 border-b border-border flex items-center justify-between px-10">
       <Link href="/" className="flex items-center gap-2">
-        <Image src="/logo.png" alt="SHINSEGAE" width={28} height={28} />
+        <Image src="/logo.png" alt="SSG" width={28} height={28} />
         <span className="text-lg font-semibold tracking-widest">
-          SHINSEGAE PDP MAKER
+          SSG PDP MAKER
         </span>
       </Link>
       <Link

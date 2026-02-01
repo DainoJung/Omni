@@ -3,7 +3,6 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
-import { StepIndicator } from "@/components/layout/StepIndicator";
 import { SectionRenderer } from "@/components/editor/SectionRenderer";
 import { PropertyPanel } from "@/components/editor/PropertyPanel";
 import { ImagePanel } from "@/components/editor/ImagePanel";
@@ -205,8 +204,8 @@ export default function ResultPage() {
     router.push(`/generate/${projectId}`);
   };
 
-  // 선택된 섹션의 이미지 프롬프트 가져오기
-  const getImagePrompt = (): string => {
+  // 선택된 섹션의 이미지 프롬프트 가져오기 (dict 또는 string)
+  const getImagePrompt = (): Record<string, string> | string => {
     if (!selectedElement || !project?.generated_data?.image_prompts) return "";
     const sec = sections.find((s) => s.section_id === selectedElement.sectionId);
     if (!sec) return "";
@@ -217,6 +216,15 @@ export default function ResultPage() {
       const key = Object.keys(prompts)[i];
       return key.startsWith(sec.section_type);
     }) || "";
+  };
+
+  // 선택된 이미지 URL 가져오기
+  const getImageUrl = (): string => {
+    if (!selectedElement) return "";
+    const sec = sections.find((s) => s.section_id === selectedElement.sectionId);
+    if (!sec) return "";
+    const phId = selectedElement.placeholderId;
+    return sec.data[phId] || "";
   };
 
   // 현재 선택된 섹션의 style_overrides
@@ -254,26 +262,30 @@ export default function ResultPage() {
   return (
     <div className="h-screen flex flex-col overflow-hidden">
       <Header />
-      <StepIndicator currentStep={3} />
 
       <div className="flex-1 flex min-h-0 overflow-hidden">
         {/* Left: Context-aware panel (sticky) */}
-        <aside className="w-[300px] shrink-0 border-r border-border overflow-y-auto p-6 space-y-6">
+        <aside className="w-[300px] shrink-0 border-r border-border overflow-hidden flex flex-col">
           {selectedElement?.type === "text" ? (
-            <PropertyPanel
-              selected={selectedElement}
-              styleOverrides={getSelectedStyleOverrides()}
-              onStyleChange={handleStyleChange}
-              onReset={handleStyleReset}
-            />
+            <div className="overflow-y-auto p-6 space-y-6">
+              <PropertyPanel
+                selected={selectedElement}
+                styleOverrides={getSelectedStyleOverrides()}
+                onStyleChange={handleStyleChange}
+                onReset={handleStyleReset}
+              />
+            </div>
           ) : selectedElement?.type === "image" ? (
-            <ImagePanel
-              selected={selectedElement}
-              imagePrompt={getImagePrompt()}
-              onRegenerate={handleImageRegenerate}
-            />
+            <div className="flex-1 min-h-0 p-6">
+              <ImagePanel
+                selected={selectedElement}
+                imageUrl={getImageUrl()}
+                imagePrompt={getImagePrompt()}
+                onRegenerate={handleImageRegenerate}
+              />
+            </div>
           ) : (
-            <>
+            <div className="overflow-y-auto p-6 space-y-6">
               <div>
                 <h3 className="text-lg font-bold mb-1">생성 결과</h3>
                 <p className="text-sm text-text-secondary">
@@ -350,7 +362,7 @@ export default function ResultPage() {
                   다시 생성
                 </Button>
               </div>
-            </>
+            </div>
           )}
         </aside>
 
@@ -359,17 +371,15 @@ export default function ResultPage() {
           className="flex-1 bg-bg-secondary overflow-auto p-6 flex justify-center items-start"
           onClick={handlePreviewClick}
         >
-          <div className="w-full flex justify-center" style={{ transform: "scale(0.55)", transformOrigin: "top center" }}>
-            <div className="max-w-[860px] w-full">
-              <div className="bg-bg-primary shadow-lg rounded-sm overflow-hidden">
-                <SectionRenderer
-                  ref={previewRef}
-                  sections={sections}
-                  onDataChange={handleDataChange}
-                  onElementSelect={setSelectedElement}
-                  selectedPlaceholderId={selectedElement?.placeholderId}
-                />
-              </div>
+          <div className="max-w-[860px] w-full">
+            <div className="bg-bg-primary shadow-lg rounded-sm overflow-hidden">
+              <SectionRenderer
+                ref={previewRef}
+                sections={sections}
+                onDataChange={handleDataChange}
+                onElementSelect={setSelectedElement}
+                selectedPlaceholderId={selectedElement?.placeholderId}
+              />
             </div>
           </div>
         </main>

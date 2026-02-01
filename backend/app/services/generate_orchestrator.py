@@ -20,6 +20,17 @@ from app.schemas.generate import GenerateResponse, RenderedSectionResponse
 
 logger = logging.getLogger(__name__)
 
+# 섹션 타입별 텍스트 키 (이미지 프롬프트에 컨텍스트로 전달할 키 목록)
+_SECTION_TEXT_KEY_MAP: dict[str, list[str]] = {
+    "hero_banner": ["category", "title", "subtitle"],
+    "description": ["desc_title_main", "desc_title_accent", "desc_body"],
+    "feature_point": ["point_label", "point_title_main", "point_title_accent", "point_body"],
+}
+
+
+def _get_section_text_keys(section_type: str) -> list[str]:
+    return _SECTION_TEXT_KEY_MAP.get(section_type, [])
+
 
 class GenerateOrchestrator:
     """v5.2 HTML 템플릿 기반 PDP 생성 파이프라인 오케스트레이터."""
@@ -86,6 +97,16 @@ class GenerateOrchestrator:
                 w, h = image_size_map[sec_type]
                 filename = f"{sec_type}_{inst_idx}.png" if is_duplicate else f"{sec_type}.png"
 
+                # 해당 섹션 인스턴스의 텍스트 추출
+                relevant_texts: dict[str, str] = {}
+                text_keys = _get_section_text_keys(sec_type)
+                for tk in text_keys:
+                    suffixed = f"{tk}__{inst_idx}" if is_duplicate else tk
+                    if suffixed in section_texts:
+                        relevant_texts[tk] = section_texts[suffixed]
+                    elif tk in section_texts:
+                        relevant_texts[tk] = section_texts[tk]
+
                 logger.info(f"{sec_type} 이미지 생성 시작 (인스턴스 {inst_idx})")
                 image_bytes, prompt_used = await generate_section_image(
                     product_names=product_names,
@@ -94,6 +115,8 @@ class GenerateOrchestrator:
                     height=h,
                     reference_image=reference_image,
                     reference_mime_type=ref_mime_type,
+                    section_texts=relevant_texts,
+                    theme=theme,
                 )
                 path = await self.storage.upload_image(
                     file_bytes=image_bytes,

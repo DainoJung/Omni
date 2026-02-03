@@ -10,6 +10,9 @@ venv/
 .env.local
 .env.*.local
 
+# AWS Keys
+*.pem
+
 # Build
 .next/
 out/

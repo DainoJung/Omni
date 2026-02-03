@@ -108,6 +108,39 @@ export const sectionsApi = {
     ),
 };
 
+// === Auth ===
+export const authApi = {
+  login: async (id: string, password: string) => {
+    const response = await fetch(`${API_URL}/api/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, password }),
+    });
+    return response.json() as Promise<{
+      success: boolean;
+      token?: string;
+      message?: string;
+    }>;
+  },
+
+  verify: async (token: string) => {
+    const response = await fetch(`${API_URL}/api/auth/verify`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
+    });
+    return response.json() as Promise<{ valid: boolean }>;
+  },
+
+  logout: async (token: string) => {
+    await fetch(`${API_URL}/api/auth/logout`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
+    });
+  },
+};
+
 // === Upload ===
 export const uploadApi = {
   uploadImage: async (

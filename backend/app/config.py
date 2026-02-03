@@ -20,6 +20,11 @@ class Settings(BaseSettings):
     CORS_ORIGINS: List[str] = ["http://localhost:3000"]
     LOG_LEVEL: str = "INFO"
 
+    # Auth
+    AUTH_ID: str = "admin"
+    AUTH_PW: str = "admin"
+    AUTH_SECRET: str = "change-this-secret-key"
+
     # Storage
     STORAGE_BUCKET_PROJECTS: str = "project-images"
     STORAGE_BUCKET_TEMPLATES: str = "templates"

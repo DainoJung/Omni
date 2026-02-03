@@ -10,6 +10,7 @@ import {
   Bebas_Neue,
 } from "next/font/google";
 import { Toaster } from "sonner";
+import { ClientLayout } from "@/components/auth/ClientLayout";
 import "./globals.css";
 
 const notoSansKR = Noto_Sans_KR({
@@ -83,7 +84,7 @@ export default function RootLayout({
       <body
         className={`${notoSansKR.variable} ${notoSerifKR.variable} ${playfairDisplay.variable} ${cormorantGaramond.variable} ${montserrat.variable} ${raleway.variable} ${libreBaskerville.variable} ${bebasNeue.variable} font-sans antialiased bg-white text-text-primary`}
       >
-        {children}
+        <ClientLayout>{children}</ClientLayout>
         <Toaster position="bottom-right" richColors />
       </body>
     </html>

@@ -156,7 +156,7 @@ export function SectionBlock({ section, onDataChange, onElementSelect, selectedP
       let placeholderEl = findPlaceholder(target);
 
       // placeholder가 없는 빈 영역 클릭 시 → 섹션 내 이미지 placeholder로 fallback
-      if (!placeholderEl) {
+      if (!placeholderEl && container) {
         const imgEl = container.querySelector<HTMLElement>("[data-placeholder$='_image']");
         if (imgEl) placeholderEl = imgEl;
       }

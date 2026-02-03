@@ -14,14 +14,6 @@ import { toast } from "sonner";
 import type { Project, RenderedSection } from "@/types";
 import type { SelectedElement } from "@/components/editor/SectionBlock";
 
-const SECTION_LABELS: Record<string, string> = {
-  hero_banner: "히어로 배너",
-  feature_badges: "특징 뱃지",
-  description: "상세 설명",
-  feature_point: "특징 포인트",
-  promo_hero: "프로모 헤더",
-  product_card: "상품 카드",
-};
 
 export default function ResultPage() {
   const params = useParams();

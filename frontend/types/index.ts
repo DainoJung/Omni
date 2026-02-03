@@ -14,7 +14,9 @@ export type SectionType =
   | "hero_banner"
   | "feature_badges"
   | "description"
-  | "feature_point";
+  | "feature_point"
+  | "promo_hero"
+  | "product_card";
 
 export interface RenderedSection {
   section_id: string;
@@ -77,6 +79,7 @@ export interface ProjectUpdate {
 export interface ProductInput {
   name: string;
   price: string;
+  brand_name?: string;
   image_id?: string;
   image_url?: string;
 }

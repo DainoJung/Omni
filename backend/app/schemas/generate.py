@@ -7,6 +7,7 @@ from datetime import datetime
 class ProductInput(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     price: str = Field(..., min_length=1, max_length=50)
+    brand_name: Optional[str] = Field(None, max_length=100)
     image_id: Optional[str] = None
 
 

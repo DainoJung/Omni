@@ -25,6 +25,7 @@ _SECTION_TEXT_KEY_MAP: dict[str, list[str]] = {
     "hero_banner": ["category", "title", "subtitle"],
     "description": ["desc_title_main", "desc_title_accent", "desc_body"],
     "feature_point": ["point_label", "point_title_main", "point_title_accent", "point_body"],
+    "promo_hero": ["script_title", "category_title", "subtitle", "location"],
 }
 
 
@@ -52,8 +53,10 @@ class GenerateOrchestrator:
             # 1. 테마 정보 조회
             theme = get_theme(theme_id)
 
-            # 2. 선택된 섹션 템플릿 조회
+            # 2. 선택된 섹션 템플릿 조회 (상품 수 기반 자동 분기)
             selected_sections = self._get_selected_sections(project_id)
+            if not selected_sections and len(products) >= 2:
+                selected_sections = ["promo_hero"] + ["product_card"] * len(products)
             section_templates = compose_sections(selected_sections)
 
             # 3. 상품 이미지 URL 수집 + 참조 이미지 다운로드
@@ -80,6 +83,7 @@ class GenerateOrchestrator:
                 "hero_banner": (860, 1400),
                 "description": (600, 600),
                 "feature_point": (860, 957),
+                "promo_hero": (860, 645),
             }
 
             # 키: "타입__인스턴스인덱스" (중복) 또는 "타입" (단일)
@@ -142,6 +146,7 @@ class GenerateOrchestrator:
                     section_texts=section_texts,
                     theme=theme,
                     product_image_urls=product_image_urls,
+                    products=products,
                     section_image_urls=section_image_urls,
                     instance_index=inst_idx if section_counts.get(sec_type, 1) > 1 else None,
                 )

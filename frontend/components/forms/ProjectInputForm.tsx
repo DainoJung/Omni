@@ -14,6 +14,7 @@ import type { SectionType } from "@/types";
 interface ProductEntry {
   name: string;
   price: string;
+  brand_name: string;
   image: File | null;
   imagePreview: string | null;
 }
@@ -85,7 +86,7 @@ export function ProjectInputForm() {
     "feature_point",
   ]);
   const [products, setProducts] = useState<ProductEntry[]>([
-    { name: "", price: "", image: null, imagePreview: null },
+    { name: "", price: "", brand_name: "", image: null, imagePreview: null },
   ]);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -93,7 +94,7 @@ export function ProjectInputForm() {
     if (products.length >= 6) return;
     setProducts([
       ...products,
-      { name: "", price: "", image: null, imagePreview: null },
+      { name: "", price: "", brand_name: "", image: null, imagePreview: null },
     ]);
   };
 
@@ -125,7 +126,8 @@ export function ProjectInputForm() {
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
     if (!theme) newErrors.theme = "테마를 선택하세요.";
-    if (selectedSections.length === 0) newErrors.template = "최소 1개 섹션을 선택하세요.";
+    if (products.length < 2 && selectedSections.length === 0)
+      newErrors.template = "최소 1개 섹션을 선택하세요.";
 
     products.forEach((p, i) => {
       if (!p.name.trim()) newErrors[`product_${i}_name`] = "제품명을 입력하세요.";
@@ -144,13 +146,15 @@ export function ProjectInputForm() {
     setLoading(true);
     try {
       // 1. 프로젝트 생성
+      const isCatalogMode = products.length >= 2;
       const project = await projectsApi.create({
         products: products.map((p) => ({
           name: p.name,
           price: p.price,
+          ...(p.brand_name ? { brand_name: p.brand_name } : {}),
         })),
         theme,
-        selected_sections: selectedSections,
+        selected_sections: isCatalogMode ? undefined : selectedSections,
       });
 
       // 2. 각 상품 이미지 업로드
@@ -197,6 +201,12 @@ export function ProjectInputForm() {
             {products.length}/6개
           </span>
         </div>
+
+        {products.length >= 2 && (
+          <p className="text-xs text-accent">
+            상품 2개 이상 입력 시 프로모션 카탈로그로 생성됩니다.
+          </p>
+        )}
 
         {products.map((product, index) => (
           <div
@@ -259,6 +269,16 @@ export function ProjectInputForm() {
                       : "border-border"
                   }`}
                 />
+                {products.length >= 2 && (
+                  <input
+                    placeholder="브랜드명 (선택, 카탈로그용)"
+                    value={product.brand_name}
+                    onChange={(e) =>
+                      updateProduct(index, "brand_name", e.target.value)
+                    }
+                    className="w-full h-9 px-3 border border-border rounded-sm text-sm focus:border-border-focus"
+                  />
+                )}
               </div>
             </div>
           </div>
@@ -276,12 +296,14 @@ export function ProjectInputForm() {
         )}
       </div>
 
-      {/* 템플릿 & 섹션 구성 */}
-      <TemplateSelector
-        selectedSections={selectedSections}
-        onChange={setSelectedSections}
-        error={errors.template}
-      />
+      {/* 템플릿 & 섹션 구성 (카탈로그 모드에서는 자동 결정) */}
+      {products.length < 2 && (
+        <TemplateSelector
+          selectedSections={selectedSections}
+          onChange={setSelectedSections}
+          error={errors.template}
+        />
+      )}
 
       <div className="pt-4">
         <Button type="submit" size="lg" loading={loading} className="w-full">

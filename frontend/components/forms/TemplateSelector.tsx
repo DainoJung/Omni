@@ -9,6 +9,8 @@ const ALL_SECTIONS: SectionType[] = [
   "feature_badges",
   "description",
   "feature_point",
+  "promo_hero",
+  "product_card",
 ];
 
 const SECTION_META: Record<
@@ -30,6 +32,14 @@ const SECTION_META: Record<
   feature_point: {
     label: "특징 포인트",
     description: "포인트 라벨, 제목, 본문, 와이드 이미지",
+  },
+  promo_hero: {
+    label: "프로모 헤더",
+    description: "필기체 타이틀 + 카테고리 + 히어로 이미지",
+  },
+  product_card: {
+    label: "상품 카드",
+    description: "상품 이미지 + 브랜드 + 상품명 + 가격",
   },
 };
 

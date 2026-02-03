@@ -183,6 +183,15 @@ _SECTION_TEXT_KEYS: dict[str, list[tuple[str, str]]] = {
         ("point_title_accent", "10자 이내 포인트 강조"),
         ("point_body", "60자 이내 포인트 설명"),
     ],
+    "promo_hero": [
+        ("script_title", "10자 이내 필기체 타이틀, 예: Holiday Gift"),
+        ("category_title", "15자 이내 카테고리명, 대문자 영문 또는 한국어"),
+        ("subtitle", "20자 이내 서브타이틀"),
+        ("location", "10자 이내 위치 정보, 예: 패션관 1층"),
+    ],
+    "product_card": [
+        ("product_note", "20자 이내 혜택/메모 문구, 예: * 구매 시 파우치 증정"),
+    ],
 }
 
 

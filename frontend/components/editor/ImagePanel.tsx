@@ -90,9 +90,9 @@ export function ImagePanel({ selected, imageUrl, imagePrompt, onRegenerate }: Im
 
       {/* 미리보기 */}
       {imageUrl && (
-        <div className="shrink-0 mt-5 space-y-1.5">
+        <div className="shrink-0 mt-4 space-y-1.5">
           <label className="block text-xs font-medium text-text-secondary">미리보기</label>
-          <div className="border border-border rounded-sm overflow-hidden">
+          <div className="border border-border rounded-sm overflow-hidden max-w-[160px]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={imageUrl} alt="섹션 이미지" className="w-full h-auto object-cover" />
           </div>

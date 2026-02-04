@@ -1,36 +1,73 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { SectionRenderer } from "@/components/editor/SectionRenderer";
-import { ImagePanel } from "@/components/editor/ImagePanel";
-import { projectsApi, sectionsApi } from "@/lib/api";
+import { projectsApi, sectionsApi, authApi, uploadApi } from "@/lib/api";
 import { exportImage } from "@/lib/export";
 import { toPng } from "html-to-image";
-import { ZoomIn, ChevronLeft, ChevronRight, Type, Minus, Plus, GripVertical, Image as ImageIcon, Sparkles, Send, ImagePlus } from "lucide-react";
+import { ZoomIn, ChevronLeft, ChevronRight, Minus, Plus, GripVertical, Image as ImageIcon, Send, ImagePlus, Download, Upload, FolderOpen, User, LogOut, X } from "lucide-react";
 import { toast } from "sonner";
 import type { Project, RenderedSection } from "@/types";
 import type { SelectedElement } from "@/components/editor/SectionBlock";
 
+interface ChatMessage {
+  role: "user" | "assistant";
+  text: string;
+  attachedImage?: { url: string; sectionId: string; placeholderId: string };
+  originalImage?: string;
+  newImage?: string;
+  sectionId?: string;
+  placeholderId?: string;
+}
+
+const STATUS_LABEL: Record<string, { text: string; className: string }> = {
+  draft: { text: "초안", className: "bg-gray-100 text-gray-600" },
+  generating: { text: "생성 중", className: "bg-blue-100 text-blue-600" },
+  editing: { text: "편집 중", className: "bg-yellow-100 text-yellow-700" },
+  completed: { text: "완료", className: "bg-green-100 text-green-700" },
+  failed: { text: "실패", className: "bg-red-100 text-red-600" },
+};
+
+function getProjectPath(project: Project): string {
+  if (project.rendered_sections?.length) return `/result/${project.id}`;
+  return `/generate/${project.id}`;
+}
 
 export default function ResultPage() {
   const params = useParams();
+  const router = useRouter();
   const projectId = params.projectId as string;
 
   const [project, setProject] = useState<Project | null>(null);
   const [sections, setSections] = useState<RenderedSection[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedElement, setSelectedElement] = useState<SelectedElement | null>(null);
-  const [zoom, setZoom] = useState(100);
+  const [zoom, setZoom] = useState(50);
   const [showZoomMenu, setShowZoomMenu] = useState(false);
   const [showSectionList, setShowSectionList] = useState(true);
   const [sectionThumbnails, setSectionThumbnails] = useState<Record<string, string>>({});
-  const [activeTab, setActiveTab] = useState<"pages" | "text" | "image" | "ai">("pages");
+  const [activeTab, setActiveTab] = useState<"pages" | "image" | "project">("pages");
+  const [projectList, setProjectList] = useState<Project[]>([]);
+  const [projectListLoading, setProjectListLoading] = useState(false);
   const [expandedSteps, setExpandedSteps] = useState<Record<number, boolean>>({});
-  const [expandedInputInfo, setExpandedInputInfo] = useState(true);
+  const [expandedInputInfo, setExpandedInputInfo] = useState(false);
   const [chatMessage, setChatMessage] = useState("");
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatAttachedImage, setChatAttachedImage] = useState<{ url: string; sectionId: string; placeholderId: string } | null>(null);
+  const [chatPendingFile, setChatPendingFile] = useState<File | null>(null);
+  const [chatLoading, setChatLoading] = useState(false);
   const [draggedSectionIndex, setDraggedSectionIndex] = useState<number | null>(null);
+  const chatFileInputRef = useRef<HTMLInputElement>(null);
+  const [dropIndicatorIndex, setDropIndicatorIndex] = useState<number | null>(null);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadedImages, setUploadedImages] = useState<string[]>([]);
+  const [originalAiImages, setOriginalAiImages] = useState<{ sectionId: string; key: string; url: string }[]>([]);
 
   // Text toolbar states
   const [fontSize, setFontSize] = useState(16);
@@ -57,6 +94,16 @@ export default function ResultPage() {
 
         if (proj.rendered_sections?.length) {
           setSections(proj.rendered_sections);
+          // 초기 AI 이미지를 별도 저장 (사진 탭 그리드용)
+          const aiImages: { sectionId: string; key: string; url: string }[] = [];
+          for (const sec of proj.rendered_sections) {
+            for (const [key, value] of Object.entries(sec.data)) {
+              if (key.endsWith("_image") && typeof value === "string" && value.startsWith("http")) {
+                aiImages.push({ sectionId: sec.section_id, key, url: value });
+              }
+            }
+          }
+          setOriginalAiImages(aiImages);
         }
       } catch {
         toast.error("프로젝트를 불러올 수 없습니다.");
@@ -66,6 +113,18 @@ export default function ResultPage() {
     }
     load();
   }, [projectId]);
+
+  // Fetch project list when project tab is active
+  useEffect(() => {
+    if (activeTab === "project" && projectList.length === 0) {
+      setProjectListLoading(true);
+      projectsApi
+        .list()
+        .then((res) => setProjectList(res.items))
+        .catch(() => toast.error("프로젝트 목록을 불러올 수 없습니다."))
+        .finally(() => setProjectListLoading(false));
+    }
+  }, [activeTab, projectList.length]);
 
   // Generate section thumbnails
   useEffect(() => {
@@ -217,58 +276,322 @@ export default function ResultPage() {
   );
 
   // 섹션 순서 변경 핸들러
-  const handleDragStart = (index: number) => {
+  const handleDragStart = (e: React.DragEvent, index: number) => {
     setDraggedSectionIndex(index);
+    e.dataTransfer.effectAllowed = "move";
   };
 
   const handleDragOver = (e: React.DragEvent, index: number) => {
     e.preventDefault();
-    if (draggedSectionIndex === null || draggedSectionIndex === index) return;
+    e.dataTransfer.dropEffect = "move";
+    if (draggedSectionIndex === null) return;
 
-    const newSections = [...sections];
-    const draggedSection = newSections[draggedSectionIndex];
-    newSections.splice(draggedSectionIndex, 1);
-    newSections.splice(index, 0, draggedSection);
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const midY = rect.top + rect.height / 2;
+    const insertAt = e.clientY < midY ? index : index + 1;
 
-    setSections(newSections);
-    setDraggedSectionIndex(index);
+    // 드래그 아이템 바로 앞/뒤는 무의미하므로 표시 안 함
+    if (insertAt === draggedSectionIndex || insertAt === draggedSectionIndex + 1) {
+      setDropIndicatorIndex(null);
+    } else {
+      setDropIndicatorIndex(insertAt);
+    }
   };
 
   const handleDragEnd = async () => {
-    if (draggedSectionIndex !== null) {
-      // 섹션 순서 변경을 서버에 저장
+    if (draggedSectionIndex !== null && dropIndicatorIndex !== null) {
+      const newSections = [...sections];
+      const [dragged] = newSections.splice(draggedSectionIndex, 1);
+      const adjustedIndex = dropIndicatorIndex > draggedSectionIndex
+        ? dropIndicatorIndex - 1
+        : dropIndicatorIndex;
+      newSections.splice(adjustedIndex, 0, dragged);
+
+      const updated = newSections.map((s, i) => ({ ...s, order: i }));
+      setSections(updated);
+
       try {
-        await projectsApi.update(projectId, {
-          rendered_sections: sections,
-        });
-        toast.success("섹션 순서가 변경되었습니다.");
+        await projectsApi.update(projectId, { rendered_sections: updated });
       } catch {
         toast.error("섹션 순서 변경에 실패했습니다.");
       }
     }
     setDraggedSectionIndex(null);
+    setDropIndicatorIndex(null);
   };
 
-  // 이미지 재생성 핸들러
-  const handleImageRegenerate = useCallback(
-    async (sectionId: string, prompt: string) => {
-      try {
-        const updatedProject = await sectionsApi.regenerateImage(
-          projectId,
-          sectionId,
-          prompt
-        );
-        if (updatedProject.rendered_sections) {
-          setSections(updatedProject.rendered_sections);
+  // 이미지 선택 시 자동으로 채팅에 첨부
+  useEffect(() => {
+    if (selectedElement?.type === "image") {
+      const sec = sections.find((s) => s.section_id === selectedElement.sectionId);
+      if (!sec) return;
+      const url = sec.data[selectedElement.placeholderId] || "";
+      if (url) {
+        setChatAttachedImage({
+          url,
+          sectionId: selectedElement.sectionId,
+          placeholderId: selectedElement.placeholderId,
+        });
+      }
+    }
+  }, [selectedElement, sections]);
+
+  // 채팅 메시지 자동 스크롤
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatMessages]);
+
+  // 채팅으로 이미지 재생성 요청
+  const handleChatSend = useCallback(async () => {
+    const message = chatMessage.trim();
+    if (!message || !chatAttachedImage) return;
+
+    let { sectionId, placeholderId, url: originalUrl } = chatAttachedImage;
+
+    // 유저 메시지 추가
+    const userMsg: ChatMessage = {
+      role: "user",
+      text: message,
+      attachedImage: { ...chatAttachedImage },
+    };
+    setChatMessages((prev) => [...prev, userMsg]);
+    setChatMessage("");
+    setChatLoading(true);
+
+    try {
+      // 사용자가 업로드한 파일이 있으면 먼저 업로드
+      if (chatPendingFile) {
+        const result = await uploadApi.uploadImage(projectId, chatPendingFile, "chat");
+        originalUrl = result.public_url;
+
+        // sectionId/placeholderId가 비어있으면 첫 번째 이미지 섹션에 적용
+        if (!sectionId || !placeholderId) {
+          for (const sec of sectionsRef.current) {
+            const imageKey = Object.keys(sec.data).find(
+              (k) => k.endsWith("_image") && typeof sec.data[k] === "string" && sec.data[k].startsWith("http")
+            );
+            if (imageKey) {
+              sectionId = sec.section_id;
+              placeholderId = imageKey;
+              break;
+            }
+          }
         }
-        setProject(updatedProject);
-        toast.success("이미지가 재생성되었습니다.");
-      } catch {
-        toast.error("이미지 재생성에 실패했습니다.");
+
+        // 업로드된 이미지를 섹션에 먼저 반영
+        if (sectionId && placeholderId) {
+          setSections((prev) =>
+            prev.map((sec) => {
+              if (sec.section_id !== sectionId) return sec;
+              return { ...sec, data: { ...sec.data, [placeholderId]: originalUrl } };
+            })
+          );
+          await sectionsApi.updateData(
+            projectId,
+            sectionId,
+            { ...sectionsRef.current.find((s) => s.section_id === sectionId)?.data, [placeholderId]: originalUrl },
+            sectionsRef.current.find((s) => s.section_id === sectionId)?.style_overrides || {}
+          );
+        }
+
+        // blob URL 해제 & pending file 초기화
+        if (chatAttachedImage.url.startsWith("blob:")) {
+          URL.revokeObjectURL(chatAttachedImage.url);
+        }
+        setChatPendingFile(null);
+      }
+
+      if (!sectionId || !placeholderId) {
+        toast.error("이미지를 적용할 섹션을 찾을 수 없습니다.");
+        setChatLoading(false);
+        return;
+      }
+
+      const updatedProject = await sectionsApi.regenerateImage(
+        projectId,
+        sectionId,
+        message
+      );
+
+      // 새 이미지 URL 가져오기
+      const newSection = updatedProject.rendered_sections?.find(
+        (s) => s.section_id === sectionId
+      );
+      const newUrl = newSection?.data[placeholderId] || "";
+
+      if (updatedProject.rendered_sections) {
+        setSections(updatedProject.rendered_sections);
+      }
+      setProject(updatedProject);
+
+      // 재생성된 이미지를 AI 이미지 갤러리에 추가
+      if (newUrl) {
+        setOriginalAiImages((prev) => {
+          const exists = prev.some((img) => img.url === newUrl);
+          if (exists) return prev;
+          return [...prev, { sectionId, key: placeholderId, url: newUrl }];
+        });
+      }
+
+      // AI 응답 메시지 추가
+      const aiMsg: ChatMessage = {
+        role: "assistant",
+        text: "이미지를 수정했습니다. 원하는 버전을 선택하세요.",
+        originalImage: originalUrl,
+        newImage: newUrl,
+        sectionId,
+        placeholderId,
+      };
+      setChatMessages((prev) => [...prev, aiMsg]);
+
+      // 첨부 이미지를 새 이미지로 갱신
+      setChatAttachedImage({ url: newUrl, sectionId, placeholderId });
+    } catch {
+      toast.error("이미지 재생성에 실패했습니다.");
+      const errorMsg: ChatMessage = {
+        role: "assistant",
+        text: "이미지 재생성에 실패했습니다. 다시 시도해주세요.",
+      };
+      setChatMessages((prev) => [...prev, errorMsg]);
+    } finally {
+      setChatLoading(false);
+    }
+  }, [chatMessage, chatAttachedImage, chatPendingFile, projectId]);
+
+  // AI 응답에서 이미지 변형 선택
+  const handleSelectVariant = useCallback(
+    async (sectionId: string, placeholderId: string, imageUrl: string) => {
+      setSections((prev) =>
+        prev.map((sec) => {
+          if (sec.section_id !== sectionId) return sec;
+          return { ...sec, data: { ...sec.data, [placeholderId]: imageUrl } };
+        })
+      );
+      setChatAttachedImage({ url: imageUrl, sectionId, placeholderId });
+      // 서버에 저장
+      const target = sectionsRef.current.find((s) => s.section_id === sectionId);
+      if (target) {
+        try {
+          await sectionsApi.updateData(
+            projectId,
+            sectionId,
+            { ...target.data, [placeholderId]: imageUrl },
+            target.style_overrides || {}
+          );
+        } catch {
+          toast.error("변경사항 저장에 실패했습니다.");
+        }
       }
     },
     [projectId]
   );
+
+  // 섹션 관리 핸들러
+  const handleSectionMoveUp = useCallback(async (index: number) => {
+    const sorted = [...sections].sort((a, b) => a.order - b.order);
+    if (index <= 0) return;
+    [sorted[index], sorted[index - 1]] = [sorted[index - 1], sorted[index]];
+    const updated = sorted.map((s, i) => ({ ...s, order: i }));
+    setSections(updated);
+    try {
+      await projectsApi.update(projectId, { rendered_sections: updated });
+    } catch {
+      toast.error("섹션 이동에 실패했습니다.");
+    }
+  }, [sections, projectId]);
+
+  const handleSectionMoveDown = useCallback(async (index: number) => {
+    const sorted = [...sections].sort((a, b) => a.order - b.order);
+    if (index >= sorted.length - 1) return;
+    [sorted[index], sorted[index + 1]] = [sorted[index + 1], sorted[index]];
+    const updated = sorted.map((s, i) => ({ ...s, order: i }));
+    setSections(updated);
+    try {
+      await projectsApi.update(projectId, { rendered_sections: updated });
+    } catch {
+      toast.error("섹션 이동에 실패했습니다.");
+    }
+  }, [sections, projectId]);
+
+  const handleSectionDuplicate = useCallback(async (index: number) => {
+    const sorted = [...sections].sort((a, b) => a.order - b.order);
+    const original = sorted[index];
+    const duplicated: RenderedSection = {
+      ...original,
+      section_id: `${original.section_id}_copy_${Date.now()}`,
+      data: { ...original.data },
+      style_overrides: original.style_overrides ? { ...original.style_overrides } : undefined,
+    };
+    sorted.splice(index + 1, 0, duplicated);
+    const updated = sorted.map((s, i) => ({ ...s, order: i }));
+    setSections(updated);
+    try {
+      await projectsApi.update(projectId, { rendered_sections: updated });
+      toast.success("섹션이 복제되었습니다.");
+    } catch {
+      toast.error("섹션 복제에 실패했습니다.");
+    }
+  }, [sections, projectId]);
+
+  const handleSectionDelete = useCallback(async (index: number) => {
+    const sorted = [...sections].sort((a, b) => a.order - b.order);
+    if (sorted.length <= 1) return;
+    sorted.splice(index, 1);
+    const updated = sorted.map((s, i) => ({ ...s, order: i }));
+    setSections(updated);
+    setSelectedElement(null);
+    try {
+      await projectsApi.update(projectId, { rendered_sections: updated });
+      toast.success("섹션이 삭제되었습니다.");
+    } catch {
+      toast.error("섹션 삭제에 실패했습니다.");
+    }
+  }, [sections, projectId]);
+
+  // 이미지 업로드 핸들러
+  // 이미지 업로드 → 갤러리에 추가
+  const handleImageUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("이미지 파일만 업로드할 수 있습니다.");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("파일 크기는 10MB 이하여야 합니다.");
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const result = await uploadApi.uploadImage(projectId, file, "section");
+      setUploadedImages((prev) => [...prev, result.public_url]);
+      toast.success("이미지가 추가되었습니다.");
+    } catch {
+      toast.error("이미지 업로드에 실패했습니다.");
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }, [projectId]);
+
+  // 갤러리 이미지를 선택된 섹션 이미지에 적용
+  const handleApplyImage = useCallback(async (imageUrl: string) => {
+    if (!selectedElement?.type || selectedElement.type !== "image") {
+      toast.error("먼저 프리뷰에서 교체할 이미지를 클릭하세요.");
+      return;
+    }
+    const { sectionId, placeholderId } = selectedElement;
+    setSections((prev) =>
+      prev.map((sec) => {
+        if (sec.section_id !== sectionId) return sec;
+        return { ...sec, data: { ...sec.data, [placeholderId]: imageUrl } };
+      })
+    );
+    setTimeout(() => flushSave(sectionId), 0);
+    toast.success("이미지가 적용되었습니다.");
+  }, [selectedElement, flushSave]);
 
   const handleExport = async () => {
     if (!previewRef.current) return;
@@ -344,28 +667,29 @@ export default function ResultPage() {
     }
   }, [showZoomMenu]);
 
+  // 프로필 메뉴 외부 클릭 감지
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
+        setShowProfileMenu(false);
+      }
+    };
 
-  // 선택된 섹션의 이미지 프롬프트 가져오기 (dict 또는 string)
-  const getImagePrompt = (): Record<string, string> | string => {
-    if (!selectedElement || !project?.generated_data?.image_prompts) return "";
-    const sec = sections.find((s) => s.section_id === selectedElement.sectionId);
-    if (!sec) return "";
+    if (showProfileMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [showProfileMenu]);
 
-    const prompts = project.generated_data.image_prompts;
-    // sec_type 또는 sec_type__index로 매칭
-    return prompts[sec.section_type] || Object.values(prompts).find((_, i) => {
-      const key = Object.keys(prompts)[i];
-      return key.startsWith(sec.section_type);
-    }) || "";
-  };
-
-  // 선택된 이미지 URL 가져오기
-  const getImageUrl = (): string => {
-    if (!selectedElement) return "";
-    const sec = sections.find((s) => s.section_id === selectedElement.sectionId);
-    if (!sec) return "";
-    const phId = selectedElement.placeholderId;
-    return sec.data[phId] || "";
+  const handleLogout = async () => {
+    const token = sessionStorage.getItem("auth_token");
+    if (token) {
+      await authApi.logout(token);
+    }
+    sessionStorage.removeItem("auth_token");
+    router.push("/login");
   };
 
   // 현재 선택된 섹션의 style_overrides
@@ -406,19 +730,22 @@ export default function ResultPage() {
 
       <div className="flex-1 flex min-h-0 overflow-hidden relative">
         {/* Left: Sidebar with Tabs */}
-        <aside
-          className={`shrink-0 border-r border-border bg-bg-primary flex transition-all duration-300 ease-in-out ${
-            showSectionList ? 'w-[400px] opacity-100' : 'w-0 opacity-0'
-          }`}
-        >
-          <div className={`w-[400px] h-full flex ${showSectionList ? '' : 'pointer-events-none'}`}>
-            {/* Tab Menu - Left Side */}
-            <div className="w-[72px] flex flex-col border-r border-border">
+        <aside className="shrink-0 border-r border-border bg-bg-primary flex relative">
+          {/* Tab Menu - Always visible */}
+          <div className="w-[72px] flex flex-col justify-between border-r border-border shrink-0">
+            <div className="flex flex-col">
               <button
-                onClick={() => setActiveTab("pages")}
+                onClick={() => {
+                  if (activeTab === "pages" && showSectionList) {
+                    setShowSectionList(false);
+                  } else {
+                    setActiveTab("pages");
+                    setShowSectionList(true);
+                  }
+                }}
                 className={`flex flex-col items-center gap-1.5 py-4 transition-colors ${
-                  activeTab === "pages"
-                    ? "text-accent bg-bg-secondary"
+                  activeTab === "pages" && showSectionList
+                    ? "text-accent bg-accent/10 border-l-2 border-accent"
                     : "text-text-tertiary hover:text-text-primary hover:bg-bg-secondary/50"
                 }`}
               >
@@ -426,21 +753,17 @@ export default function ResultPage() {
                 <span className="text-[10px]">페이지</span>
               </button>
               <button
-                onClick={() => setActiveTab("text")}
+                onClick={() => {
+                  if (activeTab === "image" && showSectionList) {
+                    setShowSectionList(false);
+                  } else {
+                    setActiveTab("image");
+                    setShowSectionList(true);
+                  }
+                }}
                 className={`flex flex-col items-center gap-1.5 py-4 transition-colors ${
-                  activeTab === "text"
-                    ? "text-accent bg-bg-secondary"
-                    : "text-text-tertiary hover:text-text-primary hover:bg-bg-secondary/50"
-                }`}
-              >
-                <Type size={20} />
-                <span className="text-[10px]">텍스트</span>
-              </button>
-              <button
-                onClick={() => setActiveTab("image")}
-                className={`flex flex-col items-center gap-1.5 py-4 transition-colors ${
-                  activeTab === "image"
-                    ? "text-accent bg-bg-secondary"
+                  activeTab === "image" && showSectionList
+                    ? "text-accent bg-accent/10 border-l-2 border-accent"
                     : "text-text-tertiary hover:text-text-primary hover:bg-bg-secondary/50"
                 }`}
               >
@@ -448,229 +771,315 @@ export default function ResultPage() {
                 <span className="text-[10px]">사진</span>
               </button>
               <button
-                onClick={() => setActiveTab("ai")}
+                onClick={() => {
+                  if (activeTab === "project" && showSectionList) {
+                    setShowSectionList(false);
+                  } else {
+                    setActiveTab("project");
+                    setShowSectionList(true);
+                  }
+                }}
                 className={`flex flex-col items-center gap-1.5 py-4 transition-colors ${
-                  activeTab === "ai"
-                    ? "text-accent bg-bg-secondary"
+                  activeTab === "project" && showSectionList
+                    ? "text-accent bg-accent/10 border-l-2 border-accent"
                     : "text-text-tertiary hover:text-text-primary hover:bg-bg-secondary/50"
                 }`}
               >
-                <Sparkles size={20} />
-                <span className="text-[10px]">AI 생성</span>
+                <FolderOpen size={20} />
+                <span className="text-[10px]">프로젝트</span>
               </button>
             </div>
 
-            {/* Tab Content - Right Side */}
-            <div className="flex-1 overflow-y-auto">
+            {/* Profile Button - Bottom */}
+            <div className="relative pb-4" ref={profileMenuRef}>
+              <button
+                onClick={() => setShowProfileMenu(!showProfileMenu)}
+                className="w-full flex flex-col items-center gap-1.5 py-3 text-text-tertiary hover:text-text-primary hover:bg-bg-secondary/50 transition-colors"
+              >
+                <div className="w-8 h-8 rounded-full bg-bg-secondary border border-border flex items-center justify-center">
+                  <User size={16} />
+                </div>
+              </button>
+
+              {/* Logout Popup */}
+              {showProfileMenu && (
+                <div className="absolute bottom-full left-full mb-0 ml-1 bg-white rounded-lg shadow-xl border border-border py-1 min-w-[160px] z-50">
+                  <button
+                    onClick={handleLogout}
+                    className="w-full px-4 py-2.5 text-left text-sm text-red-500 hover:bg-red-50 transition-colors flex items-center gap-2"
+                  >
+                    <LogOut size={14} />
+                    로그아웃
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Tab Content - Collapsible */}
+          <div
+            className={`overflow-hidden transition-all duration-300 ease-in-out ${
+              showSectionList ? 'w-[328px] opacity-100' : 'w-0 opacity-0'
+            }`}
+          >
+            <div className={`w-[328px] h-full overflow-y-auto ${showSectionList ? '' : 'pointer-events-none'}`}>
               {activeTab === "pages" && (
-                <div className="p-3 space-y-2">
+                <div
+                  className="p-3 space-y-2"
+                  onDragLeave={(e) => {
+                    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                      setDropIndicatorIndex(null);
+                    }
+                  }}
+                >
                   {sections.map((section, index) => (
-                    <div
-                      key={section.section_id}
-                      draggable
-                      onDragStart={() => handleDragStart(index)}
-                      onDragOver={(e) => handleDragOver(e, index)}
-                      onDragEnd={handleDragEnd}
-                      className={`bg-bg-secondary border border-border rounded-sm p-3 hover:border-accent transition-colors cursor-move group ${
-                        draggedSectionIndex === index ? 'opacity-50' : ''
-                      }`}
-                      onClick={() => {
-                        // 드래그 중이 아닐 때만 스크롤
-                        if (draggedSectionIndex === null) {
-                          const element = document.querySelector(`[data-section-id="${section.section_id}"]`);
-                          element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        }
-                      }}
-                    >
-                      <div className="flex items-start gap-3">
-                        {/* Drag Handle */}
-                        <div className="flex items-center justify-center w-5 h-5 text-text-tertiary group-hover:text-accent transition-colors cursor-grab active:cursor-grabbing">
-                          <GripVertical size={16} />
+                    <div key={section.section_id}>
+                      {/* Drop indicator line */}
+                      {draggedSectionIndex !== null && dropIndicatorIndex === index && (
+                        <div className="flex items-center gap-1.5 py-1">
+                          <div className="w-2 h-2 rounded-full bg-accent shrink-0" />
+                          <div className="h-[2px] bg-accent rounded-full flex-1" />
                         </div>
+                      )}
+                      <div
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, index)}
+                        onDragOver={(e) => handleDragOver(e, index)}
+                        onDragEnd={handleDragEnd}
+                        className={`bg-bg-secondary border border-border rounded-sm p-3 hover:border-accent transition-colors cursor-move group ${
+                          draggedSectionIndex === index ? 'opacity-40 scale-[0.97]' : ''
+                        }`}
+                        onClick={() => {
+                          if (draggedSectionIndex === null) {
+                            const element = document.querySelector(`[data-section-id="${section.section_id}"]`);
+                            element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                          }
+                        }}
+                      >
+                        <div className="flex items-start gap-3">
+                          {/* Drag Handle */}
+                          <div className="flex items-center justify-center w-5 h-5 text-text-tertiary group-hover:text-accent transition-colors cursor-grab active:cursor-grabbing">
+                            <GripVertical size={16} />
+                          </div>
 
-                        {/* Thumbnail */}
-                        <div className="w-16 h-16 bg-bg-tertiary border border-border rounded-sm shrink-0 overflow-hidden">
-                          {sectionThumbnails[section.section_id] ? (
-                            <img
-                              src={sectionThumbnails[section.section_id]}
-                              alt={section.section_type}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                              <div className="w-4 h-4 border-2 border-text-tertiary border-t-transparent rounded-full animate-spin"></div>
-                            </div>
-                          )}
-                        </div>
+                          {/* Thumbnail */}
+                          <div className="w-16 h-16 bg-bg-tertiary border border-border rounded-sm shrink-0 overflow-hidden">
+                            {sectionThumbnails[section.section_id] ? (
+                              <img
+                                src={sectionThumbnails[section.section_id]}
+                                alt={section.section_type}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <div className="w-4 h-4 border-2 border-text-tertiary border-t-transparent rounded-full animate-spin"></div>
+                              </div>
+                            )}
+                          </div>
 
-                        {/* Section Info */}
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-text-primary truncate">
-                            {section.section_type.replace(/_/g, ' ')}
-                          </p>
-                          <p className="text-xs text-text-tertiary mt-0.5">
-                            섹션 {index + 1}
-                          </p>
+                          {/* Section Info */}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-text-primary truncate">
+                              {section.section_type.replace(/_/g, ' ')}
+                            </p>
+                            <p className="text-xs text-text-tertiary mt-0.5">
+                              섹션 {index + 1}
+                            </p>
+                          </div>
                         </div>
                       </div>
+                      {/* Drop indicator after last item */}
+                      {draggedSectionIndex !== null && index === sections.length - 1 && dropIndicatorIndex === sections.length && (
+                        <div className="flex items-center gap-1.5 py-1">
+                          <div className="w-2 h-2 rounded-full bg-accent shrink-0" />
+                          <div className="h-[2px] bg-accent rounded-full flex-1" />
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
               )}
 
-              {activeTab === "text" && (
-                <div className="p-6">
-                  <div className="space-y-3">
-                    <h3 className="text-sm font-bold">텍스트 편집</h3>
-                    <p className="text-xs text-text-secondary">
-                      텍스트를 클릭하면 상단 툴바에서 폰트, 크기, 두께, 색상을 편집할 수 있습니다.
-                    </p>
-                    <div className="mt-4 p-3 bg-bg-secondary rounded-sm border border-border">
-                      <p className="text-xs text-text-tertiary">
-                        💡 텍스트를 더블클릭하면 내용을 직접 수정할 수 있습니다.
-                      </p>
-                    </div>
+              {activeTab === "image" && (
+                <div className="p-3 flex flex-col h-full">
+                  <p className="text-xs text-text-secondary mb-3">이미지 추가</p>
+
+                  {/* Image Grid */}
+                  <div className="grid grid-cols-2 gap-2 auto-rows-min flex-1 overflow-y-auto">
+                    {/* AI 생성 이미지 (초기 로드 시 저장된 원본) */}
+                    {originalAiImages.map(({ sectionId, key, url }) => (
+                      <div
+                        key={`ai-${sectionId}-${key}`}
+                        className="relative rounded-lg overflow-hidden border border-border hover:border-accent/50 cursor-pointer transition-colors aspect-square"
+                        onClick={() => handleApplyImage(url)}
+                      >
+                        <img
+                          src={url}
+                          alt={key}
+                          className="w-full h-full object-cover"
+                        />
+                        {/* Download badge - left */}
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            try {
+                              const res = await fetch(url);
+                              const blob = await res.blob();
+                              const blobUrl = URL.createObjectURL(blob);
+                              const a = document.createElement("a");
+                              a.href = blobUrl;
+                              a.download = `${key}_${Date.now()}.png`;
+                              document.body.appendChild(a);
+                              a.click();
+                              document.body.removeChild(a);
+                              URL.revokeObjectURL(blobUrl);
+                            } catch {
+                              toast.error("이미지 다운로드에 실패했습니다.");
+                            }
+                          }}
+                          className="absolute top-1.5 left-1.5 p-1 bg-white/90 rounded shadow-sm hover:bg-white transition-colors"
+                        >
+                          <Download size={12} className="text-text-primary" />
+                        </button>
+                        {/* AI badge - right */}
+                        <span className="absolute top-1.5 right-1.5 px-1.5 py-0.5 bg-accent text-white text-[10px] font-medium rounded shadow-sm">
+                          AI
+                        </span>
+                      </div>
+                    ))}
+                    {/* 업로드된 이미지 */}
+                    {uploadedImages.map((url, index) => (
+                      <div
+                        key={`uploaded-${index}`}
+                        className="relative rounded-lg overflow-hidden border border-border hover:border-accent/50 cursor-pointer transition-colors aspect-square"
+                        onClick={() => handleApplyImage(url)}
+                      >
+                        <img
+                          src={url}
+                          alt={`업로드 ${index + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                        {/* Download badge - left */}
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            try {
+                              const res = await fetch(url);
+                              const blob = await res.blob();
+                              const blobUrl = URL.createObjectURL(blob);
+                              const a = document.createElement("a");
+                              a.href = blobUrl;
+                              a.download = `uploaded_${Date.now()}.png`;
+                              document.body.appendChild(a);
+                              a.click();
+                              document.body.removeChild(a);
+                              URL.revokeObjectURL(blobUrl);
+                            } catch {
+                              toast.error("이미지 다운로드에 실패했습니다.");
+                            }
+                          }}
+                          className="absolute top-1.5 left-1.5 p-1 bg-white/90 rounded shadow-sm hover:bg-white transition-colors"
+                        >
+                          <Download size={12} className="text-text-primary" />
+                        </button>
+                        {/* 업로드 badge - right */}
+                        <span className="absolute top-1.5 right-1.5 px-1.5 py-0.5 bg-emerald-500 text-white text-[10px] font-medium rounded shadow-sm">
+                          업로드
+                        </span>
+                      </div>
+                    ))}
                   </div>
+
+                  {/* Upload Button */}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleImageUpload}
+                  />
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                    className="mt-3 w-full py-2.5 bg-black text-white rounded-lg text-sm font-medium flex items-center justify-center gap-2 hover:bg-gray-900 transition-colors disabled:opacity-50"
+                  >
+                    {uploading ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        업로드 중...
+                      </>
+                    ) : (
+                      <>
+                        <Upload size={16} />
+                        이미지 업로드
+                      </>
+                    )}
+                  </button>
                 </div>
               )}
 
-              {activeTab === "image" && (
-                <div className="p-6">
-                  {selectedElement?.type === "image" ? (
-                    <ImagePanel
-                      selected={selectedElement}
-                      imageUrl={getImageUrl()}
-                      imagePrompt={getImagePrompt()}
-                      onRegenerate={handleImageRegenerate}
-                    />
+              {activeTab === "project" && (
+                <div className="p-3 flex flex-col h-full">
+                  <p className="text-xs text-text-secondary mb-3">프로젝트 목록</p>
+
+                  {projectListLoading ? (
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="w-5 h-5 border-2 border-text-tertiary border-t-transparent rounded-full animate-spin"></div>
+                    </div>
                   ) : (
-                    <div className="space-y-3">
-                      <h3 className="text-sm font-bold">사진 편집</h3>
-                      <p className="text-xs text-text-secondary">
-                        이미지를 클릭하면 재생성하거나 편집할 수 있습니다.
-                      </p>
+                    <div className="flex-1 overflow-y-auto space-y-2">
+                      {projectList.map((proj) => {
+                        const status = STATUS_LABEL[proj.status] ?? STATUS_LABEL.draft;
+                        const isCurrent = proj.id === projectId;
+                        return (
+                          <div
+                            key={proj.id}
+                            onClick={() => {
+                              if (!isCurrent) router.push(getProjectPath(proj));
+                            }}
+                            className={`border rounded-lg p-3 transition-colors ${
+                              isCurrent
+                                ? "border-accent bg-accent/5 cursor-default"
+                                : "border-border hover:border-accent/50 cursor-pointer"
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 mb-1.5">
+                              <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${status.className}`}>
+                                {status.text}
+                              </span>
+                              {isCurrent && (
+                                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-accent/10 text-accent">
+                                  현재
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-sm font-medium text-text-primary truncate">
+                              {proj.products?.[0]?.name || proj.brand_name || "프로젝트"}
+                            </p>
+                            <p className="text-[11px] text-text-tertiary mt-0.5">
+                              {new Date(proj.created_at).toLocaleDateString("ko-KR")}
+                              {proj.theme_id && ` · ${proj.theme_id}`}
+                            </p>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
               )}
 
-              {activeTab === "ai" && (
-                <div className="p-4">
-                  <div className="bg-white rounded-lg border border-border p-4 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-bold text-text-primary">입력한 정보</h3>
-                      <button className="p-1 text-accent hover:bg-bg-secondary rounded transition-colors">
-                        <ChevronLeft size={16} className="rotate-90" />
-                      </button>
-                    </div>
-
-                    {/* 상품명 */}
-                    <div className="space-y-2">
-                      <label className="text-xs font-medium text-text-secondary">상품명</label>
-                      <div className="px-3 py-2 bg-bg-secondary rounded-md border border-border">
-                        <p className="text-sm text-text-primary">
-                          {products[0]?.name || "-"}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* 판매 포인트 */}
-                    <div className="space-y-2">
-                      <label className="text-xs font-medium text-text-secondary">판매 포인트</label>
-                      <div className="px-3 py-2 bg-bg-secondary rounded-md border border-border min-h-[80px]">
-                        <p className="text-sm text-text-primary whitespace-pre-wrap">
-                          {generatedData?.user_input_points || products.map((p, i) => `${i + 1}. ${p.name}`).join(' ') || "-"}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* 입력 이미지 */}
-                    {products[0]?.image_url && (
-                      <div className="space-y-2">
-                        <label className="text-xs font-medium text-text-secondary">입력 이미지</label>
-                        <div className="w-24 h-24 bg-bg-secondary rounded-md border border-border overflow-hidden">
-                          <img
-                            src={products[0].image_url}
-                            alt="product"
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {/* 참고 옵션 */}
-                    <div className="space-y-2">
-                      <label className="text-xs font-medium text-text-secondary">참고 옵션</label>
-                      <div className="flex gap-2">
-                        <span className="px-3 py-1 bg-bg-secondary rounded-full text-xs text-text-primary border border-border">
-                          {generatedData?.style || "내용"}
-                        </span>
-                        <span className="px-3 py-1 bg-bg-secondary rounded-full text-xs text-text-primary border border-border">
-                          {generatedData?.tone || "무드"}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 생성 진행 단계 */}
-                  <div className="mt-4 space-y-2">
-                    {[
-                      { name: "이미지 분석", completed: true },
-                      { name: "모델 이미지 생성", completed: true },
-                      { name: "톤앤매너 추출", completed: true },
-                      { name: "레이아웃 디자인", completed: true },
-                      { name: "콘텐츠 제작", completed: true }
-                    ].map((step, i) => (
-                      <div key={i}>
-                        <div className="bg-white rounded-lg border border-border p-3 flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <div className={`w-5 h-5 rounded-full flex items-center justify-center ${
-                              step.completed ? "bg-black" : "bg-bg-secondary"
-                            }`}>
-                              {step.completed && (
-                                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                                  <path d="M2 6L5 9L10 3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                                </svg>
-                              )}
-                            </div>
-                            <span className="text-sm font-medium text-text-primary">{step.name}</span>
-                          </div>
-                          <span className="px-2 py-0.5 bg-bg-secondary rounded-full text-xs text-text-secondary border border-border">
-                            완료됨
-                          </span>
-                        </div>
-                        {i < 4 && (
-                          <div className="w-0.5 h-2 bg-border ml-[10px]"></div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
           </div>
+
+          {/* Toggle button */}
+          <button
+            onClick={() => setShowSectionList(!showSectionList)}
+            className="absolute top-1/2 -translate-y-1/2 -right-3 bg-bg-primary border border-border rounded-full p-1 shadow-md hover:bg-bg-secondary transition-colors z-10"
+            title={showSectionList ? "패널 접기" : "패널 열기"}
+          >
+            {showSectionList ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
+          </button>
         </aside>
-
-        {/* Toggle button for section list */}
-        {!showSectionList && (
-          <button
-            onClick={() => setShowSectionList(true)}
-            className="absolute left-0 top-1/2 -translate-y-1/2 bg-bg-primary border border-border rounded-r-full p-1 shadow-md hover:bg-bg-secondary transition-colors z-10"
-            title="섹션 리스트 열기"
-          >
-            <ChevronRight size={14} />
-          </button>
-        )}
-
-        {showSectionList && (
-          <button
-            onClick={() => setShowSectionList(false)}
-            className="absolute left-[400px] top-1/2 -translate-y-1/2 -translate-x-1/2 bg-bg-primary border border-border rounded-full p-1 shadow-md hover:bg-bg-secondary transition-colors z-10"
-            title="섹션 리스트 닫기"
-          >
-            <ChevronLeft size={14} />
-          </button>
-        )}
 
         {/* Floating Text Toolbar (Canva-style) */}
         {selectedElement?.type === "text" && (
@@ -766,25 +1175,46 @@ export default function ResultPage() {
         {/* Center: Preview with Floating Zoom Controls */}
         <main className="flex-1 bg-bg-secondary overflow-auto relative">
           {/* Preview Content */}
-          <div className="h-full overflow-auto p-6 flex justify-center items-start">
+          <div
+            className="min-h-full overflow-auto p-6 flex justify-center items-start"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setSelectedElement(null);
+            }}
+          >
             <div
-              className="max-w-[860px] w-full transition-transform origin-top"
-              style={{ transform: `scale(${zoom / 100})` }}
+              className="transition-transform origin-top"
+              style={{
+                width: `${860 * (zoom / 100)}px`,
+                maxWidth: '100%',
+              }}
             >
-              <div className="bg-bg-primary shadow-lg rounded-sm overflow-hidden">
-                <SectionRenderer
-                  ref={previewRef}
-                  sections={sections}
-                  onDataChange={handleDataChange}
-                  onElementSelect={setSelectedElement}
-                  selectedPlaceholderId={selectedElement?.placeholderId}
-                />
+              <div
+                style={{
+                  width: '860px',
+                  transform: `scale(${zoom / 100})`,
+                  transformOrigin: 'top left',
+                }}
+              >
+                <div className="bg-bg-primary shadow-lg rounded-sm">
+                  <SectionRenderer
+                    ref={previewRef}
+                    sections={sections}
+                    zoom={zoom}
+                    onDataChange={handleDataChange}
+                    onElementSelect={setSelectedElement}
+                    selectedPlaceholderId={selectedElement?.placeholderId}
+                    onMoveUp={handleSectionMoveUp}
+                    onMoveDown={handleSectionMoveDown}
+                    onDuplicate={handleSectionDuplicate}
+                    onDelete={handleSectionDelete}
+                  />
+                </div>
               </div>
             </div>
           </div>
 
           {/* Floating Zoom Control */}
-          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10" ref={zoomMenuRef}>
+          <div className="sticky bottom-6 left-1/2 -translate-x-1/2 z-10 w-fit mx-auto" ref={zoomMenuRef}>
             {/* Zoom Menu Popup */}
             {showZoomMenu && (
               <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-[#2b2b2b] rounded-md shadow-lg py-1 min-w-[200px] text-white">
@@ -842,170 +1272,393 @@ export default function ResultPage() {
 
         {/* Right: Generation Info & Chat */}
         <aside className="w-[360px] shrink-0 border-l border-border bg-bg-primary flex flex-col">
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {/* 입력한 정보 */}
-            <div className="bg-white rounded-lg border border-border">
-              <button
-                onClick={() => setExpandedInputInfo(!expandedInputInfo)}
-                className="w-full p-3 flex items-center justify-between hover:bg-bg-secondary/50 transition-colors"
-              >
-                <h3 className="text-sm font-bold text-text-primary">입력한 정보</h3>
-                <ChevronLeft
-                  size={16}
-                  className={`text-text-tertiary transition-transform ${expandedInputInfo ? 'rotate-90' : '-rotate-90'}`}
-                />
-              </button>
+          <div className="flex-1 overflow-y-auto p-4 flex flex-col">
+              <div className="space-y-4">
+                {/* 입력한 정보 */}
+                <div className="bg-white rounded-lg border border-border">
+                  <button
+                    onClick={() => setExpandedInputInfo(!expandedInputInfo)}
+                    className="w-full p-3 flex items-center justify-between hover:bg-bg-secondary/50 transition-colors"
+                  >
+                    <h3 className="text-sm font-bold text-text-primary">입력한 정보</h3>
+                    <ChevronLeft
+                      size={16}
+                      className={`text-text-tertiary transition-transform ${expandedInputInfo ? 'rotate-90' : '-rotate-90'}`}
+                    />
+                  </button>
 
-              {expandedInputInfo && (
-                <div className="px-4 pb-4 space-y-4">
-                  {/* 상품명 */}
-                  <div className="space-y-2">
-                    <label className="text-xs font-medium text-text-secondary">상품명</label>
-                    <div className="px-3 py-2 bg-bg-secondary rounded-md border border-border">
-                      <p className="text-sm text-text-primary">
-                        {products[0]?.name || "-"}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* 판매 포인트 */}
-                  <div className="space-y-2">
-                    <label className="text-xs font-medium text-text-secondary">판매 포인트</label>
-                    <div className="px-3 py-2 bg-bg-secondary rounded-md border border-border min-h-[60px]">
-                      <p className="text-sm text-text-primary whitespace-pre-wrap">
-                        {generatedData?.selling_points || products.map((p, i) => `${i + 1}. ${p.name}`).join('\n') || "-"}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* 타겟 고객 */}
-                  {generatedData?.target_audience && (
-                    <div className="space-y-2">
-                      <label className="text-xs font-medium text-text-secondary">타겟 고객</label>
-                      <div className="px-3 py-2 bg-bg-secondary rounded-md border border-border">
-                        <p className="text-sm text-text-primary">
-                          {generatedData.target_audience}
-                        </p>
+                  {expandedInputInfo && (
+                    <div className="px-4 pb-4 space-y-4">
+                      {/* 테마 */}
+                      <div className="space-y-2">
+                        <label className="text-xs font-medium text-text-secondary">테마</label>
+                        <div className="px-3 py-2 bg-bg-secondary rounded-md border border-border flex items-center gap-2">
+                          {generatedData?.theme?.accent_color && (
+                            <span
+                              className="w-3 h-3 rounded-full shrink-0 border border-border"
+                              style={{ backgroundColor: generatedData.theme.accent_color }}
+                            />
+                          )}
+                          <p className="text-sm text-text-primary">
+                            {generatedData?.theme?.name || project?.theme_id || "-"}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  )}
 
-                  {/* 입력 이미지 */}
-                  {products[0]?.image_url && (
-                    <div className="space-y-2">
-                      <label className="text-xs font-medium text-text-secondary">입력 이미지</label>
-                      <div className="w-20 h-20 bg-bg-secondary rounded-md border border-border overflow-hidden">
-                        <img
-                          src={products[0].image_url}
-                          alt="product"
-                          className="w-full h-full object-cover"
-                        />
+                      {/* 상품 정보 */}
+                      <div className="space-y-2">
+                        <label className="text-xs font-medium text-text-secondary">
+                          상품 정보 ({products.length}개)
+                        </label>
+                        <div className="space-y-2">
+                          {products.map((prod, i) => (
+                            <div
+                              key={i}
+                              className="flex items-start gap-3 px-3 py-2.5 bg-bg-secondary rounded-md border border-border"
+                            >
+                              {prod.image_url && (
+                                <div className="w-12 h-12 rounded border border-border overflow-hidden shrink-0">
+                                  <img
+                                    src={prod.image_url}
+                                    alt={prod.name}
+                                    className="w-full h-full object-cover"
+                                  />
+                                </div>
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-text-primary truncate">
+                                  {prod.name || "-"}
+                                </p>
+                                {prod.price && (
+                                  <p className="text-xs text-text-secondary mt-0.5">
+                                    {prod.price}
+                                  </p>
+                                )}
+                                {prod.brand_name && (
+                                  <p className="text-xs text-text-tertiary mt-0.5">
+                                    {prod.brand_name}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
 
-                  {/* 참고 옵션 */}
-                  {generatedData?.theme && (
-                    <div className="space-y-2">
-                      <label className="text-xs font-medium text-text-secondary">참고 옵션</label>
-                      <div className="flex gap-2">
-                        <span className="px-3 py-1 bg-bg-secondary rounded-full text-xs text-text-primary border border-border">
-                          {generatedData.theme.name}
-                        </span>
-                      </div>
+                      {/* 선택된 섹션 */}
+                      {project?.selected_sections && project.selected_sections.length > 0 && (
+                        <div className="space-y-2">
+                          <label className="text-xs font-medium text-text-secondary">선택된 섹션</label>
+                          <div className="flex flex-wrap gap-1.5">
+                            {project.selected_sections.map((sec) => (
+                              <span
+                                key={sec}
+                                className="px-2.5 py-1 bg-bg-secondary rounded-full text-xs text-text-primary border border-border"
+                              >
+                                {sec.replace(/_/g, " ")}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 판매 포인트 */}
+                      {(generatedData?.selling_points || generatedData?.user_input_points) && (
+                        <div className="space-y-2">
+                          <label className="text-xs font-medium text-text-secondary">판매 포인트</label>
+                          <div className="px-3 py-2 bg-bg-secondary rounded-md border border-border">
+                            <p className="text-sm text-text-primary whitespace-pre-wrap">
+                              {generatedData?.selling_points || generatedData?.user_input_points}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 타겟 고객 */}
+                      {generatedData?.target_audience && (
+                        <div className="space-y-2">
+                          <label className="text-xs font-medium text-text-secondary">타겟 고객</label>
+                          <div className="px-3 py-2 bg-bg-secondary rounded-md border border-border">
+                            <p className="text-sm text-text-primary">
+                              {generatedData.target_audience}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 스타일 & 톤 */}
+                      {(generatedData?.style || generatedData?.tone) && (
+                        <div className="space-y-2">
+                          <label className="text-xs font-medium text-text-secondary">스타일 & 톤</label>
+                          <div className="flex flex-wrap gap-1.5">
+                            {generatedData?.style && (
+                              <span className="px-2.5 py-1 bg-bg-secondary rounded-full text-xs text-text-primary border border-border">
+                                {generatedData.style}
+                              </span>
+                            )}
+                            {generatedData?.tone && (
+                              <span className="px-2.5 py-1 bg-bg-secondary rounded-full text-xs text-text-primary border border-border">
+                                {generatedData.tone}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 사용 템플릿 */}
+                      {(project?.template_used || generatedData?.template_used) && (
+                        <div className="space-y-2">
+                          <label className="text-xs font-medium text-text-secondary">사용 템플릿</label>
+                          <div className="px-3 py-2 bg-bg-secondary rounded-md border border-border">
+                            <p className="text-sm text-text-primary">
+                              {project?.template_used || generatedData?.template_used}
+                            </p>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
-              )}
-            </div>
 
-            {/* 생성 진행 단계 */}
-            <div className="space-y-1">
-              {[
-                {
-                  name: "이미지 분석",
-                  completed: true,
-                  detail: "상품 이미지에서 주요 특징과 색상을 분석했습니다."
-                },
-                {
-                  name: "템플릿 선택",
-                  completed: true,
-                  detail: `${project?.template_used || "템플릿"} 선택됨 - ${generatedData?.theme?.name || "스타일"}에 적합한 레이아웃`
-                },
-                {
-                  name: "톤앤매너 추출",
-                  completed: true,
-                  detail: `${generatedData?.theme?.name || "테마"} 스타일로 통일된 디자인 적용`
-                },
-                {
-                  name: "레이아웃 디자인",
-                  completed: true,
-                  detail: `${sections.length}개 섹션으로 구성된 레이아웃 생성`
-                },
-                {
-                  name: "콘텐츠 제작",
-                  completed: true,
-                  detail: "텍스트 및 이미지 콘텐츠 생성 완료"
-                }
-              ].map((step, i) => (
-                <div key={i}>
-                  <div className="bg-white rounded-lg border border-border">
-                    <button
-                      onClick={() => setExpandedSteps(prev => ({ ...prev, [i]: !prev[i] }))}
-                      className="w-full p-2.5 flex items-center gap-2 hover:bg-bg-secondary/50 transition-colors"
-                    >
-                      <div className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 ${
-                        step.completed ? "bg-black" : "bg-bg-secondary"
-                      }`}>
-                        {step.completed && (
-                          <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
-                            <path d="M2 6L5 9L10 3" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                          </svg>
+                <div className="h-px bg-border" />
+
+                {/* 생성 진행 단계 */}
+                <div className="space-y-1">
+                  {[
+                    {
+                      name: "이미지 분석",
+                      completed: true,
+                      detail: "상품 이미지에서 주요 특징과 색상을 분석했습니다."
+                    },
+                    {
+                      name: "템플릿 선택",
+                      completed: true,
+                      detail: `${project?.template_used || "템플릿"} 선택됨 - ${generatedData?.theme?.name || "스타일"}에 적합한 레이아웃`
+                    },
+                    {
+                      name: "톤앤매너 추출",
+                      completed: true,
+                      detail: `${generatedData?.theme?.name || "테마"} 스타일로 통일된 디자인 적용`
+                    },
+                    {
+                      name: "레이아웃 디자인",
+                      completed: true,
+                      detail: `${sections.length}개 섹션으로 구성된 레이아웃 생성`
+                    },
+                    {
+                      name: "콘텐츠 제작",
+                      completed: true,
+                      detail: "텍스트 및 이미지 콘텐츠 생성 완료"
+                    }
+                  ].map((step, i) => (
+                    <div key={i}>
+                      <div className="bg-white rounded-lg border border-border">
+                        <button
+                          onClick={() => setExpandedSteps(prev => ({ ...prev, [i]: !prev[i] }))}
+                          className="w-full p-2.5 flex items-center gap-2 hover:bg-bg-secondary/50 transition-colors"
+                        >
+                          <div className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 ${
+                            step.completed ? "bg-black" : "bg-bg-secondary"
+                          }`}>
+                            {step.completed && (
+                              <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+                                <path d="M2 6L5 9L10 3" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                            )}
+                          </div>
+                          <span className="text-xs font-medium text-text-primary flex-1 text-left">{step.name}</span>
+                          <span className="px-2 py-0.5 bg-bg-secondary rounded-full text-[10px] text-text-secondary border border-border shrink-0">
+                            완료됨
+                          </span>
+                          <ChevronLeft
+                            size={14}
+                            className={`text-text-tertiary transition-transform ${expandedSteps[i] ? 'rotate-90' : '-rotate-90'}`}
+                          />
+                        </button>
+                        {expandedSteps[i] && step.detail && (
+                          <div className="px-2.5 pb-2.5 pt-0">
+                            <p className="text-xs text-text-secondary leading-relaxed pl-6">
+                              {step.detail}
+                            </p>
+                          </div>
                         )}
                       </div>
-                      <span className="text-xs font-medium text-text-primary flex-1 text-left">{step.name}</span>
-                      <span className="px-2 py-0.5 bg-bg-secondary rounded-full text-[10px] text-text-secondary border border-border shrink-0">
-                        완료됨
-                      </span>
-                      <ChevronLeft
-                        size={14}
-                        className={`text-text-tertiary transition-transform ${expandedSteps[i] ? 'rotate-90' : '-rotate-90'}`}
-                      />
-                    </button>
-                    {expandedSteps[i] && step.detail && (
-                      <div className="px-2.5 pb-2.5 pt-0">
-                        <p className="text-xs text-text-secondary leading-relaxed pl-6">
-                          {step.detail}
-                        </p>
+                      {i < 4 && (
+                        <div className="w-0.5 h-1 bg-border ml-[8px]"></div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 채팅 메시지 — 하단 고정 */}
+              {chatMessages.length > 0 && (
+                <>
+                  <div className="h-px bg-border my-4" />
+                  <div className="space-y-3">
+                    {chatMessages.map((msg, i) => (
+                      <div key={i}>
+                        {msg.role === "user" ? (
+                          <div className="flex flex-col items-end gap-1.5">
+                            {msg.attachedImage && (
+                              <div className="w-16 h-16 rounded-lg border border-border overflow-hidden">
+                                <img src={msg.attachedImage.url} alt="" className="w-full h-full object-cover" />
+                              </div>
+                            )}
+                            <div className="bg-accent text-white rounded-2xl rounded-tr-sm px-3.5 py-2 max-w-[85%]">
+                              <p className="text-sm">{msg.text}</p>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-start gap-1.5">
+                            <div className="bg-bg-secondary rounded-2xl rounded-tl-sm px-3.5 py-2 max-w-[85%]">
+                              <p className="text-sm text-text-primary">{msg.text}</p>
+                            </div>
+                            {msg.originalImage && msg.newImage && msg.sectionId && msg.placeholderId && (
+                              <div className="w-full">
+                                <p className="text-xs text-text-secondary mb-2">변형 선택</p>
+                                <div className="grid grid-cols-2 gap-2">
+                                  <button
+                                    onClick={() => handleSelectVariant(msg.sectionId!, msg.placeholderId!, msg.originalImage!)}
+                                    className="group relative border border-border rounded-lg overflow-hidden hover:border-accent transition-colors"
+                                  >
+                                    <img src={msg.originalImage} alt="원본" className="w-full aspect-square object-cover" />
+                                    <span className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-xs py-1 text-center">
+                                      원본
+                                    </span>
+                                  </button>
+                                  <button
+                                    onClick={() => handleSelectVariant(msg.sectionId!, msg.placeholderId!, msg.newImage!)}
+                                    className="group relative border-2 border-accent rounded-lg overflow-hidden"
+                                  >
+                                    <img src={msg.newImage} alt="수정됨" className="w-full aspect-square object-cover" />
+                                    <span className="absolute bottom-0 inset-x-0 bg-accent text-white text-xs py-1 text-center">
+                                      수정됨
+                                    </span>
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    {chatLoading && (
+                      <div className="flex items-start gap-1.5">
+                        <div className="bg-bg-secondary rounded-2xl rounded-tl-sm px-3.5 py-2.5">
+                          <div className="flex items-center gap-1.5">
+                            <div className="w-1.5 h-1.5 bg-text-tertiary rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                            <div className="w-1.5 h-1.5 bg-text-tertiary rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                            <div className="w-1.5 h-1.5 bg-text-tertiary rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                          </div>
+                        </div>
                       </div>
                     )}
+                    <div ref={chatEndRef} />
                   </div>
-                  {i < 4 && (
-                    <div className="w-0.5 h-1 bg-border ml-[8px]"></div>
-                  )}
-                </div>
-              ))}
-            </div>
+                </>
+              )}
+
+              {/* 빈 공간으로 채팅을 하단에 밀기 */}
+              <div className="flex-1" />
           </div>
 
           {/* Chat Input Area */}
           <div className="border-t border-border bg-white p-4">
-            <div className="bg-bg-secondary rounded-lg border border-border p-3">
-              <input
-                type="text"
-                value={chatMessage}
-                onChange={(e) => setChatMessage(e.target.value)}
-                placeholder="이미지를 클릭하여 AI 로 수정해보세요."
-                className="w-full bg-transparent text-sm text-text-primary placeholder:text-text-tertiary outline-none mb-3"
-              />
-              <div className="flex items-center justify-between">
-                <button className="flex items-center gap-1.5 text-xs text-text-tertiary hover:text-text-primary transition-colors">
-                  <ImagePlus size={16} />
-                  <span>이미지 추가</span>
-                </button>
+            <div className={`bg-bg-secondary rounded-lg border transition-colors duration-200 ${chatAttachedImage ? "border-accent" : "border-border"}`}>
+              {/* 첨부 이미지 — 필드 내부 상단, 애니메이션 확장/축소 */}
+              <div
+                className="overflow-hidden transition-all duration-300 ease-in-out"
+                style={{
+                  maxHeight: chatAttachedImage ? "80px" : "0px",
+                  opacity: chatAttachedImage ? 1 : 0,
+                  padding: chatAttachedImage ? "10px 12px 0 12px" : "0 12px",
+                }}
+              >
+                {chatAttachedImage && (
+                  <div className="relative group inline-block">
+                    <div className="w-14 h-14 rounded-lg border border-border overflow-hidden bg-white">
+                      <img src={chatAttachedImage.url} alt="" className="w-full h-full object-cover" />
+                    </div>
+                    <button
+                      onClick={() => {
+                        if (chatAttachedImage.url.startsWith("blob:")) {
+                          URL.revokeObjectURL(chatAttachedImage.url);
+                        }
+                        setChatAttachedImage(null);
+                        setChatPendingFile(null);
+                        setSelectedElement(null);
+                      }}
+                      className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-text-secondary text-white rounded-full flex items-center justify-center hover:bg-text-primary transition-colors"
+                    >
+                      <X size={10} />
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* 텍스트 입력 */}
+              <div className="px-3 pt-3 pb-1.5">
+                <input
+                  type="text"
+                  value={chatMessage}
+                  onChange={(e) => setChatMessage(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      handleChatSend();
+                    }
+                  }}
+                  placeholder={chatAttachedImage ? "이미지를 어떻게 편집할까요?" : "이미지를 클릭하여 AI로 수정해보세요."}
+                  className="w-full bg-transparent text-sm text-text-primary placeholder:text-text-tertiary outline-none"
+                  disabled={chatLoading}
+                />
+              </div>
+
+              {/* 하단 액션 */}
+              <div className="flex items-center justify-between px-3 pb-3 pt-1.5">
+                <div>
+                  <input
+                    ref={chatFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      if (!file.type.startsWith("image/")) {
+                        toast.error("이미지 파일만 업로드할 수 있습니다.");
+                        if (chatFileInputRef.current) chatFileInputRef.current.value = "";
+                        return;
+                      }
+                      if (file.size > 10 * 1024 * 1024) {
+                        toast.error("파일 크기는 10MB 이하여야 합니다.");
+                        if (chatFileInputRef.current) chatFileInputRef.current.value = "";
+                        return;
+                      }
+                      const previewUrl = URL.createObjectURL(file);
+                      setChatPendingFile(file);
+                      setChatAttachedImage({
+                        url: previewUrl,
+                        sectionId: chatAttachedImage?.sectionId || selectedElement?.sectionId || "",
+                        placeholderId: chatAttachedImage?.placeholderId || selectedElement?.placeholderId || "",
+                      });
+                      if (chatFileInputRef.current) chatFileInputRef.current.value = "";
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => chatFileInputRef.current?.click()}
+                    className="flex items-center gap-1.5 text-xs text-text-tertiary hover:text-text-primary transition-colors"
+                  >
+                    <ImagePlus size={16} />
+                    <span>이미지 추가</span>
+                  </button>
+                </div>
                 <button
+                  onClick={handleChatSend}
                   className="p-2 bg-accent text-white rounded-md hover:bg-accent/90 transition-colors disabled:opacity-50"
-                  disabled={!chatMessage.trim()}
+                  disabled={!chatMessage.trim() || !chatAttachedImage || chatLoading}
                 >
                   <Send size={16} />
                 </button>

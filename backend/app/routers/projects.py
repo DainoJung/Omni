@@ -1,4 +1,5 @@
 import logging
+import httpx
 from fastapi import APIRouter, HTTPException
 from uuid import UUID
 
@@ -143,13 +144,36 @@ async def regenerate_section_image(project_id: UUID, section_id: str, body: Imag
 
     w, h = image_size_map[sec_type]
 
-    # 이미지 재생성
+    # 기존 이미지를 다운로드하여 reference_image로 전달 (이미지 편집 모드)
+    existing_image_url = None
+    for key, value in target_section["data"].items():
+        if key.endswith("_image") and isinstance(value, str) and value.startswith("http"):
+            existing_image_url = value
+            break
+
+    reference_image = None
+    reference_mime_type = None
+    if existing_image_url:
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as http_client:
+                resp = await http_client.get(existing_image_url)
+                resp.raise_for_status()
+                reference_image = resp.content
+                content_type = resp.headers.get("content-type", "image/png")
+                reference_mime_type = content_type.split(";")[0].strip()
+                logger.info(f"기존 이미지 다운로드 완료: {len(reference_image)} bytes")
+        except Exception as e:
+            logger.warning(f"기존 이미지 다운로드 실패, 새로 생성합니다: {e}")
+
+    # 이미지 재생성 (reference_image가 있으면 편집 모드, 없으면 새로 생성)
     image_bytes, prompt_used = await generate_section_image(
         product_names=product_names,
         section_type=sec_type,
         width=w,
         height=h,
         custom_prompt=body.prompt,
+        reference_image=reference_image,
+        reference_mime_type=reference_mime_type,
     )
 
     # 업로드

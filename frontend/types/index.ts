@@ -61,6 +61,11 @@ export interface GeneratedData {
   theme: Theme;
   template_used?: string;
   generated_at: string;
+  user_input_points?: string;
+  selling_points?: string;
+  target_audience?: string;
+  style?: string;
+  tone?: string;
 }
 
 export interface ProjectCreate {

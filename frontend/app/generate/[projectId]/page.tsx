@@ -8,7 +8,7 @@ import { ProgressBar } from "@/components/ui/ProgressBar";
 import { Check, Loader2, Clock } from "lucide-react";
 import { generateApi, projectsApi } from "@/lib/api";
 import { toast } from "sonner";
-import type { ProductInput, Project, RenderedSection, Theme } from "@/types";
+import type { ProductInput, Project, RenderedSection } from "@/types";
 
 type StepStatus = "pending" | "running" | "done";
 
@@ -62,7 +62,7 @@ export default function GeneratePage() {
         updateStep(2, "running");
         setProgress(30);
 
-        const result = await generateApi.generate({
+        await generateApi.generate({
           project_id: projectId,
           products,
           theme: themeId,

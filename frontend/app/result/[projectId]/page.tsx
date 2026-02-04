@@ -1,16 +1,14 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { SectionRenderer } from "@/components/editor/SectionRenderer";
-import { PropertyPanel } from "@/components/editor/PropertyPanel";
 import { ImagePanel } from "@/components/editor/ImagePanel";
-import { Button } from "@/components/ui/Button";
 import { projectsApi, sectionsApi } from "@/lib/api";
 import { exportImage } from "@/lib/export";
 import { toPng } from "html-to-image";
-import { Info, ZoomIn, ChevronLeft, ChevronRight, Type, Minus, Plus, GripVertical, FileText, Image as ImageIcon, Sparkles, Send, ImagePlus } from "lucide-react";
+import { ZoomIn, ChevronLeft, ChevronRight, Type, Minus, Plus, GripVertical, Image as ImageIcon, Sparkles, Send, ImagePlus } from "lucide-react";
 import { toast } from "sonner";
 import type { Project, RenderedSection } from "@/types";
 import type { SelectedElement } from "@/components/editor/SectionBlock";
@@ -18,7 +16,6 @@ import type { SelectedElement } from "@/components/editor/SectionBlock";
 
 export default function ResultPage() {
   const params = useParams();
-  const router = useRouter();
   const projectId = params.projectId as string;
 
   const [project, setProject] = useState<Project | null>(null);
@@ -219,25 +216,6 @@ export default function ResultPage() {
     [selectedElement, debouncedSave]
   );
 
-  // 스타일 초기화 핸들러
-  const handleStyleReset = useCallback(
-    (placeholderId: string) => {
-      if (!selectedElement) return;
-      const sectionId = selectedElement.sectionId;
-
-      setSections((prev) =>
-        prev.map((sec) => {
-          if (sec.section_id !== sectionId) return sec;
-          const overrides = { ...(sec.style_overrides || {}) };
-          delete overrides[placeholderId];
-          return { ...sec, style_overrides: Object.keys(overrides).length > 0 ? overrides : undefined };
-        })
-      );
-      debouncedSave(sectionId);
-    },
-    [selectedElement, debouncedSave]
-  );
-
   // 섹션 순서 변경 핸들러
   const handleDragStart = (index: number) => {
     setDraggedSectionIndex(index);
@@ -304,14 +282,6 @@ export default function ResultPage() {
     } catch {
       toast.error("이미지 출력에 실패했습니다.");
     }
-  };
-
-  const handleZoomIn = () => {
-    setZoom((prev) => Math.min(prev + 10, 200));
-  };
-
-  const handleZoomOut = () => {
-    setZoom((prev) => Math.max(prev - 10, 25));
   };
 
   const handleZoomReset = () => {
@@ -504,7 +474,7 @@ export default function ResultPage() {
                       className={`bg-bg-secondary border border-border rounded-sm p-3 hover:border-accent transition-colors cursor-move group ${
                         draggedSectionIndex === index ? 'opacity-50' : ''
                       }`}
-                      onClick={(e) => {
+                      onClick={() => {
                         // 드래그 중이 아닐 때만 스크롤
                         if (draggedSectionIndex === null) {
                           const element = document.querySelector(`[data-section-id="${section.section_id}"]`);

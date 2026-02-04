@@ -3,10 +3,15 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { LogOut } from "lucide-react";
+import { LogOut, Download } from "lucide-react";
 import { authApi } from "@/lib/api";
 
-export function Header() {
+interface HeaderProps {
+  onDownload?: () => void;
+  showDownload?: boolean;
+}
+
+export function Header({ onDownload, showDownload = false }: HeaderProps) {
   const router = useRouter();
 
   const handleLogout = async () => {
@@ -27,6 +32,15 @@ export function Header() {
         </span>
       </Link>
       <div className="flex items-center gap-4">
+        {showDownload && onDownload && (
+          <button
+            onClick={onDownload}
+            className="flex items-center gap-1.5 text-sm bg-black text-white border border-gray-700 px-3 py-1.5 rounded-sm hover:bg-gray-900 transition-colors font-medium"
+          >
+            <Download size={16} />
+            이미지 다운로드
+          </button>
+        )}
         <Link
           href="/"
           className="text-sm text-text-secondary hover:text-text-primary transition-colors"

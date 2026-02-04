@@ -8,12 +8,24 @@ interface AuthGuardProps {
   children: React.ReactNode;
 }
 
+function isLocalhost(): boolean {
+  if (typeof window === "undefined") return false;
+  const hostname = window.location.hostname;
+  return hostname === "localhost" || hostname === "127.0.0.1";
+}
+
 export function AuthGuard({ children }: AuthGuardProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
 
   useEffect(() => {
+    // localhost에서는 인증 건너뛰기
+    if (isLocalhost()) {
+      setIsAuthenticated(true);
+      return;
+    }
+
     // 로그인 페이지는 체크하지 않음
     if (pathname === "/login") {
       setIsAuthenticated(true);

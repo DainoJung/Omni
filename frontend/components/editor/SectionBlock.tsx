@@ -38,6 +38,13 @@ export function SectionBlock({ section, onDataChange, onElementSelect, selectedP
   const propsRef = useRef({ onDataChange, onElementSelect, section });
   propsRef.current = { onDataChange, onElementSelect, section };
 
+  // Add data-section-id attribute for scrolling navigation
+  useEffect(() => {
+    if (containerRef.current) {
+      containerRef.current.setAttribute('data-section-id', section.section_id);
+    }
+  }, [section.section_id]);
+
   const renderedHtml = useMemo(() => {
     let html = section.html_template;
 

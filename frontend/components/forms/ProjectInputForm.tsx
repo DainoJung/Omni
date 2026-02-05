@@ -62,11 +62,10 @@ function ProductImageUploader({
   return (
     <div
       {...getRootProps()}
-      className={`w-20 h-20 border-2 border-dashed rounded-sm flex flex-col items-center justify-center cursor-pointer transition-colors ${
-        isDragActive
+      className={`w-20 h-20 border-2 border-dashed rounded-sm flex flex-col items-center justify-center cursor-pointer transition-colors ${isDragActive
           ? "border-accent bg-bg-secondary"
           : "border-border hover:border-text-secondary"
-      }`}
+        }`}
     >
       <input {...getInputProps()} />
       <Upload size={16} className="text-text-tertiary" />
@@ -146,7 +145,6 @@ export function ProjectInputForm() {
     setLoading(true);
     try {
       // 1. 프로젝트 생성
-      const isCatalogMode = products.length >= 2;
       const project = await projectsApi.create({
         products: products.map((p) => ({
           name: p.name,
@@ -154,7 +152,7 @@ export function ProjectInputForm() {
           ...(p.brand_name ? { brand_name: p.brand_name } : {}),
         })),
         theme,
-        selected_sections: isCatalogMode ? undefined : selectedSections,
+        selected_sections: selectedSections,
       });
 
       // 2. 각 상품 이미지 업로드
@@ -202,12 +200,6 @@ export function ProjectInputForm() {
           </span>
         </div>
 
-        {products.length >= 2 && (
-          <p className="text-xs text-accent">
-            상품 2개 이상 입력 시 프로모션 카탈로그로 생성됩니다.
-          </p>
-        )}
-
         {products.map((product, index) => (
           <div
             key={index}
@@ -251,11 +243,10 @@ export function ProjectInputForm() {
                   onChange={(e) =>
                     updateProduct(index, "name", e.target.value)
                   }
-                  className={`w-full h-9 px-3 border rounded-sm text-sm focus:border-border-focus ${
-                    errors[`product_${index}_name`]
+                  className={`w-full h-9 px-3 border rounded-sm text-sm focus:border-border-focus ${errors[`product_${index}_name`]
                       ? "border-error"
                       : "border-border"
-                  }`}
+                    }`}
                 />
                 <input
                   placeholder="가격 (필수, 예: 39,000원)"
@@ -263,11 +254,10 @@ export function ProjectInputForm() {
                   onChange={(e) =>
                     updateProduct(index, "price", e.target.value)
                   }
-                  className={`w-full h-9 px-3 border rounded-sm text-sm focus:border-border-focus ${
-                    errors[`product_${index}_price`]
+                  className={`w-full h-9 px-3 border rounded-sm text-sm focus:border-border-focus ${errors[`product_${index}_price`]
                       ? "border-error"
                       : "border-border"
-                  }`}
+                    }`}
                 />
                 {products.length >= 2 && (
                   <input
@@ -296,14 +286,12 @@ export function ProjectInputForm() {
         )}
       </div>
 
-      {/* 템플릿 & 섹션 구성 (카탈로그 모드에서는 자동 결정) */}
-      {products.length < 2 && (
-        <TemplateSelector
-          selectedSections={selectedSections}
-          onChange={setSelectedSections}
-          error={errors.template}
-        />
-      )}
+      {/* 템플릿 & 페이지 구성 */}
+      <TemplateSelector
+        selectedSections={selectedSections}
+        onChange={setSelectedSections}
+        error={errors.template}
+      />
 
       <div className="pt-4">
         <Button type="submit" size="lg" loading={loading} className="w-full">

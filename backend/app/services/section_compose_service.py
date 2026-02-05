@@ -1,4 +1,4 @@
-"""v5.2 섹션 구성 서비스: DB에서 섹션 템플릿 조회 (선택된 섹션만)"""
+"""v5.2 페이지 구성 서비스: DB에서 섹션 템플릿 조회 (선택된 섹션만)"""
 
 import logging
 
@@ -46,5 +46,5 @@ def compose_sections(selected_sections: list[str] | None = None) -> list[dict]:
         entry = {**template, "_order": i}
         sections.append(entry)
 
-    logger.info(f"섹션 구성 완료: {len(sections)}개 ({target_ordered})")
+    logger.info(f"페이지 구성 완료: {len(sections)}개 ({target_ordered})")
     return sections

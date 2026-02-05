@@ -11,6 +11,9 @@ const ALL_SECTIONS: SectionType[] = [
   "feature_point",
   "promo_hero",
   "product_card",
+  "fit_hero",
+  "fit_event_info",
+  "fit_product_trio",
 ];
 
 const SECTION_META: Record<
@@ -40,6 +43,18 @@ const SECTION_META: Record<
   product_card: {
     label: "상품 카드",
     description: "상품 이미지 + 브랜드 + 상품명 + 가격",
+  },
+  fit_hero: {
+    label: "FIT 히어로",
+    description: "배경 이미지 + 브랜드명 + 이벤트 타이틀 + 기간",
+  },
+  fit_event_info: {
+    label: "FIT 행사 정보",
+    description: "이벤트명, 혜택, 기간, 장소, CTA 버튼",
+  },
+  fit_product_trio: {
+    label: "FIT 상품 3종",
+    description: "상품 3개 가로 배열 (이미지 + 이름 + 설명 + 가격)",
   },
 };
 
@@ -153,7 +168,7 @@ export function TemplateSelector({
   return (
     <div className="space-y-2">
       <label className="block text-sm font-medium text-text-primary">
-        섹션 구성
+        페이지 구성
       </label>
 
       <div className="border border-border rounded-sm">
@@ -162,22 +177,20 @@ export function TemplateSelector({
           <button
             type="button"
             onClick={handleAutoSelect}
-            className={`flex-1 px-4 py-2.5 text-xs font-medium transition-colors ${
-              !customMode
+            className={`flex-1 px-4 py-2.5 text-xs font-medium transition-colors ${!customMode
                 ? "bg-accent text-white"
                 : "bg-bg-secondary text-text-secondary hover:bg-bg-tertiary"
-            }`}
+              }`}
           >
             자동 (전체)
           </button>
           <button
             type="button"
             onClick={handleCustomMode}
-            className={`flex-1 px-4 py-2.5 text-xs font-medium transition-colors ${
-              customMode
+            className={`flex-1 px-4 py-2.5 text-xs font-medium transition-colors ${customMode
                 ? "bg-accent text-white"
                 : "bg-bg-secondary text-text-secondary hover:bg-bg-tertiary"
-            }`}
+              }`}
           >
             직접 지정
           </button>
@@ -210,31 +223,30 @@ export function TemplateSelector({
                         onDragOver={(e) => handleDragOver(e, index)}
                         onDragLeave={handleDragLeave}
                         onDragEnd={handleDragEnd}
-                        className={`flex items-center gap-2 px-4 py-2.5 bg-white select-none border-b border-border last:border-b-0 ${
-                          isDragging ? "opacity-40" : ""
-                        }`}
+                        className={`flex items-center gap-2 px-4 py-2.5 bg-white select-none border-b border-border last:border-b-0 ${isDragging ? "opacity-40" : ""
+                          }`}
                       >
-                      <span className="cursor-grab active:cursor-grabbing text-text-tertiary shrink-0">
-                        <GripVertical size={14} />
-                      </span>
-                      <span className="w-5 h-5 rounded bg-accent text-white flex items-center justify-center shrink-0 text-xs font-mono">
-                        {index + 1}
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-text-primary">
-                          {meta.label}
-                        </p>
-                        <p className="text-xs text-text-tertiary truncate">
-                          {meta.description}
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => removeSection(index)}
-                        className="p-1 text-text-tertiary hover:text-error transition-colors shrink-0"
-                      >
-                        <X size={14} />
-                      </button>
+                        <span className="cursor-grab active:cursor-grabbing text-text-tertiary shrink-0">
+                          <GripVertical size={14} />
+                        </span>
+                        <span className="w-5 h-5 rounded bg-accent text-white flex items-center justify-center shrink-0 text-xs font-mono">
+                          {index + 1}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-text-primary">
+                            {meta.label}
+                          </p>
+                          <p className="text-xs text-text-tertiary truncate">
+                            {meta.description}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeSection(index)}
+                          className="p-1 text-text-tertiary hover:text-error transition-colors shrink-0"
+                        >
+                          <X size={14} />
+                        </button>
                       </div>
                       {showAfter && (
                         <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-black z-10" />

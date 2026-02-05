@@ -2,12 +2,14 @@
 
 import asyncio
 import logging
+import re
 from collections import Counter
 from datetime import datetime
 
 import httpx
 
 from app.database import get_supabase
+from app.services.bg_remove_service import remove_background
 from app.constants.themes import get_theme
 from app.services.template_ai_service import (
     generate_section_texts,
@@ -20,12 +22,17 @@ from app.schemas.generate import GenerateResponse, RenderedSectionResponse
 
 logger = logging.getLogger(__name__)
 
+# product_name_0, product_image_2 등 → (base_id, index) 추출
+_INDEXED_PH_RE = re.compile(r"^(.+)_(\d+)$")
+
 # 섹션 타입별 텍스트 키 (이미지 프롬프트에 컨텍스트로 전달할 키 목록)
 _SECTION_TEXT_KEY_MAP: dict[str, list[str]] = {
     "hero_banner": ["category", "title", "subtitle"],
     "description": ["desc_title_main", "desc_title_accent", "desc_body"],
     "feature_point": ["point_label", "point_title_main", "point_title_accent", "point_body"],
     "promo_hero": ["script_title", "category_title", "subtitle", "location"],
+    "fit_hero": ["brand_name", "event_title", "event_subtitle", "event_period"],
+    "fit_event_info": ["event_name", "benefit_text", "info_period", "info_location", "cta_text"],
 }
 
 
@@ -53,10 +60,8 @@ class GenerateOrchestrator:
             # 1. 테마 정보 조회
             theme = get_theme(theme_id)
 
-            # 2. 선택된 섹션 템플릿 조회 (상품 수 기반 자동 분기)
+            # 2. 선택된 섹션 템플릿 조회
             selected_sections = self._get_selected_sections(project_id)
-            if not selected_sections and len(products) >= 2:
-                selected_sections = ["promo_hero"] + ["product_card"] * len(products)
             section_templates = compose_sections(selected_sections)
 
             # 3. 상품 이미지 URL 수집 + 참조 이미지 다운로드
@@ -84,6 +89,7 @@ class GenerateOrchestrator:
                 "description": (600, 600),
                 "feature_point": (860, 957),
                 "promo_hero": (860, 645),
+                "fit_hero": (860, 413),
             }
 
             # 키: "타입__인스턴스인덱스" (중복) 또는 "타입" (단일)
@@ -133,6 +139,13 @@ class GenerateOrchestrator:
                 section_image_urls[key] = url
                 image_prompts[key] = prompt_used
 
+            # 5.5. 배경 제거 전처리 (bg_remove: true인 placeholder만)
+            product_bg_removed_urls = await self._preprocess_bg_removal(
+                section_templates=section_templates,
+                product_image_urls=product_image_urls,
+                project_id=project_id,
+            )
+
             # 6. 각 섹션 데이터 바인딩 + 렌더링
             rendered_sections = []
             instance_counter: dict[str, int] = {}
@@ -149,6 +162,7 @@ class GenerateOrchestrator:
                     products=products,
                     section_image_urls=section_image_urls,
                     instance_index=inst_idx if section_counts.get(sec_type, 1) > 1 else None,
+                    product_bg_removed_urls=product_bg_removed_urls,
                 )
                 section = render_section(
                     section_template=st,
@@ -241,6 +255,66 @@ class GenerateOrchestrator:
         if result.data:
             return result.data.get("selected_sections")
         return None
+
+    async def _preprocess_bg_removal(
+        self,
+        section_templates: list[dict],
+        product_image_urls: list[str],
+        project_id: str,
+    ) -> dict[int, str]:
+        """bg_remove: true인 placeholder의 상품 이미지 인덱스를 수집하여 배경 제거 후 URL 반환.
+
+        Returns:
+            {이미지 인덱스: 배경 제거된 이미지 URL} 딕셔너리
+        """
+        # 모든 섹션의 placeholder를 스캔하여 bg_remove가 필요한 상품 이미지 인덱스 수집
+        bg_remove_indices: set[int] = set()
+        for st in section_templates:
+            for ph in st.get("placeholders", []):
+                if (
+                    ph.get("source") == "product"
+                    and ph.get("type") == "image"
+                    and ph.get("bg_remove") is True
+                ):
+                    m = _INDEXED_PH_RE.match(ph["id"])
+                    if m:
+                        bg_remove_indices.add(int(m.group(2)))
+                    else:
+                        bg_remove_indices.add(0)
+
+        if not bg_remove_indices:
+            return {}
+
+        logger.info(f"배경 제거 대상 상품 이미지 인덱스: {sorted(bg_remove_indices)}")
+
+        result: dict[int, str] = {}
+        for idx in sorted(bg_remove_indices):
+            if idx >= len(product_image_urls):
+                continue
+            try:
+                # 원본 이미지 다운로드
+                async with httpx.AsyncClient(timeout=15.0) as http:
+                    resp = await http.get(product_image_urls[idx])
+                    resp.raise_for_status()
+                    original_bytes = resp.content
+
+                # 배경 제거
+                removed_bytes = await remove_background(original_bytes)
+
+                # Supabase에 업로드
+                filename = f"product_{idx}_bg_removed.png"
+                path = await self.storage.upload_image(
+                    file_bytes=removed_bytes,
+                    project_id=project_id,
+                    image_type="bg_removed",
+                    filename=filename,
+                )
+                result[idx] = self.storage.get_public_url(path)
+                logger.info(f"배경 제거 완료: product[{idx}]")
+            except Exception as e:
+                logger.warning(f"배경 제거 실패 (product[{idx}]), 원본 사용: {e}")
+
+        return result
 
     def _update_status(self, project_id: str, status: str) -> None:
         self.db.table("projects").update({"status": status}).eq("id", project_id).execute()

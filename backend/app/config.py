@@ -14,6 +14,11 @@ class Settings(BaseSettings):
     GEMINI_MAX_TOKENS: int = 2048
     IMAGE_GEN_MODEL: str = "gemini-2.5-flash-image"
 
+    # AWS Bedrock (배경 제거)
+    AWS_REGION: str = "us-east-1"
+    AWS_BEARER_TOKEN_BEDROCK: str = ""
+    BEDROCK_BG_MODEL: str = "amazon.nova-canvas-v1:0"
+
     # App
     BACKEND_HOST: str = "0.0.0.0"
     BACKEND_PORT: int = 8000

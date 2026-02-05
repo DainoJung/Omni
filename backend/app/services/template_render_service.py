@@ -1,8 +1,20 @@
 """v5.2 HTML 템플릿 렌더링 서비스: placeholder 치환 방식"""
 
 import logging
+import re
 
 logger = logging.getLogger(__name__)
+
+# product_name_0, product_image_2 등 → (base_id, index) 추출
+_INDEXED_PH_RE = re.compile(r"^(.+)_(\d+)$")
+
+
+def _format_price(raw: str) -> str:
+    """가격 문자열을 '00,000원' 형태로 포맷한다."""
+    digits = re.sub(r"[^\d]", "", raw)
+    if not digits:
+        return raw
+    return f"{int(digits):,}원"
 
 
 def render_section(
@@ -42,6 +54,7 @@ def bind_section_data(
     products: list[dict] | None = None,
     section_image_urls: dict[str, str] | None = None,
     instance_index: int | None = None,
+    product_bg_removed_urls: dict[int, str] | None = None,
 ) -> dict[str, str]:
     """placeholder 메타 정보를 기반으로 데이터를 매핑한다.
 
@@ -53,6 +66,7 @@ def bind_section_data(
         products: 상품 딕셔너리 목록 (name, price, brand_name 포함)
         section_image_urls: 섹션별 AI 생성 이미지 URL
         instance_index: 중복 섹션의 인스턴스 인덱스 (None이면 단일 섹션)
+        product_bg_removed_urls: 배경 제거된 상품 이미지 {인덱스: URL}
 
     Returns:
         placeholder id → 값 매핑 딕셔너리
@@ -62,6 +76,7 @@ def bind_section_data(
     accent_color = theme.get("accent_color", "#FF0000")
     section_image_urls = section_image_urls or {}
     products = products or []
+    product_bg_removed_urls = product_bg_removed_urls or {}
     data: dict[str, str] = {}
 
     def _get_text(key: str) -> str:
@@ -121,19 +136,31 @@ def bind_section_data(
                 data[ph_id] = _get_text(ph_id)
 
         elif source == "product":
-            idx = instance_index or 0
+            # 인덱싱된 placeholder 지원: product_name_0, product_image_2 등
+            m = _INDEXED_PH_RE.match(ph_id)
+            if m:
+                base_ph_id = m.group(1)
+                idx = int(m.group(2))
+            else:
+                base_ph_id = ph_id
+                idx = instance_index or 0
+
             if ph_type == "image":
-                if idx < len(product_image_urls):
+                use_bg_removed = ph.get("bg_remove") is True and idx in product_bg_removed_urls
+                if use_bg_removed:
+                    data[ph_id] = product_bg_removed_urls[idx]
+                elif idx < len(product_image_urls):
                     data[ph_id] = product_image_urls[idx]
                 elif product_image_urls:
                     data[ph_id] = product_image_urls[0]
                 else:
                     data[ph_id] = ""
-            elif ph_id == "product_name":
+            elif base_ph_id == "product_name":
                 data[ph_id] = products[idx]["name"] if idx < len(products) else ""
-            elif ph_id == "product_price":
-                data[ph_id] = products[idx]["price"] if idx < len(products) else ""
-            elif ph_id == "brand_name":
+            elif base_ph_id == "product_price":
+                raw_price = products[idx]["price"] if idx < len(products) else ""
+                data[ph_id] = _format_price(raw_price) if raw_price else ""
+            elif base_ph_id == "brand_name":
                 data[ph_id] = products[idx].get("brand_name", "") if idx < len(products) else ""
             else:
                 data[ph_id] = ""

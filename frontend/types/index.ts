@@ -16,7 +16,10 @@ export type SectionType =
   | "description"
   | "feature_point"
   | "promo_hero"
-  | "product_card";
+  | "product_card"
+  | "fit_hero"
+  | "fit_event_info"
+  | "fit_product_trio";
 
 export interface RenderedSection {
   section_id: string;

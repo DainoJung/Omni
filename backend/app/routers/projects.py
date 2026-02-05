@@ -137,6 +137,7 @@ async def regenerate_section_image(project_id: UUID, section_id: str, body: Imag
         "hero_banner": (860, 1400),
         "description": (600, 600),
         "feature_point": (860, 957),
+        "fit_hero": (860, 413),
     }
 
     if sec_type not in image_size_map:

@@ -192,6 +192,24 @@ _SECTION_TEXT_KEYS: dict[str, list[tuple[str, str]]] = {
     "product_card": [
         ("product_note", "20자 이내 혜택/메모 문구, 예: * 구매 시 파우치 증정"),
     ],
+    "fit_hero": [
+        ("brand_name", "10자 이내 브랜드명"),
+        ("event_title", "15자 이내 임팩트 있는 이벤트 타이틀, 예: 설날 선물대전"),
+        ("event_subtitle", "25자 이내 이벤트 보조 문구"),
+        ("event_period", "20자 이내 행사 기간, 예: 2025.01.20 ~ 02.05"),
+    ],
+    "fit_event_info": [
+        ("event_name", "15자 이내 행사 이름"),
+        ("benefit_text", "40자 이내 주요 혜택 설명, 줄바꿈 가능"),
+        ("info_period", "20자 이내 행사 기간"),
+        ("info_location", "15자 이내 행사 장소, 예: 전 매장"),
+        ("cta_text", "10자 이내 CTA 문구, 예: 지금 바로 쇼핑하기"),
+    ],
+    "fit_product_trio": [
+        ("product_desc_0", "25자 이내 상품1 한줄 설명"),
+        ("product_desc_1", "25자 이내 상품2 한줄 설명"),
+        ("product_desc_2", "25자 이내 상품3 한줄 설명"),
+    ],
 }
 
 

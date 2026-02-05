@@ -141,6 +141,30 @@ export const authApi = {
   },
 };
 
+// === Images ===
+export const imagesApi = {
+  removeBackground: async (projectId: string, file: File) => {
+    const formData = new FormData();
+    formData.append("project_id", projectId);
+    formData.append("file", file);
+
+    const response = await fetch(`${API_URL}/api/images/remove-bg`, {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({
+        error: "BG_REMOVE_ERROR",
+        message: "배경 제거에 실패했습니다.",
+      }));
+      throw new ApiError(response.status, errorData);
+    }
+
+    return response.json() as Promise<{ url: string }>;
+  },
+};
+
 // === Upload ===
 export const uploadApi = {
   uploadImage: async (

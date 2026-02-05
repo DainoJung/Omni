@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { SectionRenderer } from "@/components/editor/SectionRenderer";
 import { ProgressBar } from "@/components/ui/ProgressBar";
-import { Check, Loader2, Clock } from "lucide-react";
+import { Check, Loader2 } from "lucide-react";
 import { generateApi, projectsApi } from "@/lib/api";
 import { toast } from "sonner";
 import type { ProductInput, Project, RenderedSection } from "@/types";
@@ -20,12 +20,12 @@ export default function GeneratePage() {
   const [project, setProject] = useState<Project | null>(null);
   const [previewSections, setPreviewSections] = useState<RenderedSection[]>([]);
   const [steps, setSteps] = useState<
-    { label: string; status: StepStatus }[]
+    { label: string; detail: string; status: StepStatus }[]
   >([
-    { label: "입력 분석", status: "pending" },
-    { label: "HTML 템플릿 조회", status: "pending" },
-    { label: "AI 배경 & 텍스트 생성", status: "pending" },
-    { label: "템플릿 데이터 바인딩", status: "pending" },
+    { label: "입력 분석", detail: "상품 이미지 및 정보를 분석하고 있습니다.", status: "pending" },
+    { label: "HTML 템플릿 조회", detail: "최적의 레이아웃 템플릿을 선택하고 있습니다.", status: "pending" },
+    { label: "AI 배경 & 텍스트 생성", detail: "AI가 배경 이미지와 텍스트를 생성하고 있습니다.", status: "pending" },
+    { label: "템플릿 데이터 바인딩", detail: "생성된 콘텐츠를 템플릿에 적용하고 있습니다.", status: "pending" },
   ]);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -101,15 +101,72 @@ export default function GeneratePage() {
     run();
   }, [projectId, router]);
 
-  const StatusIcon = ({ status }: { status: StepStatus }) => {
-    switch (status) {
-      case "done":
-        return <Check size={16} className="text-success" />;
-      case "running":
-        return <Loader2 size={16} className="text-accent animate-spin" />;
-      default:
-        return <Clock size={16} className="text-text-tertiary" />;
-    }
+  const StepCard = ({
+    step,
+    index,
+  }: {
+    step: { label: string; detail: string; status: StepStatus };
+    index: number;
+  }) => {
+    if (step.status === "pending") return null;
+
+    const isRunning = step.status === "running";
+    const isDone = step.status === "done";
+
+    return (
+      <div
+        className="animate-fade-slide-up"
+        style={{ animationDelay: `${index * 80}ms`, opacity: 0 }}
+      >
+        <div
+          className={`bg-white rounded-lg border transition-all duration-300 ${
+            isRunning
+              ? "border-accent/30 shadow-sm"
+              : "border-border"
+          }`}
+        >
+          <div className="p-3 flex items-start gap-3">
+            {/* Icon */}
+            <div
+              className={`mt-0.5 flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center ${
+                isDone
+                  ? "bg-text-primary"
+                  : "bg-accent/10"
+              }`}
+            >
+              {isDone ? (
+                <Check size={12} className="text-white" />
+              ) : (
+                <Loader2 size={12} className="text-accent animate-spin" />
+              )}
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-text-primary">
+                  {step.label}
+                </span>
+                <span
+                  className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                    isDone
+                      ? "bg-gray-100 text-gray-600"
+                      : "bg-blue-50 text-blue-600"
+                  }`}
+                >
+                  {isDone ? "완료됨" : "진행 중"}
+                </span>
+              </div>
+              {isRunning && (
+                <p className="text-xs text-text-secondary mt-1 transition-all duration-300">
+                  {step.detail}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   const products = project?.products || [];
@@ -179,29 +236,29 @@ export default function GeneratePage() {
               </p>
             </div>
 
-            {/* Generation Steps */}
-            <div className="space-y-3">
-              <h4 className="text-sm font-medium text-text-secondary">
+            {/* Generation Steps — Card UI */}
+            <div>
+              <h4 className="text-sm font-medium text-text-secondary mb-3">
                 생성 진행 상황
               </h4>
-              {steps.map((step, i) => (
-                <div key={i} className="flex items-center gap-3">
-                  <StatusIcon status={step.status} />
-                  <span
-                    className={`text-sm ${
-                      step.status === "done"
-                        ? "text-success"
-                        : step.status === "running"
-                        ? "text-text-primary font-medium"
-                        : "text-text-tertiary"
-                    }`}
-                  >
-                    {step.label}
-                    {step.status === "done" && " 완료"}
-                    {step.status === "running" && " 중..."}
-                  </span>
-                </div>
-              ))}
+              <div className="space-y-0">
+                {steps.map((step, i) => {
+                  if (step.status === "pending") return null;
+                  const showConnector =
+                    i < steps.length - 1 &&
+                    steps[i + 1].status !== "pending";
+                  return (
+                    <div key={i}>
+                      <StepCard step={step} index={i} />
+                      {showConnector && (
+                        <div className="flex justify-start ml-[8px]">
+                          <div className="w-0.5 h-2 bg-border" />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
 
             <hr className="border-border" />

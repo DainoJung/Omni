@@ -16,8 +16,7 @@ interface ChatMessage {
   role: "user" | "assistant";
   text: string;
   attachedImage?: { url: string; sectionId: string; placeholderId: string };
-  originalImage?: string;
-  newImage?: string;
+  imageVersions?: string[];
   sectionId?: string;
   placeholderId?: string;
 }
@@ -347,6 +346,7 @@ export default function ResultPage() {
     if (!message || !chatAttachedImage) return;
 
     let { sectionId, placeholderId, url: originalUrl } = chatAttachedImage;
+    const isUserUpload = !!chatPendingFile;
 
     // 유저 메시지 추가
     const userMsg: ChatMessage = {
@@ -380,6 +380,8 @@ export default function ResultPage() {
 
         // 업로드된 이미지를 섹션에 먼저 반영
         if (sectionId && placeholderId) {
+          const targetData = sectionsRef.current.find((s) => s.section_id === sectionId)?.data || {};
+          const targetOverrides = sectionsRef.current.find((s) => s.section_id === sectionId)?.style_overrides || {};
           setSections((prev) =>
             prev.map((sec) => {
               if (sec.section_id !== sectionId) return sec;
@@ -389,8 +391,8 @@ export default function ResultPage() {
           await sectionsApi.updateData(
             projectId,
             sectionId,
-            { ...sectionsRef.current.find((s) => s.section_id === sectionId)?.data, [placeholderId]: originalUrl },
-            sectionsRef.current.find((s) => s.section_id === sectionId)?.style_overrides || {}
+            { ...targetData, [placeholderId]: originalUrl },
+            targetOverrides
           );
         }
 
@@ -433,19 +435,42 @@ export default function ResultPage() {
         });
       }
 
-      // AI 응답 메시지 추가
+      // 버전 수집: 사용자 업로드 시 이전 히스토리 초기화, 기존 이미지 재생성 시 누적
+      const versions: string[] = [];
+      if (isUserUpload) {
+        // 업로드한 이미지 → 재생성 결과만 표시
+        versions.push(originalUrl);
+        if (newUrl && newUrl !== originalUrl) versions.push(newUrl);
+      } else {
+        // 기존 이미지 재생성 → 이전 버전 누적
+        setChatMessages((prev) => {
+          for (const m of prev) {
+            if (m.role === "assistant" && m.sectionId === sectionId && m.placeholderId === placeholderId && m.imageVersions) {
+              for (const v of m.imageVersions) {
+                if (!versions.includes(v)) versions.push(v);
+              }
+            }
+          }
+          return prev;
+        });
+        if (!versions.includes(originalUrl)) versions.push(originalUrl);
+        if (newUrl && !versions.includes(newUrl)) versions.push(newUrl);
+      }
+
       const aiMsg: ChatMessage = {
         role: "assistant",
-        text: "이미지를 수정했습니다. 원하는 버전을 선택하세요.",
-        originalImage: originalUrl,
-        newImage: newUrl,
+        text: versions.length > 1
+          ? `이미지를 수정했습니다. (${versions.length}개 버전)`
+          : "이미지를 수정했습니다.",
+        imageVersions: [...versions],
         sectionId,
         placeholderId,
       };
       setChatMessages((prev) => [...prev, aiMsg]);
 
-      // 첨부 이미지를 새 이미지로 갱신
-      setChatAttachedImage({ url: newUrl, sectionId, placeholderId });
+      // 첨부 이미지를 새 이미지로 갱신 (newUrl이 없으면 원본 유지)
+      const appliedUrl = newUrl || originalUrl;
+      setChatAttachedImage({ url: appliedUrl, sectionId, placeholderId });
     } catch {
       toast.error("이미지 재생성에 실패했습니다.");
       const errorMsg: ChatMessage = {
@@ -590,7 +615,6 @@ export default function ResultPage() {
       })
     );
     setTimeout(() => flushSave(sectionId), 0);
-    toast.success("이미지가 적용되었습니다.");
   }, [selectedElement, flushSave]);
 
   const handleExport = async () => {
@@ -1176,16 +1200,16 @@ export default function ResultPage() {
         <main className="flex-1 bg-bg-secondary overflow-auto relative">
           {/* Preview Content */}
           <div
-            className="min-h-full overflow-auto p-6 flex justify-center items-start"
+            className="min-h-full p-6 flex justify-center items-start"
             onClick={(e) => {
               if (e.target === e.currentTarget) setSelectedElement(null);
             }}
           >
             <div
-              className="transition-transform origin-top"
+              className="origin-top overflow-hidden shrink-0"
               style={{
                 width: `${860 * (zoom / 100)}px`,
-                maxWidth: '100%',
+                height: 'fit-content',
               }}
             >
               <div
@@ -1514,28 +1538,35 @@ export default function ResultPage() {
                             <div className="bg-bg-secondary rounded-2xl rounded-tl-sm px-3.5 py-2 max-w-[85%]">
                               <p className="text-sm text-text-primary">{msg.text}</p>
                             </div>
-                            {msg.originalImage && msg.newImage && msg.sectionId && msg.placeholderId && (
+                            {msg.imageVersions && msg.imageVersions.length > 0 && msg.sectionId && msg.placeholderId && (
                               <div className="w-full">
-                                <p className="text-xs text-text-secondary mb-2">변형 선택</p>
-                                <div className="grid grid-cols-2 gap-2">
-                                  <button
-                                    onClick={() => handleSelectVariant(msg.sectionId!, msg.placeholderId!, msg.originalImage!)}
-                                    className="group relative border border-border rounded-lg overflow-hidden hover:border-accent transition-colors"
-                                  >
-                                    <img src={msg.originalImage} alt="원본" className="w-full aspect-square object-cover" />
-                                    <span className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-xs py-1 text-center">
-                                      원본
-                                    </span>
-                                  </button>
-                                  <button
-                                    onClick={() => handleSelectVariant(msg.sectionId!, msg.placeholderId!, msg.newImage!)}
-                                    className="group relative border-2 border-accent rounded-lg overflow-hidden"
-                                  >
-                                    <img src={msg.newImage} alt="수정됨" className="w-full aspect-square object-cover" />
-                                    <span className="absolute bottom-0 inset-x-0 bg-accent text-white text-xs py-1 text-center">
-                                      수정됨
-                                    </span>
-                                  </button>
+                                <p className="text-xs text-text-secondary mb-2">버전 선택 ({msg.imageVersions.length})</p>
+                                <div className="grid grid-cols-3 gap-1.5">
+                                  {msg.imageVersions.map((url, vi) => {
+                                    const isLatest = vi === msg.imageVersions!.length - 1;
+                                    const isFirst = vi === 0;
+                                    // 현재 섹션에 적용된 이미지인지 확인
+                                    const currentSec = sections.find((s) => s.section_id === msg.sectionId);
+                                    const isApplied = currentSec?.data[msg.placeholderId!] === url;
+                                    return (
+                                      <button
+                                        key={vi}
+                                        onClick={() => handleSelectVariant(msg.sectionId!, msg.placeholderId!, url)}
+                                        className={`group relative rounded-lg overflow-hidden transition-colors ${
+                                          isApplied
+                                            ? "border-2 border-accent"
+                                            : "border border-border hover:border-accent"
+                                        }`}
+                                      >
+                                        <img src={url} alt={`v${vi + 1}`} className="w-full aspect-square object-cover" />
+                                        <span className={`absolute bottom-0 inset-x-0 text-white text-[10px] py-0.5 text-center ${
+                                          isApplied ? "bg-accent" : isFirst ? "bg-black/60" : isLatest ? "bg-blue-500/80" : "bg-black/50"
+                                        }`}>
+                                          {isApplied ? "적용됨" : isFirst ? "원본" : `v${vi}`}
+                                        </span>
+                                      </button>
+                                    );
+                                  })}
                                 </div>
                               </div>
                             )}
@@ -1546,10 +1577,9 @@ export default function ResultPage() {
                     {chatLoading && (
                       <div className="flex items-start gap-1.5">
                         <div className="bg-bg-secondary rounded-2xl rounded-tl-sm px-3.5 py-2.5">
-                          <div className="flex items-center gap-1.5">
-                            <div className="w-1.5 h-1.5 bg-text-tertiary rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                            <div className="w-1.5 h-1.5 bg-text-tertiary rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                            <div className="w-1.5 h-1.5 bg-text-tertiary rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                          <div className="flex items-center gap-2">
+                            <div className="w-4 h-4 border-2 border-text-tertiary border-t-accent rounded-full animate-spin" />
+                            <span className="text-sm text-text-secondary">이미지 생성중...</span>
                           </div>
                         </div>
                       </div>

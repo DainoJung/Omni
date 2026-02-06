@@ -119,20 +119,18 @@ export default function GeneratePage() {
         style={{ animationDelay: `${index * 80}ms`, opacity: 0 }}
       >
         <div
-          className={`bg-white rounded-lg border transition-all duration-300 ${
-            isRunning
+          className={`bg-white rounded-lg border transition-all duration-300 ${isRunning
               ? "border-accent/30 shadow-sm"
               : "border-border"
-          }`}
+            }`}
         >
           <div className="p-3 flex items-start gap-3">
             {/* Icon */}
             <div
-              className={`mt-0.5 flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center ${
-                isDone
+              className={`mt-0.5 flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center ${isDone
                   ? "bg-text-primary"
                   : "bg-accent/10"
-              }`}
+                }`}
             >
               {isDone ? (
                 <Check size={12} className="text-white" />
@@ -148,11 +146,10 @@ export default function GeneratePage() {
                   {step.label}
                 </span>
                 <span
-                  className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
-                    isDone
+                  className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${isDone
                       ? "bg-gray-100 text-gray-600"
                       : "bg-blue-50 text-blue-600"
-                  }`}
+                    }`}
                 >
                   {isDone ? "완료됨" : "진행 중"}
                 </span>
@@ -198,8 +195,8 @@ export default function GeneratePage() {
                 <SectionRenderer
                   ref={previewRef}
                   sections={previewSections}
-                  onDataChange={() => {}}
-                  onElementSelect={() => {}}
+                  onDataChange={() => { }}
+                  onElementSelect={() => { }}
                 />
               </div>
             </div>
@@ -208,7 +205,7 @@ export default function GeneratePage() {
               <Loader2 size={48} className="text-accent animate-spin mx-auto" />
               <div>
                 <h2 className="text-xl font-bold mb-2">
-                  AI가 멀티 섹션 PDP를 생성하고 있습니다
+                  AI가 멀티 섹션 POP를 생성하고 있습니다
                 </h2>
                 <p className="text-sm text-text-secondary">
                   잠시만 기다려 주세요...

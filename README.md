@@ -1,3 +1,3 @@
-# PDP_maker
+# POP_maker
 
 Project initialized.

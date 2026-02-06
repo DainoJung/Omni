@@ -276,8 +276,8 @@ async def generate_section_texts(
     schema = _build_text_prompt_schema(section_counts)
 
     prompt = (
-        f"당신은 한국 이커머스 PDP(상품 상세 페이지) 카피라이터입니다.\n"
-        f"다음 조건으로 PDP의 각 섹션에 들어갈 한국어 텍스트를 JSON으로 생성해주세요.\n\n"
+        f"당신은 한국 이커머스 POP(상품 상세 페이지) 카피라이터입니다.\n"
+        f"다음 조건으로 POP의 각 섹션에 들어갈 한국어 텍스트를 JSON으로 생성해주세요.\n\n"
         f"조건:\n"
         f"- 상품: {products_str}\n"
         f"- 테마: {theme_name}\n"

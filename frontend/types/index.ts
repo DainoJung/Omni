@@ -33,15 +33,8 @@ export interface RenderedSection {
 }
 
 // === Project ===
-export type ProjectStatus =
-  | "draft"
-  | "generating"
-  | "completed"
-  | "failed";
-
 export interface Project {
   id: string;
-  status: ProjectStatus;
   brand_name?: string;
   theme_id?: string;
   template_used?: string;
@@ -78,7 +71,6 @@ export interface ProjectCreate {
 }
 
 export interface ProjectUpdate {
-  status?: ProjectStatus;
   rendered_sections?: RenderedSection[];
   generated_data?: Record<string, unknown>;
 }

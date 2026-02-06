@@ -661,7 +661,7 @@ export default function ResultPage() {
       await exportImage(previewRef.current, {
         format: "png",
         quality: 2,
-        filename: `PDP_${Date.now()}`,
+        filename: `POP_${Date.now()}`,
       });
       toast.success("이미지가 다운로드되었습니다.");
     } catch {

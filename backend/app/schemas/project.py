@@ -2,16 +2,8 @@ from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
 from uuid import UUID
-from enum import Enum
 
 from app.schemas.generate import ProductInput
-
-
-class ProjectStatus(str, Enum):
-    DRAFT = "draft"
-    GENERATING = "generating"
-    COMPLETED = "completed"
-    FAILED = "failed"
 
 
 class ProjectCreate(BaseModel):
@@ -21,7 +13,6 @@ class ProjectCreate(BaseModel):
 
 
 class ProjectUpdate(BaseModel):
-    status: Optional[ProjectStatus] = None
     rendered_sections: Optional[List[dict]] = None
     generated_data: Optional[dict] = None
 
@@ -37,7 +28,6 @@ class ImageRegenerateRequest(BaseModel):
 
 class ProjectResponse(BaseModel):
     id: UUID
-    status: ProjectStatus
     brand_name: Optional[str] = None
     theme_id: Optional[str] = None
     template_used: Optional[str] = None

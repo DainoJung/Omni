@@ -63,8 +63,8 @@ function ProductImageUploader({
     <div
       {...getRootProps()}
       className={`w-20 h-20 border-2 border-dashed rounded-sm flex flex-col items-center justify-center cursor-pointer transition-colors ${isDragActive
-          ? "border-accent bg-bg-secondary"
-          : "border-border hover:border-text-secondary"
+        ? "border-accent bg-bg-secondary"
+        : "border-border hover:border-text-secondary"
         }`}
     >
       <input {...getInputProps()} />
@@ -186,7 +186,7 @@ export function ProjectInputForm({ onSuccess, compact }: ProjectInputFormProps) 
     <form onSubmit={handleSubmit} className={compact ? "space-y-4" : "space-y-6"}>
       {!compact && (
         <div className="space-y-1">
-          <h2 className="text-2xl font-bold">PDP 만들기</h2>
+          <h2 className="text-2xl font-bold">POP 만들기</h2>
           <p className="text-text-secondary text-sm">
             상품 정보와 테마를 선택하면 AI가 배경과 카피를 자동 생성합니다.
           </p>
@@ -255,8 +255,8 @@ export function ProjectInputForm({ onSuccess, compact }: ProjectInputFormProps) 
                     updateProduct(index, "name", e.target.value)
                   }
                   className={`w-full h-9 px-3 border rounded-sm text-sm focus:border-border-focus ${errors[`product_${index}_name`]
-                      ? "border-error"
-                      : "border-border"
+                    ? "border-error"
+                    : "border-border"
                     }`}
                 />
                 <input
@@ -266,8 +266,8 @@ export function ProjectInputForm({ onSuccess, compact }: ProjectInputFormProps) 
                     updateProduct(index, "price", e.target.value)
                   }
                   className={`w-full h-9 px-3 border rounded-sm text-sm focus:border-border-focus ${errors[`product_${index}_price`]
-                      ? "border-error"
-                      : "border-border"
+                    ? "border-error"
+                    : "border-border"
                     }`}
                 />
                 {products.length >= 2 && (

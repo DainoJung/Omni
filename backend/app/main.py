@@ -5,7 +5,7 @@ from app.config import settings
 from app.routers import projects, generate, upload, templates, themes, auth, images
 
 app = FastAPI(
-    title="PDP Maker API",
+    title="POP Maker API",
     version="5.2.0",
     docs_url="/docs",
     redoc_url="/redoc",

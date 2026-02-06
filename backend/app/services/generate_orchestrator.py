@@ -1,4 +1,4 @@
-"""v5.2 생성 오케스트레이터: HTML 템플릿 기반 PDP 파이프라인"""
+"""v5.2 생성 오케스트레이터: HTML 템플릿 기반 POP 파이프라인"""
 
 import asyncio
 import logging
@@ -41,7 +41,7 @@ def _get_section_text_keys(section_type: str) -> list[str]:
 
 
 class GenerateOrchestrator:
-    """v5.2 HTML 템플릿 기반 PDP 생성 파이프라인 오케스트레이터."""
+    """v5.2 HTML 템플릿 기반 POP 생성 파이프라인 오케스트레이터."""
 
     def __init__(self):
         self.storage = StorageService()
@@ -53,8 +53,7 @@ class GenerateOrchestrator:
         products: list[dict],
         theme_id: str,
     ) -> GenerateResponse:
-        """HTML 템플릿 기반 PDP 생성 파이프라인을 실행한다."""
-        self._update_status(project_id, "generating")
+        """HTML 템플릿 기반 POP 생성 파이프라인을 실행한다."""
 
         try:
             # 1. 테마 정보 조회
@@ -184,7 +183,6 @@ class GenerateOrchestrator:
             }
 
             self.db.table("projects").update({
-                "status": "completed",
                 "theme_id": theme_id,
                 "template_used": template_used,
                 "generated_data": generated_data,
@@ -204,8 +202,7 @@ class GenerateOrchestrator:
             )
 
         except Exception as e:
-            logger.exception(f"PDP 생성 실패 (project={project_id}): {e}")
-            self._update_status(project_id, "failed")
+            logger.exception(f"POP 생성 실패 (project={project_id}): {e}")
             raise
 
     async def _get_product_image_urls(self, project_id: str) -> list[str]:
@@ -315,6 +312,3 @@ class GenerateOrchestrator:
                 logger.warning(f"배경 제거 실패 (product[{idx}]), 원본 사용: {e}")
 
         return result
-
-    def _update_status(self, project_id: str, status: str) -> None:
-        self.db.table("projects").update({"status": status}).eq("id", project_id).execute()

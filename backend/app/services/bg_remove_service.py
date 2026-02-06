@@ -1,15 +1,59 @@
 """AWS Bedrock Nova Canvas 배경 제거 서비스"""
 
 import base64
-import json
+import io
 import logging
 from urllib.parse import quote
 
 import httpx
+from PIL import Image
 
 from app.config import settings
 
 logger = logging.getLogger(__name__)
+
+# Bedrock Nova Canvas 이미지 크기 제한
+MIN_DIMENSION = 320
+MAX_DIMENSION = 4096
+
+
+def _ensure_valid_dimensions(image_bytes: bytes) -> bytes:
+    """이미지 크기가 Bedrock 요구사항(320-4096px)을 충족하는지 확인하고 필요시 리사이징."""
+    img = Image.open(io.BytesIO(image_bytes))
+    width, height = img.size
+
+    # 이미 유효한 크기면 원본 반환
+    if MIN_DIMENSION <= width <= MAX_DIMENSION and MIN_DIMENSION <= height <= MAX_DIMENSION:
+        return image_bytes
+
+    # 리사이징 필요
+    new_width, new_height = width, height
+
+    # 너무 작은 경우: 최소 크기로 업스케일
+    if width < MIN_DIMENSION or height < MIN_DIMENSION:
+        scale = max(MIN_DIMENSION / width, MIN_DIMENSION / height)
+        new_width = int(width * scale)
+        new_height = int(height * scale)
+        logger.info(f"이미지 업스케일: {width}x{height} → {new_width}x{new_height}")
+
+    # 너무 큰 경우: 최대 크기로 다운스케일
+    if new_width > MAX_DIMENSION or new_height > MAX_DIMENSION:
+        scale = min(MAX_DIMENSION / new_width, MAX_DIMENSION / new_height)
+        new_width = int(new_width * scale)
+        new_height = int(new_height * scale)
+        logger.info(f"이미지 다운스케일: {width}x{height} → {new_width}x{new_height}")
+
+    # 리사이징 수행
+    resized = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+
+    # PNG로 저장 (투명도 유지)
+    output = io.BytesIO()
+    if resized.mode in ('RGBA', 'LA') or (resized.mode == 'P' and 'transparency' in resized.info):
+        resized.save(output, format='PNG')
+    else:
+        resized.save(output, format='PNG')
+
+    return output.getvalue()
 
 
 async def remove_background(image_bytes: bytes, *, raise_on_error: bool = False) -> bytes:
@@ -23,7 +67,9 @@ async def remove_background(image_bytes: bytes, *, raise_on_error: bool = False)
         배경 제거된 이미지 바이트. 실패 시 원본 반환(raise_on_error=False).
     """
     try:
-        input_b64 = base64.b64encode(image_bytes).decode("utf-8")
+        # 이미지 크기 검증 및 리사이징
+        processed_bytes = _ensure_valid_dimensions(image_bytes)
+        input_b64 = base64.b64encode(processed_bytes).decode("utf-8")
 
         body = {
             "taskType": "BACKGROUND_REMOVAL",

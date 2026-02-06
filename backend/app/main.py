@@ -6,7 +6,7 @@ from app.routers import projects, generate, upload, templates, themes, auth, ima
 
 app = FastAPI(
     title="POP Maker API",
-    version="5.2.1",
+    version="5.2.2",
     docs_url="/docs",
     redoc_url="/redoc",
 )
@@ -30,4 +30,4 @@ app.include_router(images.router, prefix="/api/images", tags=["Images"])
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "version": "5.2.1"}
+    return {"status": "ok", "version": "5.2.2"}

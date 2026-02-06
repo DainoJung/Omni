@@ -53,7 +53,7 @@ export default function ResultPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [bgRemoving, setBgRemoving] = useState(false);
-  const [uploadedImages, setUploadedImages] = useState<string[]>([]);
+  const [uploadedImages, setUploadedImages] = useState<{ url: string; type: "upload" | "bg_removed" }[]>([]);
   const [originalAiImages, setOriginalAiImages] = useState<{ sectionId: string; key: string; url: string }[]>([]);
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
 
@@ -92,6 +92,20 @@ export default function ResultPage() {
             }
           }
           setOriginalAiImages(aiImages);
+        }
+
+        // 배경 제거 이미지 로드
+        try {
+          const bgRemovedResult = await imagesApi.listProjectImages(projectId, "bg_removed");
+          if (bgRemovedResult.images?.length > 0) {
+            const bgImages = bgRemovedResult.images.map((img) => ({
+              url: img.url,
+              type: "bg_removed" as const,
+            }));
+            setUploadedImages((prev) => [...prev, ...bgImages]);
+          }
+        } catch (err) {
+          console.error("배경 제거 이미지 로드 실패:", err);
         }
       } catch {
         toast.error("프로젝트를 불러올 수 없습니다.");
@@ -578,7 +592,7 @@ export default function ResultPage() {
     setUploading(true);
     try {
       const result = await uploadApi.uploadImage(projectId, file, "section");
-      setUploadedImages((prev) => [...prev, result.public_url]);
+      setUploadedImages((prev) => [...prev, { url: result.public_url, type: "upload" }]);
       toast.success("이미지가 추가되었습니다.");
     } catch {
       toast.error("이미지 업로드에 실패했습니다.");
@@ -629,7 +643,7 @@ export default function ResultPage() {
       setChatPendingFile(bgFile);
 
       // 좌측 사진 갤러리에 추가
-      setUploadedImages((prev) => [...prev, result.url]);
+      setUploadedImages((prev) => [...prev, { url: result.url, type: "bg_removed" }]);
 
       toast.success("배경이 제거되었습니다.");
     } catch {
@@ -1015,16 +1029,16 @@ export default function ResultPage() {
                         </span>
                       </div>
                     ))}
-                    {/* 업로드된 이미지 */}
-                    {uploadedImages.map((url, index) => (
+                    {/* 업로드 및 배경 제거 이미지 */}
+                    {uploadedImages.map((img, index) => (
                       <div
                         key={`uploaded-${index}`}
                         className="relative rounded-lg overflow-hidden border border-border hover:border-accent/50 cursor-pointer transition-colors aspect-square"
-                        onClick={() => handleApplyImage(url)}
+                        onClick={() => handleApplyImage(img.url)}
                       >
                         <img
-                          src={url}
-                          alt={`업로드 ${index + 1}`}
+                          src={img.url}
+                          alt={img.type === "bg_removed" ? `누끼 ${index + 1}` : `업로드 ${index + 1}`}
                           className="w-full h-full object-cover"
                         />
                         {/* Download badge - left */}
@@ -1032,12 +1046,12 @@ export default function ResultPage() {
                           onClick={async (e) => {
                             e.stopPropagation();
                             try {
-                              const res = await fetch(url);
+                              const res = await fetch(img.url);
                               const blob = await res.blob();
                               const blobUrl = URL.createObjectURL(blob);
                               const a = document.createElement("a");
                               a.href = blobUrl;
-                              a.download = `uploaded_${Date.now()}.png`;
+                              a.download = `${img.type === "bg_removed" ? "bg_removed" : "uploaded"}_${Date.now()}.png`;
                               document.body.appendChild(a);
                               a.click();
                               document.body.removeChild(a);
@@ -1050,9 +1064,11 @@ export default function ResultPage() {
                         >
                           <Download size={12} className="text-text-primary" />
                         </button>
-                        {/* 업로드 badge - right */}
-                        <span className="absolute top-1.5 right-1.5 px-1.5 py-0.5 bg-emerald-500 text-white text-[10px] font-medium rounded shadow-sm">
-                          업로드
+                        {/* 이미지 타입 badge - right */}
+                        <span className={`absolute top-1.5 right-1.5 px-1.5 py-0.5 text-white text-[10px] font-medium rounded shadow-sm ${
+                          img.type === "bg_removed" ? "bg-purple-500" : "bg-emerald-500"
+                        }`}>
+                          {img.type === "bg_removed" ? "누끼" : "업로드"}
                         </span>
                       </div>
                     ))}

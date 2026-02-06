@@ -6,6 +6,7 @@ THEMES: dict[str, dict] = {
         "name": "홀리데이",
         "icon": "🎄",
         "accent_color": "#C41E3A",
+        "catalog_bg_color": "#1a472a",
         "background_prompt": (
             "홀리데이 프로모션 배경, 크리스마스 트리, 따뜻한 조명, "
             "축제 분위기, 고급스러운 골드 포인트, 텍스트 없이"
@@ -17,6 +18,7 @@ THEMES: dict[str, dict] = {
         "name": "봄 세일",
         "icon": "🌸",
         "accent_color": "#E91E90",
+        "catalog_bg_color": "#9d174d",  # 진한 로즈 (흰색 텍스트 가독성)
         "background_prompt": (
             "봄 세일 배경, 벚꽃, 파스텔톤, 산뜻한 느낌, "
             "부드러운 그라데이션, 텍스트 없이"
@@ -28,6 +30,7 @@ THEMES: dict[str, dict] = {
         "name": "여름 특가",
         "icon": "☀️",
         "accent_color": "#0099FF",
+        "catalog_bg_color": "#0c4a6e",
         "background_prompt": (
             "여름 특가 배경, 시원한 블루톤, 청량감, "
             "트로피컬 느낌, 밝고 활기찬, 텍스트 없이"
@@ -39,6 +42,7 @@ THEMES: dict[str, dict] = {
         "name": "가을 신상",
         "icon": "🍂",
         "accent_color": "#D2691E",
+        "catalog_bg_color": "#78350f",
         "background_prompt": (
             "가을 신상 배경, 따뜻한 브라운톤, 단풍, "
             "고급스러운 분위기, 우아한, 텍스트 없이"
@@ -50,6 +54,7 @@ THEMES: dict[str, dict] = {
         "name": "겨울 프로모션",
         "icon": "❄️",
         "accent_color": "#4169E1",
+        "catalog_bg_color": "#1e3a5f",
         "background_prompt": (
             "겨울 프로모션 배경, 눈꽃, 화이트 & 실버톤, "
             "고급스러운 느낌, 아늑한 분위기, 텍스트 없이"

@@ -140,7 +140,12 @@ def bind_section_data(
             m = _INDEXED_PH_RE.match(ph_id)
             if m:
                 base_ph_id = m.group(1)
-                idx = int(m.group(2))
+                original_idx = int(m.group(2))
+                idx = original_idx
+                # fit_product_trio 등 중복 섹션에서 인스턴스별 상품 오프셋 적용
+                if instance_index is not None and section_type == "fit_product_trio":
+                    idx = original_idx + (instance_index * 3)
+                    logger.info(f"[fit_product_trio] ph_id={ph_id}, instance={instance_index}, original_idx={original_idx}, final_idx={idx}")
             else:
                 base_ph_id = ph_id
                 idx = instance_index or 0
@@ -151,9 +156,8 @@ def bind_section_data(
                     data[ph_id] = product_bg_removed_urls[idx]
                 elif idx < len(product_image_urls):
                     data[ph_id] = product_image_urls[idx]
-                elif product_image_urls:
-                    data[ph_id] = product_image_urls[0]
                 else:
+                    # 상품 인덱스 초과 시 빈 문자열 (폴백 없음)
                     data[ph_id] = ""
             elif base_ph_id == "product_name":
                 data[ph_id] = products[idx]["name"] if idx < len(products) else ""

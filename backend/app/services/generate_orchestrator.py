@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import math
 import re
 from collections import Counter
 from datetime import datetime
@@ -60,7 +61,13 @@ class GenerateOrchestrator:
             theme = get_theme(theme_id)
 
             # 2. 선택된 섹션 템플릿 조회
-            selected_sections = self._get_selected_sections(project_id)
+            # 상품 3개 이상이면 FIT 템플릿 구조로 자동 설정
+            if len(products) >= 3:
+                trio_count = math.ceil(len(products) / 3)
+                selected_sections = ["fit_hero", "fit_event_info"] + ["fit_product_trio"] * trio_count
+                logger.info(f"FIT 템플릿 자동 적용: {len(products)}개 상품 → {trio_count}개 fit_product_trio")
+            else:
+                selected_sections = self._get_selected_sections(project_id)
             section_templates = compose_sections(selected_sections)
 
             # 3. 상품 이미지 URL 수집 + 참조 이미지 다운로드
@@ -153,6 +160,9 @@ class GenerateOrchestrator:
                 inst_idx = instance_counter.get(sec_type, 0)
                 instance_counter[sec_type] = inst_idx + 1
 
+                passed_instance_index = inst_idx if section_counts.get(sec_type, 1) > 1 else None
+                logger.info(f"[섹션 바인딩] {sec_type} inst_idx={inst_idx}, section_counts={section_counts.get(sec_type)}, passed_instance_index={passed_instance_index}, products_count={len(products)}, images_count={len(product_image_urls)}")
+
                 data = bind_section_data(
                     section_template=st,
                     section_texts=section_texts,
@@ -160,7 +170,7 @@ class GenerateOrchestrator:
                     product_image_urls=product_image_urls,
                     products=products,
                     section_image_urls=section_image_urls,
-                    instance_index=inst_idx if section_counts.get(sec_type, 1) > 1 else None,
+                    instance_index=passed_instance_index,
                     product_bg_removed_urls=product_bg_removed_urls,
                 )
                 section = render_section(
@@ -265,8 +275,15 @@ class GenerateOrchestrator:
             {이미지 인덱스: 배경 제거된 이미지 URL} 딕셔너리
         """
         # 모든 섹션의 placeholder를 스캔하여 bg_remove가 필요한 상품 이미지 인덱스 수집
+        # 중복 섹션(fit_product_trio 등)의 인스턴스별 오프셋 적용
         bg_remove_indices: set[int] = set()
+        section_instance_counter: dict[str, int] = {}
+
         for st in section_templates:
+            sec_type = st.get("section_type", "")
+            instance_idx = section_instance_counter.get(sec_type, 0)
+            section_instance_counter[sec_type] = instance_idx + 1
+
             for ph in st.get("placeholders", []):
                 if (
                     ph.get("source") == "product"
@@ -275,9 +292,15 @@ class GenerateOrchestrator:
                 ):
                     m = _INDEXED_PH_RE.match(ph["id"])
                     if m:
-                        bg_remove_indices.add(int(m.group(2)))
+                        base_idx = int(m.group(2))
+                        # fit_product_trio 등 중복 섹션의 인스턴스별 오프셋 적용
+                        if sec_type == "fit_product_trio":
+                            final_idx = base_idx + (instance_idx * 3)
+                        else:
+                            final_idx = base_idx
+                        bg_remove_indices.add(final_idx)
                     else:
-                        bg_remove_indices.add(0)
+                        bg_remove_indices.add(instance_idx)
 
         if not bg_remove_indices:
             return {}

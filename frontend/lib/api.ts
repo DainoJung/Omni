@@ -163,6 +163,18 @@ export const imagesApi = {
 
     return response.json() as Promise<{ url: string }>;
   },
+
+  listProjectImages: async (projectId: string, imageType?: string) => {
+    const params = imageType ? `?image_type=${imageType}` : "";
+    return request<{
+      images: Array<{
+        id: string;
+        url: string;
+        image_type: string;
+        created_at: string;
+      }>;
+    }>(`/api/images/project/${projectId}${params}`);
+  },
 };
 
 // === Upload ===

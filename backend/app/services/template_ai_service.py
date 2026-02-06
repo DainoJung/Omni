@@ -82,9 +82,17 @@ async def generate_section_image(
 
     templates = _IMAGE_PROMPT_CONFIG["templates"]
 
+    # fit_hero는 상품 참조 없이 순수 테마 배경으로 생성
+    use_fit_hero_template = section_type == "fit_hero" and "fit_hero" in templates
+
     if custom_prompt:
         text_prompt = f"{custom_prompt} {no_text_rule}"
         prompt_vars["custom_prompt"] = custom_prompt
+    elif use_fit_hero_template:
+        # fit_hero 전용 템플릿 사용 (상품 참조 없이 분위기 배경)
+        text_prompt = templates["fit_hero"].format(**format_vars)
+        reference_image = None  # 참조 이미지 사용 안함
+        logger.info("fit_hero: 상품 참조 없이 테마 기반 배경 생성")
     elif reference_image:
         text_prompt = templates["reference"].format(**format_vars)
     else:

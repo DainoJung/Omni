@@ -1,15 +1,46 @@
 import logging
+from typing import Optional
 from uuid import uuid4
 
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Query
 
 from app.config import settings
+from app.database import get_supabase
 from app.services.bg_remove_service import remove_background
 from app.services.storage_service import StorageService
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+@router.get("/project/{project_id}")
+async def list_project_images(
+    project_id: str,
+    image_type: Optional[str] = Query(None, description="Filter by image type (input, bg_removed, generated, etc.)"),
+):
+    """프로젝트의 이미지 목록을 반환한다."""
+    db = get_supabase()
+    storage = StorageService()
+
+    query = db.table("project_images").select("*").eq("project_id", project_id)
+    if image_type:
+        query = query.eq("image_type", image_type)
+    query = query.order("created_at", desc=True)
+
+    result = query.execute()
+
+    images = []
+    for record in result.data or []:
+        url = storage.get_public_url(record["storage_path"])
+        images.append({
+            "id": record["id"],
+            "url": url,
+            "image_type": record["image_type"],
+            "created_at": record["created_at"],
+        })
+
+    return {"images": images}
 
 
 @router.post("/remove-bg")

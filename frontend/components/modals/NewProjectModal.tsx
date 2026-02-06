@@ -57,9 +57,9 @@ export function NewProjectModal({ isOpen, onClose }: NewProjectModalProps) {
     >
       <div
         ref={modalRef}
-        className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto bg-bg-primary rounded-sm shadow-xl mx-4"
+        className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto bg-white rounded-sm shadow-xl mx-4"
       >
-        <div className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 bg-bg-primary border-b border-border">
+        <div className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 bg-white border-b border-border">
           <h2 className="text-xl font-bold">새 프로젝트</h2>
           <button
             onClick={onClose}

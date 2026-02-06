@@ -253,7 +253,6 @@ INSERT INTO section_templates (section_type, name, html_template, css_template, 
   aspect-ratio: 1 / 1;
   object-fit: contain;
   border-radius: 8px;
-  background: rgba(255,255,255,0.05);
 }
 .s-ftrio__info {
   width: 100%;

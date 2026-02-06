@@ -1,0 +1,63 @@
+name: Deploy Backend to EC2
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd /home/ec2-user/backend
+
+            # Stop current server
+            sudo pkill -9 -f 'python3.11.*uvicorn' || true
+            sleep 2
+
+      - name: Copy files to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "backend/app/*,backend/requirements.txt"
+          target: "/home/ec2-user/"
+          strip_components: 0
+
+      - name: Start server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd /home/ec2-user/backend
+
+            # Clear Python cache
+            sudo rm -rf app/__pycache__ app/routers/__pycache__ app/services/__pycache__ 2>/dev/null || true
+
+            # Install dependencies if requirements changed
+            sudo python3.11 -m pip install -r requirements.txt -q
+
+            # Start server
+            sudo nohup python3.11 -m uvicorn app.main:app --host 0.0.0.0 --port 8000 > nohup.out 2>&1 &
+
+            # Wait and verify
+            sleep 5
+            curl -s http://localhost:8000/health || echo "Server may still be starting..."
+
+            echo "Deployment complete!"

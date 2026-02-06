@@ -74,7 +74,12 @@ function ProductImageUploader({
   );
 }
 
-export function ProjectInputForm() {
+interface ProjectInputFormProps {
+  onSuccess?: (projectId: string) => void;
+  compact?: boolean;
+}
+
+export function ProjectInputForm({ onSuccess, compact }: ProjectInputFormProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [theme, setTheme] = useState("");
@@ -163,7 +168,11 @@ export function ProjectInputForm() {
       }
 
       // 3. 생성 페이지로 이동
-      router.push(`/generate/${project.id}`);
+      if (onSuccess) {
+        onSuccess(project.id);
+      } else {
+        router.push(`/generate/${project.id}`);
+      }
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "프로젝트 생성에 실패했습니다."
@@ -174,13 +183,15 @@ export function ProjectInputForm() {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="space-y-1">
-        <h2 className="text-2xl font-bold">PDP 만들기</h2>
-        <p className="text-text-secondary text-sm">
-          상품 정보와 테마를 선택하면 AI가 배경과 카피를 자동 생성합니다.
-        </p>
-      </div>
+    <form onSubmit={handleSubmit} className={compact ? "space-y-4" : "space-y-6"}>
+      {!compact && (
+        <div className="space-y-1">
+          <h2 className="text-2xl font-bold">PDP 만들기</h2>
+          <p className="text-text-secondary text-sm">
+            상품 정보와 테마를 선택하면 AI가 배경과 카피를 자동 생성합니다.
+          </p>
+        </div>
+      )}
 
       {/* 테마 선택 */}
       <ThemeSelector

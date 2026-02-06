@@ -4,10 +4,11 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { SectionRenderer } from "@/components/editor/SectionRenderer";
+import { NewProjectModal } from "@/components/modals/NewProjectModal";
 import { projectsApi, sectionsApi, authApi, uploadApi, imagesApi } from "@/lib/api";
 import { exportImage } from "@/lib/export";
 import { toPng } from "html-to-image";
-import { ZoomIn, ChevronLeft, ChevronRight, Minus, Plus, GripVertical, Image as ImageIcon, Send, ImagePlus, Download, Upload, FolderOpen, User, LogOut, X, Eraser, Loader2 } from "lucide-react";
+import { ZoomIn, ChevronLeft, ChevronRight, Minus, Plus, GripVertical, Image as ImageIcon, Send, ImagePlus, Download, Upload, User, LogOut, X, Eraser, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import type { Project, RenderedSection } from "@/types";
 import type { SelectedElement } from "@/components/editor/SectionBlock";
@@ -19,19 +20,6 @@ interface ChatMessage {
   imageVersions?: string[];
   sectionId?: string;
   placeholderId?: string;
-}
-
-const STATUS_LABEL: Record<string, { text: string; className: string }> = {
-  draft: { text: "초안", className: "bg-gray-100 text-gray-600" },
-  generating: { text: "생성 중", className: "bg-blue-100 text-blue-600" },
-  editing: { text: "편집 중", className: "bg-yellow-100 text-yellow-700" },
-  completed: { text: "완료", className: "bg-green-100 text-green-700" },
-  failed: { text: "실패", className: "bg-red-100 text-red-600" },
-};
-
-function getProjectPath(project: Project): string {
-  if (project.rendered_sections?.length) return `/result/${project.id}`;
-  return `/generate/${project.id}`;
 }
 
 export default function ResultPage() {
@@ -47,9 +35,8 @@ export default function ResultPage() {
   const [showZoomMenu, setShowZoomMenu] = useState(false);
   const [showSectionList, setShowSectionList] = useState(true);
   const [sectionThumbnails, setSectionThumbnails] = useState<Record<string, string>>({});
-  const [activeTab, setActiveTab] = useState<"pages" | "image" | "project">("pages");
+  const [activeTab, setActiveTab] = useState<"pages" | "image">("pages");
   const [projectList, setProjectList] = useState<Project[]>([]);
-  const [projectListLoading, setProjectListLoading] = useState(false);
   const [expandedSteps, setExpandedSteps] = useState<Record<number, boolean>>({});
   const [expandedInputInfo, setExpandedInputInfo] = useState(false);
   const [chatMessage, setChatMessage] = useState("");
@@ -68,6 +55,7 @@ export default function ResultPage() {
   const [bgRemoving, setBgRemoving] = useState(false);
   const [uploadedImages, setUploadedImages] = useState<string[]>([]);
   const [originalAiImages, setOriginalAiImages] = useState<{ sectionId: string; key: string; url: string }[]>([]);
+  const [showNewProjectModal, setShowNewProjectModal] = useState(false);
 
   // Text toolbar states
   const [fontSize, setFontSize] = useState(16);
@@ -114,17 +102,15 @@ export default function ResultPage() {
     load();
   }, [projectId]);
 
-  // Fetch project list when project tab is active
+  // Fetch project list for header selector
   useEffect(() => {
-    if (activeTab === "project" && projectList.length === 0) {
-      setProjectListLoading(true);
+    if (projectList.length === 0) {
       projectsApi
         .list()
         .then((res) => setProjectList(res.items))
-        .catch(() => toast.error("프로젝트 목록을 불러올 수 없습니다."))
-        .finally(() => setProjectListLoading(false));
+        .catch(() => toast.error("프로젝트 목록을 불러올 수 없습니다."));
     }
-  }, [activeTab, projectList.length]);
+  }, [projectList.length]);
 
   // Generate section thumbnails
   useEffect(() => {
@@ -683,6 +669,26 @@ export default function ResultPage() {
     }
   };
 
+  const handleProjectDelete = async (id: string) => {
+    if (!confirm("이 프로젝트를 삭제하시겠습니까?")) return;
+    try {
+      await projectsApi.delete(id);
+      setProjectList((prev) => prev.filter((p) => p.id !== id));
+      toast.success("프로젝트가 삭제되었습니다.");
+      // 현재 프로젝트를 삭제했으면 다른 프로젝트로 이동
+      if (id === projectId) {
+        const remaining = projectList.filter((p) => p.id !== id);
+        if (remaining.length > 0) {
+          router.push(`/result/${remaining[0].id}`);
+        } else {
+          router.push("/");
+        }
+      }
+    } catch {
+      toast.error("프로젝트 삭제에 실패했습니다.");
+    }
+  };
+
   const handleZoomReset = () => {
     setZoom(100);
     setShowZoomMenu(false);
@@ -802,7 +808,15 @@ export default function ResultPage() {
 
   return (
     <div className="h-screen flex flex-col overflow-hidden">
-      <Header onDownload={handleExport} showDownload={true} />
+      <Header
+        onDownload={handleExport}
+        showDownload={true}
+        projects={projectList}
+        currentProjectId={projectId}
+        onProjectSelect={(id) => router.push(`/result/${id}`)}
+        onNewProject={() => setShowNewProjectModal(true)}
+        onProjectDelete={handleProjectDelete}
+      />
 
       <div className="flex-1 flex min-h-0 overflow-hidden relative">
         {/* Left: Sidebar with Tabs */}
@@ -843,23 +857,6 @@ export default function ResultPage() {
               >
                 <ImageIcon size={20} />
                 <span className="text-[10px]">사진</span>
-              </button>
-              <button
-                onClick={() => {
-                  if (activeTab === "project" && showSectionList) {
-                    setShowSectionList(false);
-                  } else {
-                    setActiveTab("project");
-                    setShowSectionList(true);
-                  }
-                }}
-                className={`flex flex-col items-center gap-1.5 py-4 transition-colors ${activeTab === "project" && showSectionList
-                  ? "text-accent bg-accent/10 border-l-2 border-accent"
-                  : "text-text-tertiary hover:text-text-primary hover:bg-bg-secondary/50"
-                  }`}
-              >
-                <FolderOpen size={20} />
-                <span className="text-[10px]">프로젝트</span>
               </button>
             </div>
 
@@ -1086,55 +1083,6 @@ export default function ResultPage() {
                       </>
                     )}
                   </button>
-                </div>
-              )}
-
-              {activeTab === "project" && (
-                <div className="p-3 flex flex-col h-full">
-                  <p className="text-xs text-text-secondary mb-3">프로젝트 목록</p>
-
-                  {projectListLoading ? (
-                    <div className="flex-1 flex items-center justify-center">
-                      <div className="w-5 h-5 border-2 border-text-tertiary border-t-transparent rounded-full animate-spin"></div>
-                    </div>
-                  ) : (
-                    <div className="flex-1 overflow-y-auto space-y-2">
-                      {projectList.map((proj) => {
-                        const status = STATUS_LABEL[proj.status] ?? STATUS_LABEL.draft;
-                        const isCurrent = proj.id === projectId;
-                        return (
-                          <div
-                            key={proj.id}
-                            onClick={() => {
-                              if (!isCurrent) router.push(getProjectPath(proj));
-                            }}
-                            className={`border rounded-lg p-3 transition-colors ${isCurrent
-                              ? "border-accent bg-accent/5 cursor-default"
-                              : "border-border hover:border-accent/50 cursor-pointer"
-                              }`}
-                          >
-                            <div className="flex items-center gap-2 mb-1.5">
-                              <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${status.className}`}>
-                                {status.text}
-                              </span>
-                              {isCurrent && (
-                                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-accent/10 text-accent">
-                                  현재
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-sm font-medium text-text-primary truncate">
-                              {proj.products?.[0]?.name || proj.brand_name || "프로젝트"}
-                            </p>
-                            <p className="text-[11px] text-text-tertiary mt-0.5">
-                              {new Date(proj.created_at).toLocaleDateString("ko-KR")}
-                              {proj.theme_id && ` · ${proj.theme_id}`}
-                            </p>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
                 </div>
               )}
 
@@ -1754,6 +1702,11 @@ export default function ResultPage() {
           </div>
         </aside>
       </div>
+
+      <NewProjectModal
+        isOpen={showNewProjectModal}
+        onClose={() => setShowNewProjectModal(false)}
+      />
     </div>
   );
 }

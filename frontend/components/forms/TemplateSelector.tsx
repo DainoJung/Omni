@@ -14,6 +14,10 @@ const ALL_SECTIONS: SectionType[] = [
   "fit_hero",
   "fit_event_info",
   "fit_product_trio",
+  "vip_special_hero",
+  "vip_private_hero",
+  "gourmet_hero",
+  "shinsegae_hero",
 ];
 
 const SECTION_META: Record<
@@ -55,6 +59,22 @@ const SECTION_META: Record<
   fit_product_trio: {
     label: "FIT 상품 3종",
     description: "상품 3개 가로 배열 (이미지 + 이름 + 설명 + 가격)",
+  },
+  vip_special_hero: {
+    label: "VIP 스페셜위크",
+    description: "다크 네이비 + 골드 배지 VIP 프로모션",
+  },
+  vip_private_hero: {
+    label: "VIP 프라이빗위크",
+    description: "럭셔리 블랙 + 골드 CTA 프라이빗 행사",
+  },
+  gourmet_hero: {
+    label: "고메트립",
+    description: "푸드/여행 테마 + 위치 + 가격 표시",
+  },
+  shinsegae_hero: {
+    label: "뱅드신세계",
+    description: "브랜드×신세계 콜라보 + 3개 혜택 뱃지",
   },
 };
 

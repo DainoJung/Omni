@@ -19,7 +19,11 @@ export type SectionType =
   | "product_card"
   | "fit_hero"
   | "fit_event_info"
-  | "fit_product_trio";
+  | "fit_product_trio"
+  | "vip_special_hero"
+  | "vip_private_hero"
+  | "gourmet_hero"
+  | "shinsegae_hero";
 
 export interface RenderedSection {
   section_id: string;

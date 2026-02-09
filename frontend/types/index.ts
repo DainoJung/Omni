@@ -32,7 +32,7 @@ export interface RenderedSection {
   template_id: string;
   html_template: string;
   css: string;
-  data: Record<string, string>;
+  data: Record<string, string | null>;
   style_overrides?: Record<string, Record<string, string>>;
 }
 

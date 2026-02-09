@@ -17,7 +17,8 @@ interface SectionBlockProps {
   selectedPlaceholderId?: string | null;
 }
 
-function escapeHtml(text: string): string {
+function escapeHtml(text: string | null | undefined): string {
+  if (text == null) return "";
   return text
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")

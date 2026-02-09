@@ -24,7 +24,7 @@ class RenderedSectionResponse(BaseModel):
     template_id: str
     html_template: str
     css: str
-    data: dict[str, str]
+    data: dict[str, Optional[str]]
 
 
 class GenerateResponse(BaseModel):

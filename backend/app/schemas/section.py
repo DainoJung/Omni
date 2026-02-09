@@ -1,5 +1,6 @@
 """v5.2 HTML 템플릿 기반 섹션 스키마 정의"""
 
+from typing import Optional
 from pydantic import BaseModel
 
 
@@ -10,7 +11,7 @@ class RenderedSection(BaseModel):
     template_id: str
     html_template: str
     css: str
-    data: dict[str, str]
+    data: dict[str, Optional[str]]
 
 
 class SectionDataUpdateRequest(BaseModel):

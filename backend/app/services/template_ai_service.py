@@ -82,17 +82,17 @@ async def generate_section_image(
 
     templates = _IMAGE_PROMPT_CONFIG["templates"]
 
-    # fit_hero는 상품 참조 없이 순수 테마 배경으로 생성
+    # fit_hero 전용 프롬프트 사용 여부
     use_fit_hero_template = section_type == "fit_hero" and "fit_hero" in templates
 
     if custom_prompt:
         text_prompt = f"{custom_prompt} {no_text_rule}"
         prompt_vars["custom_prompt"] = custom_prompt
     elif use_fit_hero_template:
-        # fit_hero 전용 템플릿 사용 (상품 참조 없이 분위기 배경)
+        # fit_hero 전용 템플릿 사용 (상품/브랜드 라이프스타일 이미지)
         text_prompt = templates["fit_hero"].format(**format_vars)
-        reference_image = None  # 참조 이미지 사용 안함
-        logger.info("fit_hero: 상품 참조 없이 테마 기반 배경 생성")
+        # reference_image 유지 — 상품 참조 이미지를 활용하여 브랜드 결에 맞는 이미지 생성
+        logger.info("fit_hero: 상품 참조 기반 브랜드 라이프스타일 이미지 생성")
     elif reference_image:
         text_prompt = templates["reference"].format(**format_vars)
     else:
@@ -201,17 +201,17 @@ _SECTION_TEXT_KEYS: dict[str, list[tuple[str, str]]] = {
         ("product_note", "20자 이내 혜택/메모 문구, 예: * 구매 시 파우치 증정"),
     ],
     "fit_hero": [
-        ("brand_name", "10자 이내 브랜드명"),
-        ("event_title", "15자 이내 임팩트 있는 이벤트 타이틀, 예: 설날 선물대전"),
-        ("event_subtitle", "25자 이내 이벤트 보조 문구"),
-        ("event_period", "20자 이내 행사 기간, 예: 2025.01.20 ~ 02.05"),
+        ("brand_name", "10자 이내 브랜드/카테고리명, 예: GUCCI"),
+        ("event_title", "20자 이내 임팩트 있는 메인 타이틀, 예: 명품&해외 패션, Timeless Luxury"),
+        ("event_subtitle", "30자 이내 서브 카피, 예: 세련된 감각과 정제된 디테일의 명품 컬렉션"),
+        ("event_period", "25자 이내 해시태그 또는 기간, 예: #2026S/S #하이엔드 #NEW컬렉션"),
     ],
     "fit_event_info": [
-        ("event_name", "15자 이내 행사 이름"),
-        ("benefit_text", "40자 이내 주요 혜택 설명, 줄바꿈 가능"),
-        ("info_period", "20자 이내 행사 기간"),
-        ("info_location", "15자 이내 행사 장소, 예: 전 매장"),
-        ("cta_text", "10자 이내 CTA 문구, 예: 지금 바로 쇼핑하기"),
+        ("event_name", "20자 이내 큐레이션 타이틀, 영문 권장, 예: New Year Gift Curation"),
+        ("benefit_text", "40자 이내 혜택 또는 설명 문구, 줄바꿈 가능"),
+        ("info_period", "20자 이내 행사 기간, 예: 1.30(금) – 2.8(일)"),
+        ("info_location", "15자 이내 행사 장소, 예: 본점"),
+        ("cta_text", "10자 이내 CTA 문구, 예: 자세히 보기"),
     ],
     "fit_product_trio": [
         ("product_desc_0", "25자 이내 상품1 한줄 설명"),

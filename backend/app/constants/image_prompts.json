@@ -4,7 +4,7 @@
   "templates": {
     "default": "이커머스 상세페이지용 고퀄리티 상품 사진. 상품: {products}. {theme}{section_context}{style_hint}, 4K 품질, 상업 사진 스타일. {no_text_rule}",
     "reference": "첨부한 사진 속 상품과 동일한 상품의 새로운 연출 사진을 만들어줘. 반드시 첨부 이미지의 상품 외형, 색상, 디자인을 그대로 유지해야 해. 상품명: {products}. {theme}{section_context}연출 스타일: {style_hint}, 4K 품질, 상업 사진. {no_text_rule}",
-    "fit_hero": "명절/시즌 프로모션 히어로 배너 배경 이미지. {theme}화려하고 축제적인 분위기, 선물 포장지, 리본, 꽃, 조명 등 장식 요소, 상품 없이 순수 배경만, 텍스트가 올라갈 수 있는 어두운 오버레이 공간 확보, 4K 품질, 상업 디자인 스타일. {no_text_rule}"
+    "fit_hero": "백화점 프로모션 히어로 배너용 고급 라이프스타일 사진. 상품: {products}. {theme}{section_context}상품과 어울리는 모델 착용샷 또는 상품 중심 럭셔리 연출, 고급 패션 매거진 스타일, 하단에 텍스트 오버레이를 위한 어두운 영역 확보, 4K 품질, 상업 패션 포토그래피. {no_text_rule}"
   },
 
   "sections": {

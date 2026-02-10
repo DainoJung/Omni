@@ -67,7 +67,19 @@
       "Bash(for spread in Spreads/Spread_u2a68.xml Spreads/Spread_u2785.xml Spreads/Spread_u2d4d.xml Spreads/Spread_u1de.xml)",
       "Bash(do echo '=== $spread ===' unzip -p '0130 명절_FIT 템플릿3.idml' $spread)",
       "WebSearch",
-      "Bash(npm run lint)"
+      "Bash(npm run lint)",
+      "Bash(echo:*)",
+      "Bash(git -C /Users/jungdain/Desktop/POP_maker status --short)",
+      "Bash(scp:*)",
+      "Bash(for f in *.idml)",
+      "Bash(do echo \"=== $f ===\")",
+      "Bash(done)",
+      "Bash(SUPA_KEY=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwaGZvd2RuaGp2ZWZhaGt6a21nIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2OTU4NjkyMCwiZXhwIjoyMDg1MTYyOTIwfQ.JTZ2VRNtJO9nkD8H3AkJADr9DShsmXXKqotbsxjKqZo\":*)",
+      "Bash(mdfind:*)",
+      "Bash(brew list:*)",
+      "Bash(pip3 list:*)",
+      "Bash(xargs:*)",
+      "Bash(npx:*)"
     ]
   }
 }

@@ -39,7 +39,9 @@ export type SectionType =
   | "vip_special_hero"
   | "vip_private_hero"
   | "gourmet_hero"
-  | "gourmet_product"
+  | "gourmet_restaurant"
+  | "gourmet_wine_intro"
+  | "gourmet_wine"
   | "shinsegae_hero";
 
 export interface RenderedSection {

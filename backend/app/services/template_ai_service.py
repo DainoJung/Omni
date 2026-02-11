@@ -238,12 +238,28 @@ _SECTION_TEXT_KEYS: dict[str, list[tuple[str, str]]] = {
     ],
     "gourmet_hero": [
         ("hero_title", "20자 이내 미식 여행 메인 타이틀, 예: 입 안에 담는 세계 여행"),
-        ("hero_subtitle", "25자 이내 서브타이틀"),
+        ("hero_subtitle", "20자 이내 서브 카피, 예: 지금 신세계로 떠나보세요."),
+        ("restaurant_heading", "20자 이내 레스토랑 카테고리 제목, 예: 여권 없이 떠나는 세계 미식 여행"),
         ("hero_desc", "40자 이내 소개 문구, 줄바꿈 가능"),
-        ("hero_sub_desc", "30자 이내 추가 설명"),
     ],
-    "gourmet_product": [
-        ("product_note", "40자 이내 상품 설명, 다이닝/미식 분위기의 감성적 문구"),
+    "gourmet_restaurant": [
+        ("travel_tag", "20자 이내 해당 레스토랑 관련 여행지 태그, 영문, 예: Travel To Hongkong"),
+        ("travel_desc", "25자 이내 여행 감성 한줄 카피, 예: 홍콩 대신, 난 요즘 여기 가요."),
+        ("restaurant_floor", "10자 이내 층수 정보, 예: (1F)"),
+        ("restaurant_desc", "50자 이내 레스토랑 분위기/특징 소개, 줄바꿈 가능"),
+        ("menu1_name", "15자 이내 해당 레스토랑 대표 메뉴 1 이름"),
+        ("menu1_desc", "30자 이내 메뉴 1 설명, 줄바꿈 가능"),
+        ("menu2_name", "15자 이내 해당 레스토랑 대표 메뉴 2 이름"),
+        ("menu2_desc", "30자 이내 메뉴 2 설명, 줄바꿈 가능"),
+        ("event1", "30자 이내 스페셜 이벤트 1, 예: - 월남쌈 beef 주문 시 음료 1캔 서비스 증정"),
+        ("event2", "30자 이내 스페셜 이벤트 2, 예: - SNS 인증 시 스프링롤 증정"),
+    ],
+    "gourmet_wine_intro": [
+        ("wine_desc", "40자 이내 와인 섹션 소개 문구, 줄바꿈 가능"),
+        ("wine_heading", "20자 이내 와인 카테고리 제목, 예: 요리와 즐기는 월드 오브 와인"),
+    ],
+    "gourmet_wine": [
+        ("wine_note", "60자 이내 와인 테이스팅 노트, 줄바꿈 가능, 예: 브리오슈의 향, 부드러운 버블\\n소금같은 미넬라리티가 인상적인 샴페인"),
     ],
     "shinsegae_hero": [
         ("event_title", "20자 이내 이벤트 타이틀"),

@@ -6,7 +6,7 @@ import { Header } from "@/components/layout/Header";
 import { SectionRenderer } from "@/components/editor/SectionRenderer";
 import { NewProjectModal } from "@/components/modals/NewProjectModal";
 import { projectsApi, sectionsApi, authApi, uploadApi, imagesApi, generateApi } from "@/lib/api";
-import { exportImage } from "@/lib/export";
+import { exportImage, inlineImages } from "@/lib/export";
 import { toPng } from "html-to-image";
 import { ZoomIn, ChevronLeft, ChevronRight, Minus, Plus, GripVertical, Image as ImageIcon, Send, ImagePlus, Download, Upload, User, LogOut, X, Eraser, Loader2, Check, Undo2, Redo2 } from "lucide-react";
 import { useHistory } from "@/hooks/useHistory";
@@ -275,12 +275,18 @@ export default function ResultPage() {
         const element = document.querySelector(`[data-section-id="${section.section_id}"]`) as HTMLElement;
         if (element) {
           try {
-            const dataUrl = await toPng(element, {
-              quality: 0.5,
-              pixelRatio: 0.3,
-              cacheBust: true,
-            });
-            thumbnails[section.section_id] = dataUrl;
+            const restore = await inlineImages(element);
+            try {
+              const dataUrl = await toPng(element, {
+                quality: 0.5,
+                pixelRatio: 0.3,
+                cacheBust: true,
+                imagePlaceholder: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+              });
+              thumbnails[section.section_id] = dataUrl;
+            } finally {
+              restore();
+            }
           } catch (error) {
             console.error(`Failed to generate thumbnail for ${section.section_id}:`, error);
           }

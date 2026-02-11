@@ -185,9 +185,16 @@ def resolve_sections(
     if page_type_id == "vip_private":
         return ["vip_private_hero"] + ["product_card"] * product_count
 
-    # 고메트립
+    # 고메트립: 레스토랑 3개 고정 + 와인 (product_count - 3)개
     if page_type_id == "gourmet":
-        return ["gourmet_hero"] + ["gourmet_product"] * product_count
+        restaurant_count = 3
+        wine_count = product_count - restaurant_count
+        return (
+            ["gourmet_hero"]
+            + ["gourmet_restaurant"] * restaurant_count
+            + ["gourmet_wine_intro"]
+            + ["gourmet_wine"] * wine_count
+        )
 
     # 뱅드신세계
     if page_type_id == "shinsegae":

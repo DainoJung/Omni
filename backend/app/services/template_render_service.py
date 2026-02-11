@@ -164,6 +164,8 @@ def bind_section_data(
             else:
                 base_ph_id = ph_id
                 idx = instance_index or 0
+                # Apply product offset (e.g., gourmet_wine products start at index 3)
+                idx += ph.get("product_offset", 0)
 
             if ph_type == "image":
                 use_bg_removed = ph.get("bg_remove") is True and idx in product_bg_removed_urls

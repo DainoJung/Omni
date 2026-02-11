@@ -24,7 +24,9 @@ const AVAILABLE_SECTIONS = [
   { type: "vip_special_hero", label: "VIP 스페셜", icon: "💎" },
   { type: "vip_private_hero", label: "VIP 프라이빗", icon: "🖤" },
   { type: "gourmet_hero", label: "고메트립 히어로", icon: "🍽️" },
-  { type: "gourmet_product", label: "고메트립 상품", icon: "🍷" },
+  { type: "gourmet_restaurant", label: "고메트립 레스토랑", icon: "🍳" },
+  { type: "gourmet_wine_intro", label: "고메트립 와인 인트로", icon: "🍷" },
+  { type: "gourmet_wine", label: "고메트립 와인", icon: "🍾" },
   { type: "shinsegae_hero", label: "뱅드신세계", icon: "🏬" },
 ] as const;
 

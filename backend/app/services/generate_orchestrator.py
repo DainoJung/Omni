@@ -35,8 +35,10 @@ _SECTION_TEXT_KEY_MAP: dict[str, list[str]] = {
     "fit_event_info": ["info_period", "event_subtitle"],
     "vip_special_hero": ["vip_badge", "event_title", "event_subtitle", "benefit_text", "event_period"],
     "vip_private_hero": ["private_label", "event_title", "event_desc", "cta_text"],
-    "gourmet_hero": ["hero_title", "hero_subtitle", "hero_desc", "hero_sub_desc"],
-    "gourmet_product": ["product_note"],
+    "gourmet_hero": ["hero_title", "hero_subtitle", "restaurant_heading", "hero_desc"],
+    "gourmet_restaurant": ["travel_tag", "travel_desc", "restaurant_floor", "restaurant_desc", "menu1_name", "menu1_desc", "menu2_name", "menu2_desc", "event1", "event2"],
+    "gourmet_wine_intro": ["wine_desc", "wine_heading"],
+    "gourmet_wine": ["wine_note"],
     "shinsegae_hero": ["event_title", "benefit_1", "benefit_2", "benefit_3", "event_period"],
 }
 
@@ -112,8 +114,8 @@ class GenerateOrchestrator:
                 "fit_product_trio": (860, 1133),
                 "vip_special_hero": (860, 500),
                 "vip_private_hero": (860, 480),
-                "gourmet_hero": (860, 780),
-                "gourmet_product": (860, 400),
+                "gourmet_restaurant": (860, 480),
+                "gourmet_wine": (860, 860),
                 "shinsegae_hero": (860, 500),
             }
 
@@ -166,32 +168,65 @@ class GenerateOrchestrator:
                         image_prompts[slot_key] = p_used
                     continue
 
-                # gourmet_product: 개별 상품명 기반 이미지 생성
-                if sec_type == "gourmet_product":
+                # gourmet_restaurant: 레스토랑별 장면 이미지 생성
+                if sec_type == "gourmet_restaurant":
                     p_name = [product_names[inst_idx]] if inst_idx < len(product_names) else product_names
-                    gp_filename = f"{sec_type}_{inst_idx}.png"
-                    logger.info(f"{sec_type} 개별 상품 이미지 생성 (인스턴스 {inst_idx}, 상품: {p_name[0]})")
+                    gr_filename = f"{sec_type}_{inst_idx}.png"
+                    logger.info(f"{sec_type} 레스토랑 장면 이미지 생성 (인스턴스 {inst_idx}, 레스토랑: {p_name[0]})")
 
-                    gp_texts: dict[str, str] = {}
+                    gr_texts: dict[str, str] = {}
                     for tk in _get_section_text_keys(sec_type):
                         suffixed = f"{tk}__{inst_idx}" if is_duplicate else tk
                         if suffixed in section_texts:
-                            gp_texts[tk] = section_texts[suffixed]
+                            gr_texts[tk] = section_texts[suffixed]
 
                     img_bytes, p_used = await generate_section_image(
                         product_names=p_name,
                         section_type=sec_type,
                         width=w,
                         height=h,
-                        section_texts=gp_texts,
+                        section_texts=gr_texts,
                         theme=theme,
-                        brand_name=brand_name if page_type_id == "brand_promotion" else None,
                     )
                     path = await self.storage.upload_image(
                         file_bytes=img_bytes,
                         project_id=project_id,
                         image_type="generated",
-                        filename=gp_filename,
+                        filename=gr_filename,
+                    )
+                    url = self.storage.get_public_url(path)
+                    key = f"{sec_type}__{inst_idx}" if is_duplicate else sec_type
+                    section_image_urls[key] = url
+                    image_prompts[key] = p_used
+                    continue
+
+                # gourmet_wine: 와인별 보틀 이미지 생성 (상품 인덱스 +3 오프셋)
+                if sec_type == "gourmet_wine":
+                    wine_offset = 3
+                    wine_idx = inst_idx + wine_offset
+                    p_name = [product_names[wine_idx]] if wine_idx < len(product_names) else product_names[-1:]
+                    gw_filename = f"{sec_type}_{inst_idx}.png"
+                    logger.info(f"{sec_type} 와인 보틀 이미지 생성 (인스턴스 {inst_idx}, 와인: {p_name[0]})")
+
+                    gw_texts: dict[str, str] = {}
+                    for tk in _get_section_text_keys(sec_type):
+                        suffixed = f"{tk}__{inst_idx}" if is_duplicate else tk
+                        if suffixed in section_texts:
+                            gw_texts[tk] = section_texts[suffixed]
+
+                    img_bytes, p_used = await generate_section_image(
+                        product_names=p_name,
+                        section_type=sec_type,
+                        width=w,
+                        height=h,
+                        section_texts=gw_texts,
+                        theme=theme,
+                    )
+                    path = await self.storage.upload_image(
+                        file_bytes=img_bytes,
+                        project_id=project_id,
+                        image_type="generated",
+                        filename=gw_filename,
                     )
                     url = self.storage.get_public_url(path)
                     key = f"{sec_type}__{inst_idx}" if is_duplicate else sec_type

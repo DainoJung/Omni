@@ -218,6 +218,33 @@ _SECTION_TEXT_KEYS: dict[str, list[tuple[str, str]]] = {
         ("product_desc_1", "25자 이내 상품2 한줄 설명"),
         ("product_desc_2", "25자 이내 상품3 한줄 설명"),
     ],
+    "vip_special_hero": [
+        ("vip_badge", "8자 이내 VIP 배지, 예: VIP SPECIAL"),
+        ("event_title", "20자 이내 이벤트 메인 타이틀"),
+        ("event_subtitle", "30자 이내 서브 카피"),
+        ("benefit_text", "25자 이내 혜택 문구, 예: 최대 30% 할인"),
+        ("event_period", "20자 이내 행사 기간"),
+    ],
+    "vip_private_hero": [
+        ("private_label", "10자 이내 프라이빗 라벨, 예: PRIVATE WEEK"),
+        ("event_title", "20자 이내 이벤트 메인 타이틀"),
+        ("event_desc", "40자 이내 이벤트 설명"),
+        ("cta_text", "10자 이내 CTA 문구, 예: 지금 확인하기"),
+    ],
+    "gourmet_hero": [
+        ("trip_tag", "10자 이내 태그, 예: GOURMET TRIP"),
+        ("trip_title", "20자 이내 미식 여행 타이틀"),
+        ("location", "15자 이내 장소, 예: 서울 강남"),
+        ("trip_desc", "40자 이내 설명"),
+        ("price", "15자 이내 가격 정보, 예: 1인 89,000원~"),
+    ],
+    "shinsegae_hero": [
+        ("event_title", "20자 이내 이벤트 타이틀"),
+        ("benefit_1", "20자 이내 혜택1, 예: 최대 10만원 적립"),
+        ("benefit_2", "20자 이내 혜택2, 예: 전 브랜드 15% 할인"),
+        ("benefit_3", "20자 이내 혜택3, 예: 무료 주차 3시간"),
+        ("event_period", "20자 이내 행사 기간"),
+    ],
 }
 
 

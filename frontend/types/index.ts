@@ -9,6 +9,21 @@ export interface Theme {
   is_active?: boolean;
 }
 
+// === Page Type ===
+export interface PageType {
+  id: string;
+  name: string;
+  icon: string;
+  description: string;
+  min_products: number;
+  max_products: number;
+  requires_price: boolean;
+  accent_color: string;
+  catalog_bg_color: string;
+  background_prompt: string;
+  copy_keywords: string[];
+}
+
 // === Section (v5.2 HTML Template) ===
 export type SectionType =
   | "hero_banner"
@@ -70,8 +85,7 @@ export interface GeneratedData {
 
 export interface ProjectCreate {
   products: ProductInput[];
-  theme: string;
-  selected_sections?: SectionType[];
+  page_type: string;
 }
 
 export interface ProjectUpdate {
@@ -82,7 +96,7 @@ export interface ProjectUpdate {
 // === Product ===
 export interface ProductInput {
   name: string;
-  price: string;
+  price?: string;
   brand_name?: string;
   image_id?: string;
   image_url?: string;
@@ -92,13 +106,13 @@ export interface ProductInput {
 export interface GenerateRequest {
   project_id: string;
   products: ProductInput[];
-  theme: string;
+  page_type: string;
 }
 
 export interface GenerateResponse {
   project_id: string;
   template_used: string;
-  theme: string;
+  page_type: string;
   rendered_sections: RenderedSection[];
   generated_at: string;
 }

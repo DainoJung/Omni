@@ -45,7 +45,7 @@ export default function GeneratePage() {
         setProject(proj);
 
         const products: ProductInput[] = proj.products || [];
-        const themeId = proj.theme_id || "holiday";
+        const themeId = proj.theme_id || "product_detail";
 
         // Step 1: 입력 분석
         updateStep(0, "running");
@@ -65,7 +65,7 @@ export default function GeneratePage() {
         await generateApi.generate({
           project_id: projectId,
           products,
-          theme: themeId,
+          page_type: themeId,
         });
 
         updateStep(1, "done");

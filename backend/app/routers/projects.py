@@ -25,8 +25,7 @@ async def create_project(data: ProjectCreate):
     db = get_supabase()
     insert_data = {
         "products": [p.model_dump() for p in data.products],
-        "theme_id": data.theme,
-        "selected_sections": data.selected_sections,
+        "theme_id": data.page_type,
     }
     result = db.table("projects").insert(insert_data).execute()
     if not result.data:
@@ -138,6 +137,10 @@ async def regenerate_section_image(project_id: UUID, section_id: str, body: Imag
         "description": (600, 600),
         "feature_point": (860, 957),
         "fit_hero": (860, 413),
+        "vip_special_hero": (860, 500),
+        "vip_private_hero": (860, 480),
+        "gourmet_hero": (860, 520),
+        "shinsegae_hero": (860, 500),
     }
 
     if sec_type not in image_size_map:

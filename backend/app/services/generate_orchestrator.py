@@ -2,7 +2,6 @@
 
 import asyncio
 import logging
-import math
 import re
 from collections import Counter
 from datetime import datetime
@@ -11,7 +10,7 @@ import httpx
 
 from app.database import get_supabase
 from app.services.bg_remove_service import remove_background
-from app.constants.themes import get_theme
+from app.constants.page_types import get_page_type, resolve_sections
 from app.services.template_ai_service import (
     generate_section_texts,
     generate_section_image,
@@ -34,6 +33,10 @@ _SECTION_TEXT_KEY_MAP: dict[str, list[str]] = {
     "promo_hero": ["script_title", "category_title", "subtitle", "location"],
     "fit_hero": ["brand_name", "event_title", "event_subtitle", "event_period"],
     "fit_event_info": ["event_name", "benefit_text", "info_period", "info_location", "cta_text"],
+    "vip_special_hero": ["vip_badge", "event_title", "event_subtitle", "benefit_text", "event_period"],
+    "vip_private_hero": ["private_label", "event_title", "event_desc", "cta_text"],
+    "gourmet_hero": ["trip_tag", "trip_title", "location", "trip_desc", "price"],
+    "shinsegae_hero": ["event_title", "benefit_1", "benefit_2", "benefit_3", "event_period"],
 }
 
 
@@ -52,22 +55,26 @@ class GenerateOrchestrator:
         self,
         project_id: str,
         products: list[dict],
-        theme_id: str,
+        page_type_id: str,
     ) -> GenerateResponse:
         """HTML 템플릿 기반 POP 생성 파이프라인을 실행한다."""
 
         try:
-            # 1. 테마 정보 조회
-            theme = get_theme(theme_id)
+            # 1. 페이지 타입 정보 조회 → 테마 호환 dict 생성
+            page_type = get_page_type(page_type_id)
+            theme = {
+                "id": page_type["id"],
+                "name": page_type["name"],
+                "icon": page_type["icon"],
+                "accent_color": page_type["accent_color"],
+                "catalog_bg_color": page_type["catalog_bg_color"],
+                "background_prompt": page_type["background_prompt"],
+                "copy_keywords": page_type["copy_keywords"],
+            }
 
-            # 2. 선택된 섹션 템플릿 조회
-            # 상품 3개 이상이면 FIT 템플릿 구조로 자동 설정
-            if len(products) >= 3:
-                trio_count = math.ceil(len(products) / 3)
-                selected_sections = ["fit_hero", "fit_event_info"] + ["fit_product_trio"] * trio_count
-                logger.info(f"FIT 템플릿 자동 적용: {len(products)}개 상품 → {trio_count}개 fit_product_trio")
-            else:
-                selected_sections = self._get_selected_sections(project_id)
+            # 2. 페이지 타입 + 상품 수 기반 섹션 자동 결정
+            selected_sections = resolve_sections(page_type_id, len(products))
+            logger.info(f"페이지 타입 '{page_type['name']}' → 섹션: {selected_sections}")
             section_templates = compose_sections(selected_sections)
 
             # 3. 상품 이미지 URL 수집 + 참조 이미지 다운로드
@@ -96,6 +103,10 @@ class GenerateOrchestrator:
                 "feature_point": (860, 957),
                 "promo_hero": (860, 645),
                 "fit_hero": (860, 413),
+                "vip_special_hero": (860, 500),
+                "vip_private_hero": (860, 480),
+                "gourmet_hero": (860, 520),
+                "shinsegae_hero": (860, 500),
             }
 
             # 키: "타입__인스턴스인덱스" (중복) 또는 "타입" (단일)
@@ -193,7 +204,7 @@ class GenerateOrchestrator:
             }
 
             self.db.table("projects").update({
-                "theme_id": theme_id,
+                "theme_id": page_type_id,
                 "template_used": template_used,
                 "generated_data": generated_data,
                 "rendered_sections": rendered_sections,
@@ -204,7 +215,7 @@ class GenerateOrchestrator:
             return GenerateResponse(
                 project_id=project_id,
                 template_used=template_used,
-                theme=theme_id,
+                page_type=page_type_id,
                 rendered_sections=[
                     RenderedSectionResponse(**s) for s in rendered_sections
                 ],
@@ -249,19 +260,6 @@ class GenerateOrchestrator:
         except Exception as e:
             logger.warning(f"참조 이미지 다운로드 실패, 텍스트 기반 생성으로 대체: {e}")
             return None, None
-
-    def _get_selected_sections(self, project_id: str) -> list[str] | None:
-        """프로젝트에 저장된 selected_sections를 반환한다."""
-        result = (
-            self.db.table("projects")
-            .select("selected_sections")
-            .eq("id", project_id)
-            .single()
-            .execute()
-        )
-        if result.data:
-            return result.data.get("selected_sections")
-        return None
 
     async def _preprocess_bg_removal(
         self,

@@ -6,7 +6,7 @@ from datetime import datetime
 
 class ProductInput(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
-    price: str = Field(..., min_length=1, max_length=50)
+    price: Optional[str] = Field(None, max_length=50)
     brand_name: Optional[str] = Field(None, max_length=100)
     image_id: Optional[str] = None
 
@@ -14,7 +14,7 @@ class ProductInput(BaseModel):
 class GenerateRequest(BaseModel):
     project_id: UUID
     products: List[ProductInput] = Field(..., min_length=1, max_length=6)
-    theme: str = Field(..., min_length=1, max_length=50)
+    page_type: str = Field(..., min_length=1, max_length=50)
 
 
 class RenderedSectionResponse(BaseModel):
@@ -30,7 +30,7 @@ class RenderedSectionResponse(BaseModel):
 class GenerateResponse(BaseModel):
     project_id: UUID
     template_used: str
-    theme: str
+    page_type: str
     rendered_sections: List[RenderedSectionResponse]
     generated_at: datetime
 

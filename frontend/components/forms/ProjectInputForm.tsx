@@ -3,13 +3,12 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
-import { ThemeSelector } from "./ThemeSelector";
-import { TemplateSelector } from "./TemplateSelector";
+import { PageTypeSelector } from "./PageTypeSelector";
 import { projectsApi, uploadApi } from "@/lib/api";
 import { toast } from "sonner";
 import { Plus, Trash2, Upload, X } from "lucide-react";
 import { useDropzone } from "react-dropzone";
-import type { SectionType } from "@/types";
+import type { PageType } from "@/types";
 
 interface ProductEntry {
   name: string;
@@ -82,20 +81,41 @@ interface ProjectInputFormProps {
 export function ProjectInputForm({ onSuccess, compact }: ProjectInputFormProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [theme, setTheme] = useState("");
-  const [selectedSections, setSelectedSections] = useState<SectionType[]>([
-    "hero_banner",
-    "feature_badges",
-    "description",
-    "feature_point",
-  ]);
+  const [pageTypeId, setPageTypeId] = useState("");
+  const [pageTypeConfig, setPageTypeConfig] = useState<PageType | null>(null);
   const [products, setProducts] = useState<ProductEntry[]>([
     { name: "", price: "", brand_name: "", image: null, imagePreview: null },
   ]);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  const requiresPrice = pageTypeConfig?.requires_price ?? true;
+  const minProducts = pageTypeConfig?.min_products ?? 1;
+  const maxProducts = pageTypeConfig?.max_products ?? 6;
+
+  const handlePageTypeChange = (pt: PageType) => {
+    setPageTypeId(pt.id);
+    setPageTypeConfig(pt);
+
+    // 상품 수를 페이지 타입의 min/max에 맞게 조정
+    if (products.length < pt.min_products) {
+      const toAdd = pt.min_products - products.length;
+      setProducts([
+        ...products,
+        ...Array.from({ length: toAdd }, () => ({
+          name: "",
+          price: "",
+          brand_name: "",
+          image: null,
+          imagePreview: null,
+        })),
+      ]);
+    } else if (products.length > pt.max_products) {
+      setProducts(products.slice(0, pt.max_products));
+    }
+  };
+
   const addProduct = () => {
-    if (products.length >= 6) return;
+    if (products.length >= maxProducts) return;
     setProducts([
       ...products,
       { name: "", price: "", brand_name: "", image: null, imagePreview: null },
@@ -103,7 +123,7 @@ export function ProjectInputForm({ onSuccess, compact }: ProjectInputFormProps) 
   };
 
   const removeProduct = (index: number) => {
-    if (products.length <= 1) return;
+    if (products.length <= minProducts) return;
     const updated = products.filter((_, i) => i !== index);
     setProducts(updated);
   };
@@ -129,13 +149,16 @@ export function ProjectInputForm({ onSuccess, compact }: ProjectInputFormProps) 
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
-    if (!theme) newErrors.theme = "테마를 선택하세요.";
-    if (products.length < 2 && selectedSections.length === 0)
-      newErrors.template = "최소 1개 섹션을 선택하세요.";
+    if (!pageTypeId) newErrors.page_type = "페이지 유형을 선택하세요.";
+
+    if (products.length < minProducts) {
+      newErrors.products = `최소 ${minProducts}개 상품이 필요합니다.`;
+    }
 
     products.forEach((p, i) => {
       if (!p.name.trim()) newErrors[`product_${i}_name`] = "제품명을 입력하세요.";
-      if (!p.price.trim()) newErrors[`product_${i}_price`] = "가격을 입력하세요.";
+      if (requiresPrice && !p.price.trim())
+        newErrors[`product_${i}_price`] = "가격을 입력하세요.";
       if (!p.image) newErrors[`product_${i}_image`] = "이미지를 추가하세요.";
     });
 
@@ -153,11 +176,10 @@ export function ProjectInputForm({ onSuccess, compact }: ProjectInputFormProps) 
       const project = await projectsApi.create({
         products: products.map((p) => ({
           name: p.name,
-          price: p.price,
+          ...(requiresPrice ? { price: p.price } : {}),
           ...(p.brand_name ? { brand_name: p.brand_name } : {}),
         })),
-        theme,
-        selected_sections: selectedSections,
+        page_type: pageTypeId,
       });
 
       // 2. 각 상품 이미지 업로드
@@ -188,16 +210,16 @@ export function ProjectInputForm({ onSuccess, compact }: ProjectInputFormProps) 
         <div className="space-y-1">
           <h2 className="text-2xl font-bold">POP 만들기</h2>
           <p className="text-text-secondary text-sm">
-            상품 정보와 테마를 선택하면 AI가 배경과 카피를 자동 생성합니다.
+            페이지 유형을 선택하고 상품 정보를 입력하면 AI가 자동으로 생성합니다.
           </p>
         </div>
       )}
 
-      {/* 테마 선택 */}
-      <ThemeSelector
-        value={theme}
-        onChange={setTheme}
-        error={errors.theme}
+      {/* 페이지 유형 선택 */}
+      <PageTypeSelector
+        value={pageTypeId}
+        onChange={handlePageTypeChange}
+        error={errors.page_type}
       />
 
       {/* 상품 목록 */}
@@ -207,9 +229,12 @@ export function ProjectInputForm({ onSuccess, compact }: ProjectInputFormProps) 
             상품 정보 <span className="text-error">*</span>
           </label>
           <span className="text-xs text-text-tertiary">
-            {products.length}/6개
+            {products.length}/{maxProducts}개
           </span>
         </div>
+        {errors.products && (
+          <p className="text-xs text-error">{errors.products}</p>
+        )}
 
         {products.map((product, index) => (
           <div
@@ -238,7 +263,7 @@ export function ProjectInputForm({ onSuccess, compact }: ProjectInputFormProps) 
                   <span className="text-xs font-medium text-text-secondary shrink-0">
                     상품 {index + 1}
                   </span>
-                  {products.length > 1 && (
+                  {products.length > minProducts && (
                     <button
                       type="button"
                       onClick={() => removeProduct(index)}
@@ -259,17 +284,19 @@ export function ProjectInputForm({ onSuccess, compact }: ProjectInputFormProps) 
                     : "border-border"
                     }`}
                 />
-                <input
-                  placeholder="가격 (필수, 예: 39,000원)"
-                  value={product.price}
-                  onChange={(e) =>
-                    updateProduct(index, "price", e.target.value)
-                  }
-                  className={`w-full h-9 px-3 border rounded-sm text-sm focus:border-border-focus ${errors[`product_${index}_price`]
-                    ? "border-error"
-                    : "border-border"
-                    }`}
-                />
+                {requiresPrice && (
+                  <input
+                    placeholder="가격 (필수, 예: 39,000원)"
+                    value={product.price}
+                    onChange={(e) =>
+                      updateProduct(index, "price", e.target.value)
+                    }
+                    className={`w-full h-9 px-3 border rounded-sm text-sm focus:border-border-focus ${errors[`product_${index}_price`]
+                      ? "border-error"
+                      : "border-border"
+                      }`}
+                  />
+                )}
                 {products.length >= 2 && (
                   <input
                     placeholder="브랜드명 (선택, 카탈로그용)"
@@ -285,7 +312,7 @@ export function ProjectInputForm({ onSuccess, compact }: ProjectInputFormProps) 
           </div>
         ))}
 
-        {products.length < 6 && (
+        {products.length < maxProducts && (
           <button
             type="button"
             onClick={addProduct}
@@ -296,13 +323,6 @@ export function ProjectInputForm({ onSuccess, compact }: ProjectInputFormProps) 
           </button>
         )}
       </div>
-
-      {/* 템플릿 & 페이지 구성 */}
-      <TemplateSelector
-        selectedSections={selectedSections}
-        onChange={setSelectedSections}
-        error={errors.template}
-      />
 
       <div className="pt-4">
         <Button type="submit" size="lg" loading={loading} className="w-full">

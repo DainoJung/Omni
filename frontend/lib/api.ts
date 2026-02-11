@@ -5,6 +5,7 @@ import type {
   GenerateRequest,
   GenerateResponse,
   Theme,
+  PageType,
   ListResponse,
   ErrorResponse,
 } from "@/types";
@@ -77,6 +78,11 @@ export const generateApi = {
 // === Themes ===
 export const themesApi = {
   list: () => request<Theme[]>("/api/themes"),
+};
+
+// === Page Types ===
+export const pageTypesApi = {
+  list: () => request<PageType[]>("/api/page-types"),
 };
 
 // === Sections ===

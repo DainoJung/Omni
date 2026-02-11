@@ -13,7 +13,7 @@ async def generate(data: GenerateRequest):
         result = await orchestrator.generate(
             project_id=str(data.project_id),
             products=[p.model_dump() for p in data.products],
-            theme_id=data.theme,
+            page_type_id=data.page_type,
         )
         return result
     except ValueError as e:

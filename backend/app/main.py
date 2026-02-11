@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import projects, generate, upload, templates, themes, auth, images
+from app.routers import projects, generate, upload, templates, themes, auth, images, page_types
 
 app = FastAPI(
     title="POP Maker API",
@@ -26,6 +26,7 @@ app.include_router(upload.router, prefix="/api/upload", tags=["Upload"])
 app.include_router(templates.router, prefix="/api/templates", tags=["Templates"])
 app.include_router(themes.router, prefix="/api/themes", tags=["Themes"])
 app.include_router(images.router, prefix="/api/images", tags=["Images"])
+app.include_router(page_types.router, prefix="/api/page-types", tags=["PageTypes"])
 
 
 @app.get("/health")

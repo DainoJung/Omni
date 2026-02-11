@@ -45,7 +45,7 @@ export function NewProjectModal({ isOpen, onClose }: NewProjectModalProps) {
 
   const handleSuccess = (projectId: string) => {
     onClose();
-    router.push(`/generate/${projectId}`);
+    router.push(`/result/${projectId}`);
   };
 
   if (!isOpen) return null;

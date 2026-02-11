@@ -9,8 +9,7 @@ import { Loader2 } from "lucide-react";
 import { ProjectInputForm } from "@/components/forms/ProjectInputForm";
 
 function getNextPath(project: Project): string {
-  if (project.rendered_sections?.length) return `/result/${project.id}`;
-  return `/generate/${project.id}`;
+  return `/result/${project.id}`;
 }
 
 export default function HomePage() {

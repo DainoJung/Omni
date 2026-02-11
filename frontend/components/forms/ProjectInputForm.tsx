@@ -193,7 +193,7 @@ export function ProjectInputForm({ onSuccess, compact }: ProjectInputFormProps) 
       if (onSuccess) {
         onSuccess(project.id);
       } else {
-        router.push(`/generate/${project.id}`);
+        router.push(`/result/${project.id}`);
       }
     } catch (err) {
       toast.error(

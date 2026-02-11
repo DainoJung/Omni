@@ -5,13 +5,21 @@ import { useParams, useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { SectionRenderer } from "@/components/editor/SectionRenderer";
 import { NewProjectModal } from "@/components/modals/NewProjectModal";
-import { projectsApi, sectionsApi, authApi, uploadApi, imagesApi } from "@/lib/api";
+import { projectsApi, sectionsApi, authApi, uploadApi, imagesApi, generateApi } from "@/lib/api";
 import { exportImage } from "@/lib/export";
 import { toPng } from "html-to-image";
-import { ZoomIn, ChevronLeft, ChevronRight, Minus, Plus, GripVertical, Image as ImageIcon, Send, ImagePlus, Download, Upload, User, LogOut, X, Eraser, Loader2 } from "lucide-react";
+import { ZoomIn, ChevronLeft, ChevronRight, Minus, Plus, GripVertical, Image as ImageIcon, Send, ImagePlus, Download, Upload, User, LogOut, X, Eraser, Loader2, Check } from "lucide-react";
 import { toast } from "sonner";
 import type { Project, RenderedSection } from "@/types";
 import type { SelectedElement } from "@/components/editor/SectionBlock";
+
+type GenerationStepStatus = "pending" | "running" | "done";
+
+interface GenerationStep {
+  label: string;
+  detail: string;
+  status: GenerationStepStatus;
+}
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -57,6 +65,23 @@ export default function ResultPage() {
   const [originalAiImages, setOriginalAiImages] = useState<{ sectionId: string; key: string; url: string }[]>([]);
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
 
+  // Generation states
+  const [generating, setGenerating] = useState(false);
+  const [generationProgress, setGenerationProgress] = useState(0);
+  const [generationSteps, setGenerationSteps] = useState<GenerationStep[]>([
+    { label: "입력 분석", detail: "상품 이미지 및 정보를 분석하고 있습니다.", status: "pending" },
+    { label: "HTML 템플릿 조회", detail: "최적의 레이아웃 템플릿을 선택하고 있습니다.", status: "pending" },
+    { label: "AI 배경 & 텍스트 생성", detail: "AI가 배경 이미지와 텍스트를 생성하고 있습니다.", status: "pending" },
+    { label: "템플릿 데이터 바인딩", detail: "생성된 콘텐츠를 템플릿에 적용하고 있습니다.", status: "pending" },
+  ]);
+  const [generationError, setGenerationError] = useState<string | null>(null);
+
+  const updateGenerationStep = (index: number, status: GenerationStepStatus) => {
+    setGenerationSteps((s) =>
+      s.map((st, i) => (i === index ? { ...st, status } : st))
+    );
+  };
+
   // Text toolbar states
   const [fontSize, setFontSize] = useState(16);
   const [fontWeight, setFontWeight] = useState(400);
@@ -74,6 +99,21 @@ export default function ResultPage() {
     sectionsRef.current = sections;
   }, [sections]);
 
+  const loadProjectData = useCallback((proj: Project) => {
+    if (proj.rendered_sections?.length) {
+      setSections(proj.rendered_sections);
+      const aiImages: { sectionId: string; key: string; url: string }[] = [];
+      for (const sec of proj.rendered_sections) {
+        for (const [key, value] of Object.entries(sec.data)) {
+          if (key.endsWith("_image") && typeof value === "string" && value.startsWith("http")) {
+            aiImages.push({ sectionId: sec.section_id, key, url: value });
+          }
+        }
+      }
+      setOriginalAiImages(aiImages);
+    }
+  }, []);
+
   useEffect(() => {
     async function load() {
       try {
@@ -81,31 +121,78 @@ export default function ResultPage() {
         setProject(proj);
 
         if (proj.rendered_sections?.length) {
-          setSections(proj.rendered_sections);
-          // 초기 AI 이미지를 별도 저장 (사진 탭 그리드용)
-          const aiImages: { sectionId: string; key: string; url: string }[] = [];
-          for (const sec of proj.rendered_sections) {
-            for (const [key, value] of Object.entries(sec.data)) {
-              if (key.endsWith("_image") && typeof value === "string" && value.startsWith("http")) {
-                aiImages.push({ sectionId: sec.section_id, key, url: value });
-              }
-            }
-          }
-          setOriginalAiImages(aiImages);
-        }
+          // 이미 생성 완료된 프로젝트
+          loadProjectData(proj);
 
-        // 배경 제거 이미지 로드
-        try {
-          const bgRemovedResult = await imagesApi.listProjectImages(projectId, "bg_removed");
-          if (bgRemovedResult.images?.length > 0) {
-            const bgImages = bgRemovedResult.images.map((img) => ({
-              url: img.url,
-              type: "bg_removed" as const,
-            }));
-            setUploadedImages((prev) => [...prev, ...bgImages]);
+          // 배경 제거 이미지 로드
+          try {
+            const bgRemovedResult = await imagesApi.listProjectImages(projectId, "bg_removed");
+            if (bgRemovedResult.images?.length > 0) {
+              const bgImages = bgRemovedResult.images.map((img) => ({
+                url: img.url,
+                type: "bg_removed" as const,
+              }));
+              setUploadedImages((prev) => [...prev, ...bgImages]);
+            }
+          } catch (err) {
+            console.error("배경 제거 이미지 로드 실패:", err);
           }
-        } catch (err) {
-          console.error("배경 제거 이미지 로드 실패:", err);
+        } else {
+          // 아직 생성되지 않은 프로젝트 → AI 생성 시작
+          setGenerating(true);
+          setGenerationProgress(0);
+
+          try {
+            const products = proj.products || [];
+            const pageType = proj.theme_id || "product_detail";
+
+            // Step 1: 입력 분석
+            updateGenerationStep(0, "running");
+            setGenerationProgress(10);
+            await new Promise((r) => setTimeout(r, 400));
+            updateGenerationStep(0, "done");
+            setGenerationProgress(15);
+
+            // Step 2: 템플릿 선택
+            updateGenerationStep(1, "running");
+            setGenerationProgress(20);
+
+            // Step 3: AI 생성
+            updateGenerationStep(2, "running");
+            setGenerationProgress(30);
+
+            await generateApi.generate({
+              project_id: projectId,
+              products,
+              page_type: pageType,
+            });
+
+            updateGenerationStep(1, "done");
+            updateGenerationStep(2, "done");
+            setGenerationProgress(85);
+
+            // Step 4: 바인딩 완료
+            updateGenerationStep(3, "running");
+            setGenerationProgress(90);
+
+            const updatedProj = await projectsApi.get(projectId);
+            setProject(updatedProj);
+            loadProjectData(updatedProj);
+
+            await new Promise((r) => setTimeout(r, 400));
+            updateGenerationStep(3, "done");
+            setGenerationProgress(100);
+
+            // 잠시 후 생성 상태 해제
+            setTimeout(() => {
+              setGenerating(false);
+            }, 800);
+          } catch (err) {
+            setGenerationError(
+              err instanceof Error ? err.message : "생성에 실패했습니다."
+            );
+            toast.error("AI 생성에 실패했습니다. 다시 시도해 주세요.");
+          }
         }
       } catch {
         toast.error("프로젝트를 불러올 수 없습니다.");
@@ -114,7 +201,7 @@ export default function ResultPage() {
       }
     }
     load();
-  }, [projectId]);
+  }, [projectId, loadProjectData]);
 
   // Fetch project list for header selector
   useEffect(() => {
@@ -806,7 +893,7 @@ export default function ResultPage() {
     );
   }
 
-  if (sections.length === 0) {
+  if (sections.length === 0 && !generating) {
     return (
       <div className="h-screen flex flex-col overflow-hidden">
         <Header />
@@ -1208,44 +1295,74 @@ export default function ResultPage() {
 
         {/* Center: Preview with Floating Zoom Controls */}
         <main className="flex-1 bg-bg-secondary overflow-auto relative">
-          {/* Preview Content */}
-          <div
-            className="min-h-full p-6 flex justify-center items-start"
-            onClick={(e) => {
-              if (e.target === e.currentTarget) setSelectedElement(null);
-            }}
-          >
+          {generating && sections.length === 0 ? (
+            /* 생성 중 로딩 화면 */
+            <div className="min-h-full flex items-center justify-center">
+              {generationError ? (
+                <div className="text-center space-y-4">
+                  <h2 className="text-xl font-bold text-error">생성 실패</h2>
+                  <p className="text-sm text-error">{generationError}</p>
+                  <button
+                    onClick={() => window.location.reload()}
+                    className="text-sm text-accent underline"
+                  >
+                    다시 시도
+                  </button>
+                </div>
+              ) : (
+                <div className="text-center space-y-4">
+                  <Loader2 size={48} className="text-accent animate-spin mx-auto" />
+                  <div>
+                    <h2 className="text-xl font-bold mb-2">
+                      AI가 멀티 섹션 POP를 생성하고 있습니다
+                    </h2>
+                    <p className="text-sm text-text-secondary">
+                      잠시만 기다려 주세요...
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            /* 프리뷰 콘텐츠 */
             <div
-              className="origin-top overflow-hidden shrink-0"
-              style={{
-                width: `${860 * (zoom / 100)}px`,
-                height: 'fit-content',
+              className="min-h-full p-6 flex justify-center items-start"
+              onClick={(e) => {
+                if (e.target === e.currentTarget) setSelectedElement(null);
               }}
             >
               <div
+                className="origin-top overflow-hidden shrink-0"
                 style={{
-                  width: '860px',
-                  transform: `scale(${zoom / 100})`,
-                  transformOrigin: 'top left',
+                  width: `${860 * (zoom / 100)}px`,
+                  height: 'fit-content',
                 }}
               >
-                <div className="bg-bg-primary shadow-lg rounded-sm">
-                  <SectionRenderer
-                    ref={previewRef}
-                    sections={sections}
-                    zoom={zoom}
-                    onDataChange={handleDataChange}
-                    onElementSelect={setSelectedElement}
-                    selectedPlaceholderId={selectedElement?.placeholderId}
-                    onMoveUp={handleSectionMoveUp}
-                    onMoveDown={handleSectionMoveDown}
-                    onDuplicate={handleSectionDuplicate}
-                    onDelete={handleSectionDelete}
-                  />
+                <div
+                  style={{
+                    width: '860px',
+                    transform: `scale(${zoom / 100})`,
+                    transformOrigin: 'top left',
+                  }}
+                >
+                  <div className="bg-bg-primary shadow-lg rounded-sm">
+                    <SectionRenderer
+                      ref={previewRef}
+                      sections={sections}
+                      zoom={zoom}
+                      onDataChange={handleDataChange}
+                      onElementSelect={setSelectedElement}
+                      selectedPlaceholderId={selectedElement?.placeholderId}
+                      onMoveUp={handleSectionMoveUp}
+                      onMoveDown={handleSectionMoveDown}
+                      onDuplicate={handleSectionDuplicate}
+                      onDelete={handleSectionDelete}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Floating Zoom Control */}
           <div className="sticky bottom-6 left-1/2 -translate-x-1/2 z-10 w-fit mx-auto" ref={zoomMenuRef}>
@@ -1307,6 +1424,138 @@ export default function ResultPage() {
         {/* Right: Generation Info & Chat */}
         <aside className="w-[360px] shrink-0 border-l border-border bg-bg-primary flex flex-col">
           <div className="flex-1 overflow-y-auto p-4 flex flex-col">
+            {/* 생성 중 실시간 진행 상황 */}
+            {generating && (
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-lg font-bold mb-1">AI 상세페이지 생성 중</h3>
+                  <p className="text-xs text-text-secondary">
+                    입력하신 정보로 상세페이지를 생성하고 있습니다.
+                  </p>
+                </div>
+
+                {/* Progress Bar */}
+                <div className="space-y-2">
+                  <div className="w-full h-2 bg-bg-secondary rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-accent rounded-full transition-all duration-500 ease-out"
+                      style={{ width: `${generationProgress}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-text-secondary text-center">
+                    {generationProgress}%
+                  </p>
+                </div>
+
+                {/* Generation Steps */}
+                <div>
+                  <h4 className="text-sm font-medium text-text-secondary mb-3">
+                    생성 진행 상황
+                  </h4>
+                  <div className="space-y-0">
+                    {generationSteps.map((step, i) => {
+                      if (step.status === "pending") return null;
+                      const isRunning = step.status === "running";
+                      const isDone = step.status === "done";
+                      const showConnector =
+                        i < generationSteps.length - 1 &&
+                        generationSteps[i + 1].status !== "pending";
+                      return (
+                        <div key={i}>
+                          <div
+                            className="animate-fade-slide-up"
+                            style={{ animationDelay: `${i * 80}ms`, opacity: 0 }}
+                          >
+                            <div
+                              className={`bg-white rounded-lg border transition-all duration-300 ${
+                                isRunning ? "border-accent/30 shadow-sm" : "border-border"
+                              }`}
+                            >
+                              <div className="p-3 flex items-start gap-3">
+                                <div
+                                  className={`mt-0.5 flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center ${
+                                    isDone ? "bg-text-primary" : "bg-accent/10"
+                                  }`}
+                                >
+                                  {isDone ? (
+                                    <Check size={12} className="text-white" />
+                                  ) : (
+                                    <Loader2 size={12} className="text-accent animate-spin" />
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm font-medium text-text-primary">
+                                      {step.label}
+                                    </span>
+                                    <span
+                                      className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                                        isDone
+                                          ? "bg-gray-100 text-gray-600"
+                                          : "bg-blue-50 text-blue-600"
+                                      }`}
+                                    >
+                                      {isDone ? "완료됨" : "진행 중"}
+                                    </span>
+                                  </div>
+                                  {isRunning && (
+                                    <p className="text-xs text-text-secondary mt-1">
+                                      {step.detail}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          {showConnector && (
+                            <div className="flex justify-start ml-[8px]">
+                              <div className="w-0.5 h-2 bg-border" />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <hr className="border-border" />
+
+                {/* 입력된 상품 정보 */}
+                <div className="space-y-2">
+                  <h4 className="text-sm font-medium text-text-secondary">
+                    입력된 정보
+                  </h4>
+                  <div className="space-y-2">
+                    {(project?.products || []).map((prod, i) => (
+                      <div
+                        key={i}
+                        className="border border-border rounded-sm p-3 space-y-2"
+                      >
+                        {prod.image_url && (
+                          <div className="w-16 h-16 rounded-sm border border-border overflow-hidden">
+                            <img
+                              src={prod.image_url}
+                              alt={prod.name}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        )}
+                        <div>
+                          <p className="text-sm font-medium">{prod.name}</p>
+                          <p className="text-xs text-text-secondary">{prod.price}</p>
+                          {prod.brand_name && (
+                            <p className="text-xs text-text-tertiary">{prod.brand_name}</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 생성 완료 후 기존 UI */}
+            {!generating && (<>
             <div className="space-y-4">
               {/* 입력한 정보 */}
               <div className="bg-white rounded-lg border border-border">
@@ -1593,10 +1842,11 @@ export default function ResultPage() {
 
             {/* 빈 공간으로 채팅을 하단에 밀기 */}
             <div className="flex-1" />
+            </>)}
           </div>
 
           {/* Chat Input Area */}
-          <div className="border-t border-border bg-white p-4">
+          {!generating && <div className="border-t border-border bg-white p-4">
             <div className={`bg-bg-secondary rounded-lg border transition-colors duration-200 ${chatAttachedImage ? "border-accent" : "border-border"}`}>
               {/* 첨부 이미지 — 필드 내부 상단, 애니메이션 확장/축소 */}
               <div
@@ -1715,7 +1965,7 @@ export default function ResultPage() {
                 </button>
               </div>
             </div>
-          </div>
+          </div>}
         </aside>
       </div>
 

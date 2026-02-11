@@ -27,6 +27,8 @@ async def create_project(data: ProjectCreate):
         "products": [p.model_dump() for p in data.products],
         "theme_id": data.page_type,
     }
+    if data.selected_sections:
+        insert_data["selected_sections"] = data.selected_sections
     result = db.table("projects").insert(insert_data).execute()
     if not result.data:
         raise HTTPException(status_code=500, detail="프로젝트 생성 실패")
@@ -134,14 +136,14 @@ async def regenerate_section_image(project_id: UUID, section_id: str, body: Imag
     # 이미지 크기 매핑
     image_size_map = {
         "hero_banner": (860, 1400),
-        "description": (600, 600),
+        "description": (860, 860),
         "feature_point": (860, 957),
         "fit_hero": (860, 625),
         "fit_event_info": (860, 1220),
-        "fit_product_trio": (640, 850),
+        "fit_product_trio": (860, 1133),
         "vip_special_hero": (860, 500),
         "vip_private_hero": (860, 480),
-        "gourmet_hero": (860, 520),
+        "gourmet_hero": (860, 780),
         "shinsegae_hero": (860, 500),
     }
 

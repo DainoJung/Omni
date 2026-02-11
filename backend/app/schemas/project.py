@@ -7,8 +7,9 @@ from app.schemas.generate import ProductInput
 
 
 class ProjectCreate(BaseModel):
-    products: List[ProductInput] = Field(..., min_length=1, max_length=6)
+    products: List[ProductInput] = Field(..., min_length=1, max_length=9)
     page_type: str = Field(..., min_length=1, max_length=50)
+    selected_sections: Optional[List[str]] = None
 
 
 class ProjectUpdate(BaseModel):

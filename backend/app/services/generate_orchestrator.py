@@ -32,7 +32,7 @@ _SECTION_TEXT_KEY_MAP: dict[str, list[str]] = {
     "feature_point": ["point_label", "point_title_main", "point_title_accent", "point_body"],
     "promo_hero": ["script_title", "category_title", "subtitle", "location"],
     "fit_hero": ["event_title", "event_period", "event_subtitle", "event_desc", "event_hashtags"],
-    "fit_event_info": ["info_period"],
+    "fit_event_info": ["info_period", "event_subtitle"],
     "vip_special_hero": ["vip_badge", "event_title", "event_subtitle", "benefit_text", "event_period"],
     "vip_private_hero": ["private_label", "event_title", "event_desc", "cta_text"],
     "gourmet_hero": ["hero_title", "hero_subtitle", "hero_desc", "hero_sub_desc"],
@@ -74,7 +74,11 @@ class GenerateOrchestrator:
             }
 
             # 2. 페이지 타입 + 상품 수 기반 섹션 자동 결정
-            selected_sections = resolve_sections(page_type_id, len(products))
+            stored_sections = None
+            if page_type_id == "custom":
+                proj = self.db.table("projects").select("selected_sections").eq("id", project_id).single().execute()
+                stored_sections = (proj.data or {}).get("selected_sections")
+            selected_sections = resolve_sections(page_type_id, len(products), stored_sections)
             logger.info(f"페이지 타입 '{page_type['name']}' → 섹션: {selected_sections}")
             section_templates = compose_sections(selected_sections)
 
@@ -100,17 +104,21 @@ class GenerateOrchestrator:
             # 5. 섹션 이미지 순차 생성 (인스턴스별 개별 이미지)
             image_size_map = {
                 "hero_banner": (860, 1400),
-                "description": (600, 600),
+                "description": (860, 860),
                 "feature_point": (860, 957),
                 "promo_hero": (860, 645),
                 "fit_hero": (860, 625),
                 "fit_event_info": (860, 1220),
-                "fit_product_trio": (640, 850),
+                "fit_product_trio": (860, 1133),
                 "vip_special_hero": (860, 500),
                 "vip_private_hero": (860, 480),
                 "gourmet_hero": (860, 780),
+                "gourmet_product": (860, 400),
                 "shinsegae_hero": (860, 500),
             }
+
+            # 브랜드명 추출 (브랜드 기획전용: 모든 상품이 동일 브랜드)
+            brand_name = products[0].get("brand_name", "") if products else ""
 
             # 키: "타입__인스턴스인덱스" (중복) 또는 "타입" (단일)
             section_image_urls: dict[str, str] = {}
@@ -144,6 +152,7 @@ class GenerateOrchestrator:
                             reference_mime_type=ref_mime_type,
                             section_texts={},
                             theme=theme,
+                            brand_name=brand_name if page_type_id == "brand_promotion" else None,
                         )
                         path = await self.storage.upload_image(
                             file_bytes=img_bytes,
@@ -155,6 +164,39 @@ class GenerateOrchestrator:
                         slot_key = f"{sec_type}__{inst_idx}__p{slot}"
                         section_image_urls[slot_key] = url
                         image_prompts[slot_key] = p_used
+                    continue
+
+                # gourmet_product: 개별 상품명 기반 이미지 생성
+                if sec_type == "gourmet_product":
+                    p_name = [product_names[inst_idx]] if inst_idx < len(product_names) else product_names
+                    gp_filename = f"{sec_type}_{inst_idx}.png"
+                    logger.info(f"{sec_type} 개별 상품 이미지 생성 (인스턴스 {inst_idx}, 상품: {p_name[0]})")
+
+                    gp_texts: dict[str, str] = {}
+                    for tk in _get_section_text_keys(sec_type):
+                        suffixed = f"{tk}__{inst_idx}" if is_duplicate else tk
+                        if suffixed in section_texts:
+                            gp_texts[tk] = section_texts[suffixed]
+
+                    img_bytes, p_used = await generate_section_image(
+                        product_names=p_name,
+                        section_type=sec_type,
+                        width=w,
+                        height=h,
+                        section_texts=gp_texts,
+                        theme=theme,
+                        brand_name=brand_name if page_type_id == "brand_promotion" else None,
+                    )
+                    path = await self.storage.upload_image(
+                        file_bytes=img_bytes,
+                        project_id=project_id,
+                        image_type="generated",
+                        filename=gp_filename,
+                    )
+                    url = self.storage.get_public_url(path)
+                    key = f"{sec_type}__{inst_idx}" if is_duplicate else sec_type
+                    section_image_urls[key] = url
+                    image_prompts[key] = p_used
                     continue
 
                 filename = f"{sec_type}_{inst_idx}.png" if is_duplicate else f"{sec_type}.png"
@@ -179,6 +221,7 @@ class GenerateOrchestrator:
                     reference_mime_type=ref_mime_type,
                     section_texts=relevant_texts,
                     theme=theme,
+                    brand_name=brand_name if page_type_id == "brand_promotion" else None,
                 )
                 path = await self.storage.upload_image(
                     file_bytes=image_bytes,

@@ -178,12 +178,14 @@ INSERT INTO section_templates (section_type, name, html_template, css_template, 
   font-weight: 600;
   font-size: 26px;
   line-height: 130%;
-}',
+}
+.s-gmp__price:empty { display: none; }
+.s-gmp__spacer-1:has(+ .s-gmp__price:empty) { display: none; }',
 -- placeholders
 '[
   {"id": "product_name", "type": "text", "label": "상품명", "editable": true, "source": "product"},
   {"id": "product_price", "type": "text", "label": "가격", "editable": true, "source": "product"},
-  {"id": "product_image", "type": "image", "label": "상품 이미지", "editable": false, "source": "product"},
+  {"id": "product_image", "type": "image", "label": "상품 이미지", "editable": false, "source": "ai"},
   {"id": "product_note", "type": "text", "label": "상품 설명", "editable": true, "source": "ai"},
   {"id": "bg_color", "type": "text", "label": "배경 색상", "editable": false, "source": "theme"}
 ]');

@@ -6,9 +6,27 @@ import { Button } from "@/components/ui/Button";
 import { PageTypeSelector } from "./PageTypeSelector";
 import { projectsApi, uploadApi } from "@/lib/api";
 import { toast } from "sonner";
-import { Plus, Trash2, Upload, X } from "lucide-react";
+import { Plus, Trash2, Upload, X, GripVertical } from "lucide-react";
 import { useDropzone } from "react-dropzone";
 import type { PageType } from "@/types";
+
+// ── 섹션 직접 선택용 섹션 목록 ──
+const AVAILABLE_SECTIONS = [
+  { type: "hero_banner", label: "히어로 배너", icon: "🖼️" },
+  { type: "feature_badges", label: "특징 배지", icon: "🏷️" },
+  { type: "description", label: "상세 설명", icon: "📝" },
+  { type: "feature_point", label: "포인트", icon: "✨" },
+  { type: "promo_hero", label: "프로모 히어로", icon: "🎪" },
+  { type: "product_card", label: "상품 카드", icon: "🛍️" },
+  { type: "fit_hero", label: "핏 히어로", icon: "👗" },
+  { type: "fit_event_info", label: "핏 이벤트 정보", icon: "📋" },
+  { type: "fit_product_trio", label: "핏 3상품", icon: "👠" },
+  { type: "vip_special_hero", label: "VIP 스페셜", icon: "💎" },
+  { type: "vip_private_hero", label: "VIP 프라이빗", icon: "🖤" },
+  { type: "gourmet_hero", label: "고메트립 히어로", icon: "🍽️" },
+  { type: "gourmet_product", label: "고메트립 상품", icon: "🍷" },
+  { type: "shinsegae_hero", label: "뱅드신세계", icon: "🏬" },
+] as const;
 
 interface ProductEntry {
   name: string;
@@ -73,6 +91,230 @@ function ProductImageUploader({
   );
 }
 
+// ── 고메트립 전용 폼 ──
+const WINE_COUNT_OPTIONS = [3, 6] as const;
+
+function GourmetForm({
+  restaurants,
+  wines,
+  wineCount,
+  onRestaurantChange,
+  onWineChange,
+  onWineCountChange,
+  errors,
+}: {
+  restaurants: string[];
+  wines: string[];
+  wineCount: 3 | 6;
+  onRestaurantChange: (idx: number, value: string) => void;
+  onWineChange: (idx: number, value: string) => void;
+  onWineCountChange: (count: 3 | 6) => void;
+  errors: Record<string, string>;
+}) {
+  return (
+    <div className="space-y-5">
+      {/* 레스토랑 섹션 */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-text-primary">
+            🍽️ 레스토랑 <span className="text-error">*</span>
+          </span>
+          <span className="text-xs text-text-tertiary">3개 고정</span>
+        </div>
+        {restaurants.map((name, i) => (
+          <div key={`r-${i}`}>
+            <input
+              placeholder={`레스토랑 ${i + 1} 이름`}
+              value={name}
+              onChange={(e) => onRestaurantChange(i, e.target.value)}
+              className={`w-full h-9 px-3 border rounded-sm text-sm focus:border-border-focus ${
+                errors[`restaurant_${i}`] ? "border-error" : "border-border"
+              }`}
+            />
+            {errors[`restaurant_${i}`] && (
+              <p className="text-xs text-error mt-1">{errors[`restaurant_${i}`]}</p>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* 와인 섹션 */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-text-primary">
+              🍷 와인 <span className="text-error">*</span>
+            </span>
+          </div>
+          <div className="flex gap-1">
+            {WINE_COUNT_OPTIONS.map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => onWineCountChange(n)}
+                className={`px-3 py-1 text-xs rounded-sm border transition-colors ${
+                  wineCount === n
+                    ? "border-accent bg-accent/10 text-accent font-medium"
+                    : "border-border text-text-tertiary hover:border-text-secondary"
+                }`}
+              >
+                {n}개
+              </button>
+            ))}
+          </div>
+        </div>
+        {wines.slice(0, wineCount).map((name, i) => (
+          <div key={`w-${i}`}>
+            <input
+              placeholder={`와인 ${i + 1} 이름`}
+              value={name}
+              onChange={(e) => onWineChange(i, e.target.value)}
+              className={`w-full h-9 px-3 border rounded-sm text-sm focus:border-border-focus ${
+                errors[`wine_${i}`] ? "border-error" : "border-border"
+              }`}
+            />
+            {errors[`wine_${i}`] && (
+              <p className="text-xs text-error mt-1">{errors[`wine_${i}`]}</p>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── 섹션 직접 선택 폼 ──
+function CustomSectionForm({
+  selectedSections,
+  onAdd,
+  onRemove,
+  products,
+  onProductChange,
+  onAddProduct,
+  onRemoveProduct,
+  errors,
+}: {
+  selectedSections: string[];
+  onAdd: (type: string) => void;
+  onRemove: (idx: number) => void;
+  products: string[];
+  onProductChange: (idx: number, value: string) => void;
+  onAddProduct: () => void;
+  onRemoveProduct: (idx: number) => void;
+  errors: Record<string, string>;
+}) {
+  return (
+    <div className="space-y-5">
+      {/* 섹션 선택 */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-medium text-text-primary">
+            🧩 섹션 선택 <span className="text-error">*</span>
+          </span>
+          <span className="text-xs text-text-tertiary">
+            클릭하여 추가
+          </span>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {AVAILABLE_SECTIONS.map((s) => (
+            <button
+              key={s.type}
+              type="button"
+              onClick={() => onAdd(s.type)}
+              className="px-2.5 py-1.5 text-xs border border-border rounded-sm hover:border-accent hover:bg-accent/5 transition-colors flex items-center gap-1"
+            >
+              <span>{s.icon}</span>
+              <span>{s.label}</span>
+              <Plus size={12} className="text-text-tertiary" />
+            </button>
+          ))}
+        </div>
+        {errors.sections && (
+          <p className="text-xs text-error">{errors.sections}</p>
+        )}
+      </div>
+
+      {/* 선택된 섹션 순서 */}
+      {selectedSections.length > 0 && (
+        <div className="space-y-2">
+          <span className="text-xs font-medium text-text-secondary">
+            선택된 섹션 ({selectedSections.length}개)
+          </span>
+          <div className="space-y-1">
+            {selectedSections.map((secType, idx) => {
+              const info = AVAILABLE_SECTIONS.find((s) => s.type === secType);
+              return (
+                <div
+                  key={`${secType}-${idx}`}
+                  className="flex items-center gap-2 px-3 py-2 bg-bg-secondary rounded-sm border border-border"
+                >
+                  <span className="text-xs text-text-tertiary w-5 text-center">
+                    {idx + 1}
+                  </span>
+                  <span className="text-sm">{info?.icon}</span>
+                  <span className="text-xs font-medium text-text-primary flex-1">
+                    {info?.label ?? secType}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => onRemove(idx)}
+                    className="p-0.5 text-text-tertiary hover:text-error transition-colors"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* 상품명 입력 */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-medium text-text-primary">
+            상품명 <span className="text-error">*</span>
+          </span>
+          <span className="text-xs text-text-tertiary">
+            {products.length}/9개
+          </span>
+        </div>
+        {products.map((name, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <input
+              placeholder={`상품 ${i + 1} 이름`}
+              value={name}
+              onChange={(e) => onProductChange(i, e.target.value)}
+              className={`flex-1 h-9 px-3 border rounded-sm text-sm focus:border-border-focus ${
+                errors[`custom_product_${i}`] ? "border-error" : "border-border"
+              }`}
+            />
+            {products.length > 1 && (
+              <button
+                type="button"
+                onClick={() => onRemoveProduct(i)}
+                className="p-1 text-text-tertiary hover:text-error transition-colors"
+              >
+                <Trash2 size={14} />
+              </button>
+            )}
+          </div>
+        ))}
+        {products.length < 9 && (
+          <button
+            type="button"
+            onClick={onAddProduct}
+            className="w-full h-9 border-2 border-dashed border-border rounded-sm text-xs text-text-secondary hover:border-accent hover:text-accent transition-colors flex items-center justify-center gap-1"
+          >
+            <Plus size={14} />
+            상품 추가
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 interface ProjectInputFormProps {
   onSuccess?: (projectId: string) => void;
   compact?: boolean;
@@ -83,18 +325,46 @@ export function ProjectInputForm({ onSuccess, compact }: ProjectInputFormProps) 
   const [loading, setLoading] = useState(false);
   const [pageTypeId, setPageTypeId] = useState("");
   const [pageTypeConfig, setPageTypeConfig] = useState<PageType | null>(null);
+  const [brandName, setBrandName] = useState("");
   const [products, setProducts] = useState<ProductEntry[]>([
     { name: "", price: "", brand_name: "", image: null, imagePreview: null },
   ]);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // 고메트립 전용 state
+  const [restaurants, setRestaurants] = useState<string[]>(["", "", ""]);
+  const [wines, setWines] = useState<string[]>(["", "", "", "", "", ""]);
+  const [wineCount, setWineCount] = useState<3 | 6>(3);
+
+  // 커스텀 섹션 선택 state
+  const [customSections, setCustomSections] = useState<string[]>([]);
+  const [customProducts, setCustomProducts] = useState<string[]>([""]);
+
+  const isGourmet = pageTypeId === "gourmet";
+  const isCustom = pageTypeId === "custom";
   const requiresPrice = pageTypeConfig?.requires_price ?? true;
+  const requiresBrand = pageTypeConfig?.requires_brand ?? false;
   const minProducts = pageTypeConfig?.min_products ?? 1;
   const maxProducts = pageTypeConfig?.max_products ?? 6;
 
   const handlePageTypeChange = (pt: PageType) => {
     setPageTypeId(pt.id);
     setPageTypeConfig(pt);
+    setErrors({});
+
+    if (pt.id === "gourmet") {
+      // 고메트립은 별도 state 사용
+      setRestaurants(["", "", ""]);
+      setWines(["", "", "", "", "", ""]);
+      setWineCount(3);
+      return;
+    }
+
+    if (pt.id === "custom") {
+      setCustomSections([]);
+      setCustomProducts([""]);
+      return;
+    }
 
     // 상품 수를 페이지 타입의 min/max에 맞게 조정
     if (products.length < pt.min_products) {
@@ -151,16 +421,32 @@ export function ProjectInputForm({ onSuccess, compact }: ProjectInputFormProps) 
     const newErrors: Record<string, string> = {};
     if (!pageTypeId) newErrors.page_type = "페이지 유형을 선택하세요.";
 
-    if (products.length < minProducts) {
-      newErrors.products = `최소 ${minProducts}개 상품이 필요합니다.`;
+    if (isGourmet) {
+      restaurants.forEach((r, i) => {
+        if (!r.trim()) newErrors[`restaurant_${i}`] = "레스토랑명을 입력하세요.";
+      });
+      wines.slice(0, wineCount).forEach((w, i) => {
+        if (!w.trim()) newErrors[`wine_${i}`] = "와인명을 입력하세요.";
+      });
+    } else if (isCustom) {
+      if (customSections.length === 0)
+        newErrors.sections = "최소 1개 섹션을 선택하세요.";
+      customProducts.forEach((name, i) => {
+        if (!name.trim())
+          newErrors[`custom_product_${i}`] = "상품명을 입력하세요.";
+      });
+    } else {
+      if (requiresBrand && !brandName.trim())
+        newErrors.brand_name = "브랜드명을 입력하세요.";
+      if (products.length < minProducts)
+        newErrors.products = `최소 ${minProducts}개 상품이 필요합니다.`;
+      products.forEach((p, i) => {
+        if (!p.name.trim()) newErrors[`product_${i}_name`] = "제품명을 입력하세요.";
+        if (requiresPrice && !p.price.trim())
+          newErrors[`product_${i}_price`] = "가격을 입력하세요.";
+        if (!p.image) newErrors[`product_${i}_image`] = "이미지를 추가하세요.";
+      });
     }
-
-    products.forEach((p, i) => {
-      if (!p.name.trim()) newErrors[`product_${i}_name`] = "제품명을 입력하세요.";
-      if (requiresPrice && !p.price.trim())
-        newErrors[`product_${i}_price`] = "가격을 입력하세요.";
-      if (!p.image) newErrors[`product_${i}_image`] = "이미지를 추가하세요.";
-    });
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -172,20 +458,39 @@ export function ProjectInputForm({ onSuccess, compact }: ProjectInputFormProps) 
 
     setLoading(true);
     try {
+      // 모드별 products 변환
+      let submitProducts;
+      if (isGourmet) {
+        submitProducts = [
+          ...restaurants.map((name) => ({ name })),
+          ...wines.slice(0, wineCount).map((name) => ({ name })),
+        ];
+      } else if (isCustom) {
+        submitProducts = customProducts.map((name) => ({ name }));
+      } else {
+        submitProducts = products.map((p) => {
+          const effectiveBrand = requiresBrand ? brandName : p.brand_name;
+          return {
+            name: p.name,
+            ...(requiresPrice ? { price: p.price } : {}),
+            ...(effectiveBrand ? { brand_name: effectiveBrand } : {}),
+          };
+        });
+      }
+
       // 1. 프로젝트 생성
       const project = await projectsApi.create({
-        products: products.map((p) => ({
-          name: p.name,
-          ...(requiresPrice ? { price: p.price } : {}),
-          ...(p.brand_name ? { brand_name: p.brand_name } : {}),
-        })),
+        products: submitProducts,
         page_type: pageTypeId,
+        ...(isCustom ? { selected_sections: customSections } : {}),
       });
 
-      // 2. 각 상품 이미지 업로드
-      for (const prod of products) {
-        if (prod.image) {
-          await uploadApi.uploadImage(project.id, prod.image, "input");
+      // 2. 각 상품 이미지 업로드 (고메트립/커스텀은 이미지 없음)
+      if (!isGourmet && !isCustom) {
+        for (const prod of products) {
+          if (prod.image) {
+            await uploadApi.uploadImage(project.id, prod.image, "input");
+          }
         }
       }
 
@@ -222,107 +527,172 @@ export function ProjectInputForm({ onSuccess, compact }: ProjectInputFormProps) 
         error={errors.page_type}
       />
 
-      {/* 상품 목록 */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
+      {/* 고메트립 전용 폼 */}
+      {isGourmet && (
+        <GourmetForm
+          restaurants={restaurants}
+          wines={wines}
+          wineCount={wineCount}
+          onRestaurantChange={(i, v) => {
+            const updated = [...restaurants];
+            updated[i] = v;
+            setRestaurants(updated);
+          }}
+          onWineChange={(i, v) => {
+            const updated = [...wines];
+            updated[i] = v;
+            setWines(updated);
+          }}
+          onWineCountChange={setWineCount}
+          errors={errors}
+        />
+      )}
+
+      {/* 커스텀 섹션 선택 폼 */}
+      {isCustom && (
+        <CustomSectionForm
+          selectedSections={customSections}
+          onAdd={(type) => setCustomSections((prev) => [...prev, type])}
+          onRemove={(idx) =>
+            setCustomSections((prev) => prev.filter((_, i) => i !== idx))
+          }
+          products={customProducts}
+          onProductChange={(idx, value) => {
+            const updated = [...customProducts];
+            updated[idx] = value;
+            setCustomProducts(updated);
+          }}
+          onAddProduct={() => setCustomProducts((prev) => [...prev, ""])}
+          onRemoveProduct={(idx) =>
+            setCustomProducts((prev) => prev.filter((_, i) => i !== idx))
+          }
+          errors={errors}
+        />
+      )}
+
+      {/* 브랜드명 (브랜드 기획전일 때) */}
+      {!isGourmet && !isCustom && requiresBrand && (
+        <div className="space-y-2">
           <label className="block text-sm font-medium text-text-primary">
-            상품 정보 <span className="text-error">*</span>
+            브랜드명 <span className="text-error">*</span>
           </label>
-          <span className="text-xs text-text-tertiary">
-            {products.length}/{maxProducts}개
-          </span>
+          <input
+            placeholder="브랜드명을 입력하세요 (예: GUCCI)"
+            value={brandName}
+            onChange={(e) => setBrandName(e.target.value)}
+            className={`w-full h-10 px-3 border rounded-sm text-sm font-medium focus:border-border-focus ${
+              errors.brand_name ? "border-error" : "border-border"
+            }`}
+          />
+          {errors.brand_name && (
+            <p className="text-xs text-error">{errors.brand_name}</p>
+          )}
         </div>
-        {errors.products && (
-          <p className="text-xs text-error">{errors.products}</p>
-        )}
+      )}
 
-        {products.map((product, index) => (
-          <div
-            key={index}
-            className="border border-border rounded-sm p-4 space-y-3"
-          >
-            <div className="flex items-start gap-4">
-              {/* 이미지 업로더 */}
-              <div className="shrink-0">
-                <ProductImageUploader
-                  image={product.image}
-                  preview={product.imagePreview}
-                  onSelect={(file) => updateProduct(index, "image", file)}
-                  onRemove={() => updateProduct(index, "image", null)}
-                />
-                {errors[`product_${index}_image`] && (
-                  <p className="text-xs text-error mt-1">
-                    {errors[`product_${index}_image`]}
-                  </p>
-                )}
-              </div>
+      {/* 상품 목록 (고메트립/커스텀 외) */}
+      {!isGourmet && !isCustom && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <label className="block text-sm font-medium text-text-primary">
+              상품 정보 <span className="text-error">*</span>
+            </label>
+            <span className="text-xs text-text-tertiary">
+              {products.length}/{maxProducts}개
+            </span>
+          </div>
+          {errors.products && (
+            <p className="text-xs text-error">{errors.products}</p>
+          )}
 
-              {/* 텍스트 입력 */}
-              <div className="flex-1 space-y-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-medium text-text-secondary shrink-0">
-                    상품 {index + 1}
-                  </span>
-                  {products.length > minProducts && (
-                    <button
-                      type="button"
-                      onClick={() => removeProduct(index)}
-                      className="ml-auto p-1 text-text-tertiary hover:text-error transition-colors"
-                    >
-                      <Trash2 size={14} />
-                    </button>
+          {products.map((product, index) => (
+            <div
+              key={index}
+              className="border border-border rounded-sm p-4 space-y-3"
+            >
+              <div className="flex items-start gap-4">
+                {/* 이미지 업로더 */}
+                <div className="shrink-0">
+                  <ProductImageUploader
+                    image={product.image}
+                    preview={product.imagePreview}
+                    onSelect={(file) => updateProduct(index, "image", file)}
+                    onRemove={() => updateProduct(index, "image", null)}
+                  />
+                  {errors[`product_${index}_image`] && (
+                    <p className="text-xs text-error mt-1">
+                      {errors[`product_${index}_image`]}
+                    </p>
                   )}
                 </div>
-                <input
-                  placeholder="제품명 (필수)"
-                  value={product.name}
-                  onChange={(e) =>
-                    updateProduct(index, "name", e.target.value)
-                  }
-                  className={`w-full h-9 px-3 border rounded-sm text-sm focus:border-border-focus ${errors[`product_${index}_name`]
-                    ? "border-error"
-                    : "border-border"
-                    }`}
-                />
-                {requiresPrice && (
+
+                {/* 텍스트 입력 */}
+                <div className="flex-1 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-text-secondary shrink-0">
+                      상품 {index + 1}
+                    </span>
+                    {minProducts !== maxProducts && products.length > minProducts && (
+                      <button
+                        type="button"
+                        onClick={() => removeProduct(index)}
+                        className="ml-auto p-1 text-text-tertiary hover:text-error transition-colors"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                  </div>
                   <input
-                    placeholder="가격 (필수, 예: 39,000원)"
-                    value={product.price}
+                    placeholder="제품명 (필수)"
+                    value={product.name}
                     onChange={(e) =>
-                      updateProduct(index, "price", e.target.value)
+                      updateProduct(index, "name", e.target.value)
                     }
-                    className={`w-full h-9 px-3 border rounded-sm text-sm focus:border-border-focus ${errors[`product_${index}_price`]
+                    className={`w-full h-9 px-3 border rounded-sm text-sm focus:border-border-focus ${errors[`product_${index}_name`]
                       ? "border-error"
                       : "border-border"
                       }`}
                   />
-                )}
-                {products.length >= 2 && (
-                  <input
-                    placeholder="브랜드명 (선택, 카탈로그용)"
-                    value={product.brand_name}
-                    onChange={(e) =>
-                      updateProduct(index, "brand_name", e.target.value)
-                    }
-                    className="w-full h-9 px-3 border border-border rounded-sm text-sm focus:border-border-focus"
-                  />
-                )}
+                  {requiresPrice && (
+                    <input
+                      placeholder="가격 (필수, 예: 39,000원)"
+                      value={product.price}
+                      onChange={(e) =>
+                        updateProduct(index, "price", e.target.value)
+                      }
+                      className={`w-full h-9 px-3 border rounded-sm text-sm focus:border-border-focus ${errors[`product_${index}_price`]
+                        ? "border-error"
+                        : "border-border"
+                        }`}
+                    />
+                  )}
+                  {!requiresBrand && products.length >= 2 && (
+                    <input
+                      placeholder="브랜드명 (선택, 카탈로그용)"
+                      value={product.brand_name}
+                      onChange={(e) =>
+                        updateProduct(index, "brand_name", e.target.value)
+                      }
+                      className="w-full h-9 px-3 border border-border rounded-sm text-sm focus:border-border-focus"
+                    />
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          ))}
 
-        {products.length < maxProducts && (
-          <button
-            type="button"
-            onClick={addProduct}
-            className="w-full h-10 border-2 border-dashed border-border rounded-sm text-sm text-text-secondary hover:border-accent hover:text-accent transition-colors flex items-center justify-center gap-1.5"
-          >
-            <Plus size={16} />
-            상품 추가
-          </button>
-        )}
-      </div>
+          {minProducts !== maxProducts && products.length < maxProducts && (
+            <button
+              type="button"
+              onClick={addProduct}
+              className="w-full h-10 border-2 border-dashed border-border rounded-sm text-sm text-text-secondary hover:border-accent hover:text-accent transition-colors flex items-center justify-center gap-1.5"
+            >
+              <Plus size={16} />
+              상품 추가
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="pt-4">
         <Button type="submit" size="lg" loading={loading} className="w-full">

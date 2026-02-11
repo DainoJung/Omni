@@ -21,12 +21,13 @@ PAGE_TYPES: dict[str, dict] = {
     },
     "promotion": {
         "id": "promotion",
-        "name": "기획전",
+        "name": "상품 기획전",
         "icon": "🎪",
-        "description": "시즌/테마별 기획전 프로모션 페이지",
+        "description": "여러 상품을 모아 만드는 기획전",
         "min_products": 2,
         "max_products": 6,
         "requires_price": True,
+        "requires_brand": False,
         "accent_color": "#E91E90",
         "catalog_bg_color": "#9d174d",
         "background_prompt": (
@@ -34,6 +35,23 @@ PAGE_TYPES: dict[str, dict] = {
             "고급스러운 연출, 텍스트 없이"
         ),
         "copy_keywords": ["특별한", "한정", "기획", "혜택"],
+    },
+    "brand_promotion": {
+        "id": "brand_promotion",
+        "name": "브랜드 기획전",
+        "icon": "👜",
+        "description": "단일 브랜드 상품 3개로 만드는 기획전",
+        "min_products": 3,
+        "max_products": 3,
+        "requires_price": True,
+        "requires_brand": True,
+        "accent_color": "#2c2e35",
+        "catalog_bg_color": "#2c2e35",
+        "background_prompt": (
+            "하이엔드 패션 브랜드 기획전 배경, 럭셔리 매거진 분위기, "
+            "어두운 톤, 세련된 조명, 텍스트 없이"
+        ),
+        "copy_keywords": ["럭셔리", "브랜드", "컬렉션", "프리미엄"],
     },
     "vip_special": {
         "id": "vip_special",
@@ -72,9 +90,9 @@ PAGE_TYPES: dict[str, dict] = {
         "name": "고메트립",
         "icon": "🍽️",
         "description": "미식 여행/다이닝 프로모션 페이지",
-        "min_products": 1,
-        "max_products": 6,
-        "requires_price": True,
+        "min_products": 6,
+        "max_products": 9,
+        "requires_price": False,
         "accent_color": "#D97706",
         "catalog_bg_color": "#78350f",
         "background_prompt": (
@@ -82,6 +100,22 @@ PAGE_TYPES: dict[str, dict] = {
             "따뜻한 조명, 미식 여행 느낌, 텍스트 없이"
         ),
         "copy_keywords": ["미식", "다이닝", "셰프", "프리미엄"],
+    },
+    "custom": {
+        "id": "custom",
+        "name": "섹션 직접 선택",
+        "icon": "🧩",
+        "description": "섹션을 직접 골라 테스트용 페이지 구성",
+        "min_products": 1,
+        "max_products": 9,
+        "requires_price": False,
+        "accent_color": "#6366F1",
+        "catalog_bg_color": "#312e81",
+        "background_prompt": (
+            "고급 프로모션 배경, 세련된 분위기, "
+            "프리미엄 느낌, 텍스트 없이"
+        ),
+        "copy_keywords": ["프리미엄", "특별한", "큐레이션", "엄선된"],
     },
     "shinsegae": {
         "id": "shinsegae",
@@ -115,8 +149,18 @@ def list_page_types() -> list[dict]:
     return list(PAGE_TYPES.values())
 
 
-def resolve_sections(page_type_id: str, product_count: int) -> list[str]:
+def resolve_sections(
+    page_type_id: str,
+    product_count: int,
+    selected_sections: list[str] | None = None,
+) -> list[str]:
     """페이지 타입과 상품 수에 따라 섹션 목록을 자동 결정한다."""
+    # 커스텀: 프로젝트에 저장된 섹션 목록 사용
+    if page_type_id == "custom":
+        if not selected_sections:
+            raise ValueError("커스텀 모드에서는 selected_sections가 필요합니다.")
+        return list(selected_sections)
+
     if page_type_id == "product_detail":
         return [
             "hero_banner",
@@ -128,11 +172,10 @@ def resolve_sections(page_type_id: str, product_count: int) -> list[str]:
         ]
 
     if page_type_id == "promotion":
-        if product_count >= 3 and product_count % 3 == 0:
-            trio_count = product_count // 3
-            return ["fit_hero", "fit_event_info"] + ["fit_product_trio"] * trio_count
-        else:
-            return ["promo_hero"] + ["product_card"] * product_count
+        return ["promo_hero"] + ["product_card"] * product_count
+
+    if page_type_id == "brand_promotion":
+        return ["fit_hero", "fit_event_info", "fit_brand_special", "fit_product_trio"]
 
     # VIP 스페셜위크
     if page_type_id == "vip_special":

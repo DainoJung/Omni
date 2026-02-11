@@ -29,6 +29,7 @@ async def generate_section_image(
     custom_prompt: str | None = None,
     section_texts: dict[str, str] | None = None,
     theme: dict | None = None,
+    brand_name: str | None = None,
 ) -> tuple[bytes, str]:
     """섹션별 상품 컨텍스트 AI 이미지를 생성한다.
 
@@ -52,6 +53,11 @@ async def generate_section_image(
     if theme:
         theme_context = f"테마: {theme.get('name', '')}, 분위기: {theme.get('background_prompt', '')}. "
 
+    # 브랜드 스타일 컨텍스트 (브랜드 기획전용)
+    brand_style = ""
+    if brand_name:
+        brand_style = f"브랜드: {brand_name}. 이 브랜드의 시그니처 스타일, 미학, 분위기를 반영하세요. "
+
     # 섹션 텍스트에서 컨텍스트 추출
     section_context = ""
     if section_texts:
@@ -66,6 +72,7 @@ async def generate_section_image(
     prompt_vars = {
         "products": products_str,
         "theme": theme_context.rstrip(". ") if theme_context else "",
+        "brand_style": brand_style.rstrip(". ") if brand_style else "",
         "section_context": section_context.rstrip(". ") if section_context else "",
         "style_hint": style_hint,
         "no_text_rule": no_text_rule,
@@ -75,6 +82,7 @@ async def generate_section_image(
     format_vars = {
         "products": products_str,
         "theme": theme_context,
+        "brand_style": brand_style,
         "section_context": section_context,
         "style_hint": style_hint,
         "no_text_rule": no_text_rule,
@@ -208,6 +216,7 @@ _SECTION_TEXT_KEYS: dict[str, list[tuple[str, str]]] = {
     ],
     "fit_event_info": [
         ("info_period", "20자 이내 행사 기간, 예: 1.30(금) – 2.8(일)"),
+        ("event_subtitle", "25자 이내 이벤트 서브타이틀, 예: The Season of Giving"),
     ],
     "fit_product_trio": [
         ("product_desc_0", "25자 이내 상품1 한줄 설명"),

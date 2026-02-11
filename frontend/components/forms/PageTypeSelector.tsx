@@ -12,11 +12,13 @@ interface PageTypeSelectorProps {
 
 const FALLBACK_PAGE_TYPES: PageType[] = [
   { id: "product_detail", name: "상품 상세", icon: "📦", description: "단일 상품의 상세 정보", min_products: 1, max_products: 1, requires_price: false, accent_color: "#2563EB", catalog_bg_color: "#1e3a5f", background_prompt: "", copy_keywords: [] },
-  { id: "promotion", name: "기획전", icon: "🎪", description: "시즌/테마별 기획전", min_products: 2, max_products: 6, requires_price: true, accent_color: "#E91E90", catalog_bg_color: "#9d174d", background_prompt: "", copy_keywords: [] },
+  { id: "promotion", name: "상품 기획전", icon: "🎪", description: "여러 상품을 모아 만드는 기획전", min_products: 2, max_products: 6, requires_price: true, accent_color: "#E91E90", catalog_bg_color: "#9d174d", background_prompt: "", copy_keywords: [] },
+  { id: "brand_promotion", name: "브랜드 기획전", icon: "👜", description: "단일 브랜드 상품 3개 기획전", min_products: 3, max_products: 3, requires_price: true, requires_brand: true, accent_color: "#2c2e35", catalog_bg_color: "#2c2e35", background_prompt: "", copy_keywords: [] },
   { id: "vip_special", name: "VIP 스페셜위크", icon: "💎", description: "VIP 스페셜위크 프로모션", min_products: 2, max_products: 6, requires_price: true, accent_color: "#8B5CF6", catalog_bg_color: "#4c1d95", background_prompt: "", copy_keywords: [] },
   { id: "vip_private", name: "VIP 프라이빗위크", icon: "🖤", description: "VIP 프라이빗위크 프로모션", min_products: 2, max_products: 6, requires_price: true, accent_color: "#1F2937", catalog_bg_color: "#111827", background_prompt: "", copy_keywords: [] },
-  { id: "gourmet", name: "고메트립", icon: "🍽️", description: "미식 여행/다이닝 프로모션", min_products: 1, max_products: 6, requires_price: true, accent_color: "#D97706", catalog_bg_color: "#78350f", background_prompt: "", copy_keywords: [] },
+  { id: "gourmet", name: "고메트립", icon: "🍽️", description: "레스토랑 3 + 와인 3~6", min_products: 6, max_products: 9, requires_price: false, accent_color: "#D97706", catalog_bg_color: "#78350f", background_prompt: "", copy_keywords: [] },
   { id: "shinsegae", name: "뱅드신세계", icon: "🏬", description: "신세계백화점 뱅크 프로모션", min_products: 2, max_products: 6, requires_price: true, accent_color: "#DC2626", catalog_bg_color: "#7f1d1d", background_prompt: "", copy_keywords: [] },
+  { id: "custom", name: "섹션 직접 선택", icon: "🧩", description: "섹션별 테스트", min_products: 1, max_products: 9, requires_price: false, accent_color: "#6366F1", catalog_bg_color: "#312e81", background_prompt: "", copy_keywords: [] },
 ];
 
 export function PageTypeSelector({ value, onChange, error }: PageTypeSelectorProps) {
@@ -75,6 +77,7 @@ export function PageTypeSelector({ value, onChange, error }: PageTypeSelectorPro
                 ? `${pt.min_products}개 상품`
                 : `${pt.min_products}~${pt.max_products}개 상품`}
               {pt.requires_price ? " · 가격 필요" : ""}
+              {pt.requires_brand ? " · 브랜드 선택" : ""}
             </span>
           </button>
         ))}

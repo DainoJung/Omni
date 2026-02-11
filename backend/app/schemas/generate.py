@@ -13,7 +13,7 @@ class ProductInput(BaseModel):
 
 class GenerateRequest(BaseModel):
     project_id: UUID
-    products: List[ProductInput] = Field(..., min_length=1, max_length=6)
+    products: List[ProductInput] = Field(..., min_length=1, max_length=9)
     page_type: str = Field(..., min_length=1, max_length=50)
 
 

@@ -18,6 +18,7 @@ export interface PageType {
   min_products: number;
   max_products: number;
   requires_price: boolean;
+  requires_brand?: boolean;
   accent_color: string;
   catalog_bg_color: string;
   background_prompt: string;
@@ -38,6 +39,7 @@ export type SectionType =
   | "vip_special_hero"
   | "vip_private_hero"
   | "gourmet_hero"
+  | "gourmet_product"
   | "shinsegae_hero";
 
 export interface RenderedSection {
@@ -86,6 +88,7 @@ export interface GeneratedData {
 export interface ProjectCreate {
   products: ProductInput[];
   page_type: string;
+  selected_sections?: string[];
 }
 
 export interface ProjectUpdate {

@@ -3,6 +3,8 @@
 import logging
 import re
 
+from app.constants.brand_logos import get_brand_logo, get_grid_logos
+
 logger = logging.getLogger(__name__)
 
 # product_name_0, product_image_2 등 → (base_id, index) 추출
@@ -186,6 +188,15 @@ def bind_section_data(
             if ph_id == "layout_dir":
                 idx = instance_index or 0
                 data[ph_id] = "left" if idx % 2 == 0 else "right"
+            elif ph_id == "main_brand_logo":
+                brand = products[0].get("brand_name", "") if products else ""
+                logo = get_brand_logo(brand) if brand else None
+                data[ph_id] = logo or ""
+            elif ph_id.startswith("grid_logo_"):
+                brand = products[0].get("brand_name", "") if products else ""
+                grid_idx = int(ph_id.split("_")[-1])
+                grid = get_grid_logos(brand) if brand else [None] * 9
+                data[ph_id] = grid[grid_idx] if grid_idx < len(grid) and grid[grid_idx] else ""
             else:
                 data[ph_id] = ""
 

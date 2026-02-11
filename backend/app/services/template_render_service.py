@@ -100,20 +100,33 @@ def bind_section_data(
 
         elif source == "ai":
             if ph_type == "image":
-                # 인스턴스 키 우선 조회 ("type__idx"), 없으면 타입 키
-                if instance_index is not None:
-                    ai_url = section_image_urls.get(
-                        f"{section_type}__{instance_index}",
-                        section_image_urls.get(section_type, ""),
-                    )
+                # fit_product_trio: 상품 슬롯별 개별 AI 이미지 조회
+                if section_type == "fit_product_trio":
+                    m_ai = _INDEXED_PH_RE.match(ph_id)
+                    if m_ai:
+                        slot_idx = int(m_ai.group(2))
+                        inst = instance_index if instance_index is not None else 0
+                        slot_key = f"{section_type}__{inst}__p{slot_idx}"
+                        ai_url = section_image_urls.get(slot_key, "")
+                        data[ph_id] = ai_url
+                        logger.info(f"[fit_product_trio AI] ph_id={ph_id}, slot_key={slot_key}, found={bool(ai_url)}")
+                    else:
+                        data[ph_id] = ""
                 else:
-                    ai_url = section_image_urls.get(section_type, "")
-                if ai_url:
-                    data[ph_id] = ai_url
-                elif product_image_urls:
-                    data[ph_id] = product_image_urls[0]
-                else:
-                    data[ph_id] = ""
+                    # 인스턴스 키 우선 조회 ("type__idx"), 없으면 타입 키
+                    if instance_index is not None:
+                        ai_url = section_image_urls.get(
+                            f"{section_type}__{instance_index}",
+                            section_image_urls.get(section_type, ""),
+                        )
+                    else:
+                        ai_url = section_image_urls.get(section_type, "")
+                    if ai_url:
+                        data[ph_id] = ai_url
+                    elif product_image_urls:
+                        data[ph_id] = product_image_urls[0]
+                    else:
+                        data[ph_id] = ""
             elif ph_type == "html":
                 if ph_id == "hashtags_html":
                     hashtag_key = "hashtags"

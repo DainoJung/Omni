@@ -8,7 +8,8 @@ import { NewProjectModal } from "@/components/modals/NewProjectModal";
 import { projectsApi, sectionsApi, authApi, uploadApi, imagesApi, generateApi } from "@/lib/api";
 import { exportImage } from "@/lib/export";
 import { toPng } from "html-to-image";
-import { ZoomIn, ChevronLeft, ChevronRight, Minus, Plus, GripVertical, Image as ImageIcon, Send, ImagePlus, Download, Upload, User, LogOut, X, Eraser, Loader2, Check } from "lucide-react";
+import { ZoomIn, ChevronLeft, ChevronRight, Minus, Plus, GripVertical, Image as ImageIcon, Send, ImagePlus, Download, Upload, User, LogOut, X, Eraser, Loader2, Check, Undo2, Redo2 } from "lucide-react";
+import { useHistory } from "@/hooks/useHistory";
 import { toast } from "sonner";
 import type { Project, RenderedSection } from "@/types";
 import type { SelectedElement } from "@/components/editor/SectionBlock";
@@ -94,14 +95,66 @@ export default function ResultPage() {
   const sectionsRef = useRef<RenderedSection[]>([]);
   const zoomMenuRef = useRef<HTMLDivElement>(null);
 
+  // History (undo/redo)
+  const { pushSnapshot, undo, redo, canUndo, canRedo } = useHistory();
+  // Force re-render when history state changes (canUndo/canRedo are functions reading refs)
+  const [, forceRender] = useState(0);
+  const triggerRender = useCallback(() => forceRender((n) => n + 1), []);
+
   // sectionsRef를 항상 최신 상태로 유지
   useEffect(() => {
     sectionsRef.current = sections;
   }, [sections]);
 
+  const applySnapshot = useCallback(
+    async (snapshot: RenderedSection[]) => {
+      setSections(snapshot);
+      sectionsRef.current = snapshot;
+      triggerRender();
+      try {
+        await projectsApi.update(projectId, { rendered_sections: snapshot });
+      } catch {
+        toast.error("변경사항 저장에 실패했습니다.");
+      }
+    },
+    [projectId, triggerRender]
+  );
+
+  const handleUndo = useCallback(() => {
+    const snapshot = undo();
+    if (snapshot) applySnapshot(snapshot);
+  }, [undo, applySnapshot]);
+
+  const handleRedo = useCallback(() => {
+    const snapshot = redo();
+    if (snapshot) applySnapshot(snapshot);
+  }, [redo, applySnapshot]);
+
+  // Keyboard shortcuts: Cmd+Z / Ctrl+Z (undo), Cmd+Shift+Z / Ctrl+Shift+Z (redo)
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) return;
+
+      const isMod = e.metaKey || e.ctrlKey;
+      if (!isMod || e.key.toLowerCase() !== "z") return;
+
+      e.preventDefault();
+      if (e.shiftKey) {
+        handleRedo();
+      } else {
+        handleUndo();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [handleUndo, handleRedo]);
+
   const loadProjectData = useCallback((proj: Project) => {
     if (proj.rendered_sections?.length) {
       setSections(proj.rendered_sections);
+      pushSnapshot(proj.rendered_sections);
+      triggerRender();
       const aiImages: { sectionId: string; key: string; url: string }[] = [];
       for (const sec of proj.rendered_sections) {
         for (const [key, value] of Object.entries(sec.data)) {
@@ -112,7 +165,7 @@ export default function ResultPage() {
       }
       setOriginalAiImages(aiImages);
     }
-  }, []);
+  }, [pushSnapshot, triggerRender]);
 
   useEffect(() => {
     async function load() {
@@ -331,24 +384,41 @@ export default function ResultPage() {
   // 섹션 데이터 변경 핸들러 (텍스트 인라인 편집)
   const handleDataChange = useCallback(
     (sectionId: string, placeholderId: string, newValue: string) => {
+      pushSnapshot(sectionsRef.current);
       setSections((prev) =>
         prev.map((sec) => {
           if (sec.section_id !== sectionId) return sec;
           return { ...sec, data: { ...sec.data, [placeholderId]: newValue } };
         })
       );
+      triggerRender();
       // 텍스트 편집은 즉시 저장 (blur 1회만 발생하므로 디바운스 불필요)
       // flushSave는 sectionsRef에서 읽으므로, setState 후 다음 틱에 실행
       setTimeout(() => flushSave(sectionId), 0);
     },
-    [flushSave]
+    [flushSave, pushSnapshot, triggerRender]
   );
 
   // 스타일 오버라이드 변경 핸들러 (슬라이더/컬러피커 — 빈번하게 호출됨)
+  const styleSnapshotPushedRef = useRef(false);
+  const styleSnapshotTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const handleStyleChange = useCallback(
     (placeholderId: string, styles: Record<string, string>) => {
       if (!selectedElement) return;
       const sectionId = selectedElement.sectionId;
+
+      // Push snapshot once at the start of a rapid-change sequence
+      if (!styleSnapshotPushedRef.current) {
+        pushSnapshot(sectionsRef.current);
+        triggerRender();
+        styleSnapshotPushedRef.current = true;
+      }
+      // Reset the flag after 500ms of inactivity
+      if (styleSnapshotTimerRef.current) clearTimeout(styleSnapshotTimerRef.current);
+      styleSnapshotTimerRef.current = setTimeout(() => {
+        styleSnapshotPushedRef.current = false;
+      }, 500);
 
       setSections((prev) =>
         prev.map((sec) => {
@@ -359,7 +429,7 @@ export default function ResultPage() {
       );
       debouncedSave(sectionId);
     },
-    [selectedElement, debouncedSave]
+    [selectedElement, debouncedSave, pushSnapshot, triggerRender]
   );
 
   // 섹션 순서 변경 핸들러
@@ -387,6 +457,7 @@ export default function ResultPage() {
 
   const handleDragEnd = async () => {
     if (draggedSectionIndex !== null && dropIndicatorIndex !== null) {
+      pushSnapshot(sections);
       const newSections = [...sections];
       const [dragged] = newSections.splice(draggedSectionIndex, 1);
       const adjustedIndex = dropIndicatorIndex > draggedSectionIndex
@@ -396,6 +467,7 @@ export default function ResultPage() {
 
       const updated = newSections.map((s, i) => ({ ...s, order: i }));
       setSections(updated);
+      triggerRender();
 
       try {
         await projectsApi.update(projectId, { rendered_sections: updated });
@@ -510,7 +582,9 @@ export default function ResultPage() {
       const newUrl = newSection?.data[placeholderId] || "";
 
       if (updatedProject.rendered_sections) {
+        pushSnapshot(sectionsRef.current);
         setSections(updatedProject.rendered_sections);
+        triggerRender();
       }
       setProject(updatedProject);
 
@@ -574,12 +648,14 @@ export default function ResultPage() {
   // AI 응답에서 이미지 변형 선택
   const handleSelectVariant = useCallback(
     async (sectionId: string, placeholderId: string, imageUrl: string) => {
+      pushSnapshot(sectionsRef.current);
       setSections((prev) =>
         prev.map((sec) => {
           if (sec.section_id !== sectionId) return sec;
           return { ...sec, data: { ...sec.data, [placeholderId]: imageUrl } };
         })
       );
+      triggerRender();
       setChatAttachedImage({ url: imageUrl, sectionId, placeholderId });
       // 서버에 저장
       const target = sectionsRef.current.find((s) => s.section_id === sectionId);
@@ -596,37 +672,42 @@ export default function ResultPage() {
         }
       }
     },
-    [projectId]
+    [projectId, pushSnapshot, triggerRender]
   );
 
   // 섹션 관리 핸들러
   const handleSectionMoveUp = useCallback(async (index: number) => {
     const sorted = [...sections].sort((a, b) => a.order - b.order);
     if (index <= 0) return;
+    pushSnapshot(sections);
     [sorted[index], sorted[index - 1]] = [sorted[index - 1], sorted[index]];
     const updated = sorted.map((s, i) => ({ ...s, order: i }));
     setSections(updated);
+    triggerRender();
     try {
       await projectsApi.update(projectId, { rendered_sections: updated });
     } catch {
       toast.error("섹션 이동에 실패했습니다.");
     }
-  }, [sections, projectId]);
+  }, [sections, projectId, pushSnapshot, triggerRender]);
 
   const handleSectionMoveDown = useCallback(async (index: number) => {
     const sorted = [...sections].sort((a, b) => a.order - b.order);
     if (index >= sorted.length - 1) return;
+    pushSnapshot(sections);
     [sorted[index], sorted[index + 1]] = [sorted[index + 1], sorted[index]];
     const updated = sorted.map((s, i) => ({ ...s, order: i }));
     setSections(updated);
+    triggerRender();
     try {
       await projectsApi.update(projectId, { rendered_sections: updated });
     } catch {
       toast.error("섹션 이동에 실패했습니다.");
     }
-  }, [sections, projectId]);
+  }, [sections, projectId, pushSnapshot, triggerRender]);
 
   const handleSectionDuplicate = useCallback(async (index: number) => {
+    pushSnapshot(sections);
     const sorted = [...sections].sort((a, b) => a.order - b.order);
     const original = sorted[index];
     const duplicated: RenderedSection = {
@@ -638,28 +719,31 @@ export default function ResultPage() {
     sorted.splice(index + 1, 0, duplicated);
     const updated = sorted.map((s, i) => ({ ...s, order: i }));
     setSections(updated);
+    triggerRender();
     try {
       await projectsApi.update(projectId, { rendered_sections: updated });
       toast.success("섹션이 복제되었습니다.");
     } catch {
       toast.error("섹션 복제에 실패했습니다.");
     }
-  }, [sections, projectId]);
+  }, [sections, projectId, pushSnapshot, triggerRender]);
 
   const handleSectionDelete = useCallback(async (index: number) => {
     const sorted = [...sections].sort((a, b) => a.order - b.order);
     if (sorted.length <= 1) return;
+    pushSnapshot(sections);
     sorted.splice(index, 1);
     const updated = sorted.map((s, i) => ({ ...s, order: i }));
     setSections(updated);
     setSelectedElement(null);
+    triggerRender();
     try {
       await projectsApi.update(projectId, { rendered_sections: updated });
       toast.success("섹션이 삭제되었습니다.");
     } catch {
       toast.error("섹션 삭제에 실패했습니다.");
     }
-  }, [sections, projectId]);
+  }, [sections, projectId, pushSnapshot, triggerRender]);
 
   // 이미지 업로드 핸들러
   // 이미지 업로드 → 갤러리에 추가
@@ -746,6 +830,7 @@ export default function ResultPage() {
       toast.error("먼저 프리뷰에서 교체할 이미지를 클릭하세요.");
       return;
     }
+    pushSnapshot(sectionsRef.current);
     const { sectionId, placeholderId } = selectedElement;
     setSections((prev) =>
       prev.map((sec) => {
@@ -753,8 +838,9 @@ export default function ResultPage() {
         return { ...sec, data: { ...sec.data, [placeholderId]: imageUrl } };
       })
     );
+    triggerRender();
     setTimeout(() => flushSave(sectionId), 0);
-  }, [selectedElement, flushSave]);
+  }, [selectedElement, flushSave, pushSnapshot, triggerRender]);
 
   const handleExport = async () => {
     if (!previewRef.current) return;
@@ -882,27 +968,8 @@ export default function ResultPage() {
     return sec?.style_overrides || {};
   };
 
-  if (loading) {
-    return (
-      <div className="h-screen flex flex-col overflow-hidden">
-        <Header />
-        <div className="flex-1 flex items-center justify-center text-text-secondary">
-          불러오는 중...
-        </div>
-      </div>
-    );
-  }
-
-  if (sections.length === 0 && !generating) {
-    return (
-      <div className="h-screen flex flex-col overflow-hidden">
-        <Header />
-        <div className="flex-1 flex items-center justify-center text-text-secondary">
-          생성된 콘텐츠가 없습니다.
-        </div>
-      </div>
-    );
-  }
+  const isContentReady = !loading && !generating && sections.length > 0;
+  const showCenterLoading = loading || (generating && sections.length === 0);
 
   const products = project?.products || [];
   const generatedData = project?.generated_data;
@@ -911,7 +978,7 @@ export default function ResultPage() {
     <div className="h-screen flex flex-col overflow-hidden">
       <Header
         onDownload={handleExport}
-        showDownload={true}
+        showDownload={isContentReady}
         projects={projectList}
         currentProjectId={projectId}
         onProjectSelect={(id) => router.push(`/result/${id}`)}
@@ -1295,8 +1362,7 @@ export default function ResultPage() {
 
         {/* Center: Preview with Floating Zoom Controls */}
         <main className="flex-1 bg-bg-secondary overflow-auto relative">
-          {generating && sections.length === 0 ? (
-            /* 생성 중 로딩 화면 */
+          {showCenterLoading ? (
             <div className="min-h-full flex items-center justify-center">
               {generationError ? (
                 <div className="text-center space-y-4">
@@ -1314,7 +1380,7 @@ export default function ResultPage() {
                   <Loader2 size={48} className="text-accent animate-spin mx-auto" />
                   <div>
                     <h2 className="text-xl font-bold mb-2">
-                      AI가 멀티 섹션 POP를 생성하고 있습니다
+                      {generating ? "AI가 멀티 섹션 POP를 생성하고 있습니다" : "프로젝트를 불러오는 중입니다"}
                     </h2>
                     <p className="text-sm text-text-secondary">
                       잠시만 기다려 주세요...
@@ -1323,8 +1389,7 @@ export default function ResultPage() {
                 </div>
               )}
             </div>
-          ) : (
-            /* 프리뷰 콘텐츠 */
+          ) : sections.length > 0 ? (
             <div
               className="min-h-full p-6 flex justify-center items-start"
               onClick={(e) => {
@@ -1362,10 +1427,34 @@ export default function ResultPage() {
                 </div>
               </div>
             </div>
+          ) : (
+            <div className="min-h-full flex items-center justify-center text-text-secondary">
+              생성된 콘텐츠가 없습니다.
+            </div>
           )}
 
-          {/* Floating Zoom Control */}
-          <div className="sticky bottom-6 left-1/2 -translate-x-1/2 z-10 w-fit mx-auto" ref={zoomMenuRef}>
+          {/* Floating Zoom Control + Undo/Redo */}
+          <div className="sticky bottom-6 left-1/2 -translate-x-1/2 z-10 w-fit mx-auto flex items-center gap-2" ref={zoomMenuRef}>
+            {/* Undo / Redo Buttons */}
+            <div className="flex items-center bg-bg-primary border border-border rounded-full shadow-lg">
+              <button
+                onClick={handleUndo}
+                disabled={!canUndo()}
+                className="p-2 hover:bg-bg-secondary transition-colors rounded-l-full disabled:opacity-30 disabled:cursor-not-allowed"
+                title="실행 취소 (⌘Z)"
+              >
+                <Undo2 size={16} />
+              </button>
+              <div className="w-px h-5 bg-border" />
+              <button
+                onClick={handleRedo}
+                disabled={!canRedo()}
+                className="p-2 hover:bg-bg-secondary transition-colors rounded-r-full disabled:opacity-30 disabled:cursor-not-allowed"
+                title="다시 실행 (⌘⇧Z)"
+              >
+                <Redo2 size={16} />
+              </button>
+            </div>
             {/* Zoom Menu Popup */}
             {showZoomMenu && (
               <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-[#2b2b2b] rounded-md shadow-lg py-1 min-w-[200px] text-white">
@@ -1425,7 +1514,7 @@ export default function ResultPage() {
         <aside className="w-[360px] shrink-0 border-l border-border bg-bg-primary flex flex-col">
           <div className="flex-1 overflow-y-auto p-4 flex flex-col">
             {/* 생성 중 실시간 진행 상황 */}
-            {generating && (
+            {!isContentReady && (
               <div className="space-y-6">
                 <div>
                   <h3 className="text-lg font-bold mb-1">AI 상세페이지 생성 중</h3>
@@ -1555,7 +1644,7 @@ export default function ResultPage() {
             )}
 
             {/* 생성 완료 후 기존 UI */}
-            {!generating && (<>
+            {isContentReady && (<>
             <div className="space-y-4">
               {/* 입력한 정보 */}
               <div className="bg-white rounded-lg border border-border">
@@ -1846,7 +1935,7 @@ export default function ResultPage() {
           </div>
 
           {/* Chat Input Area */}
-          {!generating && <div className="border-t border-border bg-white p-4">
+          {isContentReady && <div className="border-t border-border bg-white p-4">
             <div className={`bg-bg-secondary rounded-lg border transition-colors duration-200 ${chatAttachedImage ? "border-accent" : "border-border"}`}>
               {/* 첨부 이미지 — 필드 내부 상단, 애니메이션 확장/축소 */}
               <div

@@ -144,7 +144,7 @@ def resolve_sections(page_type_id: str, product_count: int) -> list[str]:
 
     # 고메트립
     if page_type_id == "gourmet":
-        return ["gourmet_hero"] + ["product_card"] * product_count
+        return ["gourmet_hero"] + ["gourmet_product"] * product_count
 
     # 뱅드신세계
     if page_type_id == "shinsegae":

@@ -82,17 +82,16 @@ async def generate_section_image(
 
     templates = _IMAGE_PROMPT_CONFIG["templates"]
 
-    # fit_hero 전용 프롬프트 사용 여부
-    use_fit_hero_template = section_type == "fit_hero" and "fit_hero" in templates
+    # 섹션별 전용 프롬프트 사용 여부
+    section_template_key = section_type if section_type in templates else None
 
     if custom_prompt:
         text_prompt = f"{custom_prompt} {no_text_rule}"
         prompt_vars["custom_prompt"] = custom_prompt
-    elif use_fit_hero_template:
-        # fit_hero 전용 템플릿 사용 (상품/브랜드 라이프스타일 이미지)
-        text_prompt = templates["fit_hero"].format(**format_vars)
-        # reference_image 유지 — 상품 참조 이미지를 활용하여 브랜드 결에 맞는 이미지 생성
-        logger.info("fit_hero: 상품 참조 기반 브랜드 라이프스타일 이미지 생성")
+    elif section_template_key:
+        # 섹션 전용 템플릿 사용
+        text_prompt = templates[section_template_key].format(**format_vars)
+        logger.info(f"{section_type}: 전용 프롬프트 기반 이미지 생성")
     elif reference_image:
         text_prompt = templates["reference"].format(**format_vars)
     else:
@@ -201,17 +200,14 @@ _SECTION_TEXT_KEYS: dict[str, list[tuple[str, str]]] = {
         ("product_note", "20자 이내 혜택/메모 문구, 예: * 구매 시 파우치 증정"),
     ],
     "fit_hero": [
-        ("brand_name", "10자 이내 브랜드/카테고리명, 예: GUCCI"),
-        ("event_title", "20자 이내 임팩트 있는 메인 타이틀, 예: 명품&해외 패션, Timeless Luxury"),
-        ("event_subtitle", "30자 이내 서브 카피, 예: 세련된 감각과 정제된 디테일의 명품 컬렉션"),
-        ("event_period", "25자 이내 해시태그 또는 기간, 예: #2026S/S #하이엔드 #NEW컬렉션"),
+        ("event_title", "25자 이내 큐레이션 타이틀, 영문 권장, 예: New Year Gift Curation"),
+        ("event_period", "20자 이내 행사 기간, 예: 1.30(금) – 2.8(일)"),
+        ("event_subtitle", "25자 이내 카테고리 카피, 예: 명품&해외 패션, Timeless Luxury"),
+        ("event_desc", "50자 이내 설명 문구, 줄바꿈 가능, 예: 세련된 감각과 정제된 디테일의 명품 컬렉션"),
+        ("event_hashtags", "30자 이내 해시태그, 예: #2026S/S #하이엔드 #NEW컬렉션"),
     ],
     "fit_event_info": [
-        ("event_name", "20자 이내 큐레이션 타이틀, 영문 권장, 예: New Year Gift Curation"),
-        ("benefit_text", "40자 이내 혜택 또는 설명 문구, 줄바꿈 가능"),
         ("info_period", "20자 이내 행사 기간, 예: 1.30(금) – 2.8(일)"),
-        ("info_location", "15자 이내 행사 장소, 예: 본점"),
-        ("cta_text", "10자 이내 CTA 문구, 예: 자세히 보기"),
     ],
     "fit_product_trio": [
         ("product_desc_0", "25자 이내 상품1 한줄 설명"),
@@ -232,11 +228,13 @@ _SECTION_TEXT_KEYS: dict[str, list[tuple[str, str]]] = {
         ("cta_text", "10자 이내 CTA 문구, 예: 지금 확인하기"),
     ],
     "gourmet_hero": [
-        ("trip_tag", "10자 이내 태그, 예: GOURMET TRIP"),
-        ("trip_title", "20자 이내 미식 여행 타이틀"),
-        ("location", "15자 이내 장소, 예: 서울 강남"),
-        ("trip_desc", "40자 이내 설명"),
-        ("price", "15자 이내 가격 정보, 예: 1인 89,000원~"),
+        ("hero_title", "20자 이내 미식 여행 메인 타이틀, 예: 입 안에 담는 세계 여행"),
+        ("hero_subtitle", "25자 이내 서브타이틀"),
+        ("hero_desc", "40자 이내 소개 문구, 줄바꿈 가능"),
+        ("hero_sub_desc", "30자 이내 추가 설명"),
+    ],
+    "gourmet_product": [
+        ("product_note", "40자 이내 상품 설명, 다이닝/미식 분위기의 감성적 문구"),
     ],
     "shinsegae_hero": [
         ("event_title", "20자 이내 이벤트 타이틀"),

@@ -31,11 +31,12 @@ _SECTION_TEXT_KEY_MAP: dict[str, list[str]] = {
     "description": ["desc_title_main", "desc_title_accent", "desc_body"],
     "feature_point": ["point_label", "point_title_main", "point_title_accent", "point_body"],
     "promo_hero": ["script_title", "category_title", "subtitle", "location"],
-    "fit_hero": ["brand_name", "event_title", "event_subtitle", "event_period"],
-    "fit_event_info": ["event_name", "benefit_text", "info_period", "info_location", "cta_text"],
+    "fit_hero": ["event_title", "event_period", "event_subtitle", "event_desc", "event_hashtags"],
+    "fit_event_info": ["info_period"],
     "vip_special_hero": ["vip_badge", "event_title", "event_subtitle", "benefit_text", "event_period"],
     "vip_private_hero": ["private_label", "event_title", "event_desc", "cta_text"],
-    "gourmet_hero": ["trip_tag", "trip_title", "location", "trip_desc", "price"],
+    "gourmet_hero": ["hero_title", "hero_subtitle", "hero_desc", "hero_sub_desc"],
+    "gourmet_product": ["product_note"],
     "shinsegae_hero": ["event_title", "benefit_1", "benefit_2", "benefit_3", "event_period"],
 }
 
@@ -102,10 +103,12 @@ class GenerateOrchestrator:
                 "description": (600, 600),
                 "feature_point": (860, 957),
                 "promo_hero": (860, 645),
-                "fit_hero": (860, 413),
+                "fit_hero": (860, 625),
+                "fit_event_info": (860, 1220),
+                "fit_product_trio": (640, 850),
                 "vip_special_hero": (860, 500),
                 "vip_private_hero": (860, 480),
-                "gourmet_hero": (860, 520),
+                "gourmet_hero": (860, 780),
                 "shinsegae_hero": (860, 500),
             }
 
@@ -122,6 +125,38 @@ class GenerateOrchestrator:
 
                 is_duplicate = section_counts.get(sec_type, 1) > 1
                 w, h = image_size_map[sec_type]
+
+                # fit_product_trio: 상품별 개별 모델 이미지 3장 생성
+                if sec_type == "fit_product_trio":
+                    for slot in range(3):
+                        p_idx = inst_idx * 3 + slot
+                        if p_idx >= len(product_names):
+                            continue
+                        slot_name = [product_names[p_idx]]
+                        slot_filename = f"{sec_type}_{inst_idx}_p{slot}.png"
+                        logger.info(f"{sec_type} 상품별 모델 이미지 생성 (인스턴스 {inst_idx}, 슬롯 {slot}, 상품: {slot_name[0]})")
+                        img_bytes, p_used = await generate_section_image(
+                            product_names=slot_name,
+                            section_type=sec_type,
+                            width=w,
+                            height=h,
+                            reference_image=reference_image,
+                            reference_mime_type=ref_mime_type,
+                            section_texts={},
+                            theme=theme,
+                        )
+                        path = await self.storage.upload_image(
+                            file_bytes=img_bytes,
+                            project_id=project_id,
+                            image_type="generated",
+                            filename=slot_filename,
+                        )
+                        url = self.storage.get_public_url(path)
+                        slot_key = f"{sec_type}__{inst_idx}__p{slot}"
+                        section_image_urls[slot_key] = url
+                        image_prompts[slot_key] = p_used
+                    continue
+
                 filename = f"{sec_type}_{inst_idx}.png" if is_duplicate else f"{sec_type}.png"
 
                 # 해당 섹션 인스턴스의 텍스트 추출

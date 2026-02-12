@@ -72,6 +72,7 @@ export interface Project {
   pipeline_result?: Record<string, unknown>;
   output_url?: string;
   background_config?: BackgroundConfig;
+  background_settings?: BackgroundSettings;
   restaurants?: RestaurantInput[];
   created_at: string;
   updated_at: string;
@@ -108,6 +109,7 @@ export interface ProjectUpdate {
   generated_data?: Record<string, unknown>;
   restaurants?: RestaurantInput[];
   background_config?: BackgroundConfig;
+  background_settings?: BackgroundSettings;
 }
 
 // === Product ===
@@ -124,6 +126,19 @@ export interface BackgroundConfig {
   mode: "solid" | "ai";
   hex_color: string;
   ai_prompt?: string;
+}
+
+export interface SectionBg {
+  type: "solid" | "ai" | "none";
+  hex_color?: string;
+  ai_prompt?: string;
+  ai_image_url?: string;
+}
+
+export interface BackgroundSettings {
+  scope: "all" | "per_section";
+  global: SectionBg;
+  per_section: Record<string, SectionBg>;
 }
 
 // === Gourmet ===

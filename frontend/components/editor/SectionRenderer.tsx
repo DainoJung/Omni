@@ -3,7 +3,7 @@
 import { forwardRef } from "react";
 import { SectionBlock } from "./SectionBlock";
 import { ChevronUp, ChevronDown, Copy, Trash2, Plus } from "lucide-react";
-import type { RenderedSection } from "@/types";
+import type { RenderedSection, BackgroundSettings, SectionBg } from "@/types";
 import type { SelectedElement } from "./SectionBlock";
 
 interface SectionRendererProps {
@@ -16,14 +16,21 @@ interface SectionRendererProps {
   onMoveDown?: (index: number) => void;
   onDuplicate?: (index: number) => void;
   onDelete?: (index: number) => void;
+  backgroundSettings?: BackgroundSettings;
 }
 
 export const SectionRenderer = forwardRef<HTMLDivElement, SectionRendererProps>(
   function SectionRenderer(
-    { sections, zoom = 100, onDataChange, onElementSelect, selectedPlaceholderId, onMoveUp, onMoveDown, onDuplicate, onDelete },
+    { sections, zoom = 100, onDataChange, onElementSelect, selectedPlaceholderId, onMoveUp, onMoveDown, onDuplicate, onDelete, backgroundSettings },
     ref
   ) {
     const sorted = [...sections].sort((a, b) => a.order - b.order);
+
+    const getBgForSection = (sectionId: string): SectionBg | undefined => {
+      if (!backgroundSettings) return undefined;
+      if (backgroundSettings.scope === "all") return backgroundSettings.global;
+      return backgroundSettings.per_section[sectionId];
+    };
     const inverseScale = 100 / zoom;
     const btnBase =
       "w-[34px] h-[34px] flex items-center justify-center bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors shadow-sm";
@@ -37,6 +44,7 @@ export const SectionRenderer = forwardRef<HTMLDivElement, SectionRendererProps>(
               onDataChange={onDataChange}
               onElementSelect={onElementSelect}
               selectedPlaceholderId={selectedPlaceholderId}
+              backgroundConfig={getBgForSection(section.section_id)}
             />
             {/* Section Control Buttons - 호버 시 표시, 줌 무관 고정 크기 */}
             <div

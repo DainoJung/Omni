@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useEffect } from "react";
-import type { RenderedSection } from "@/types";
+import type { RenderedSection, SectionBg } from "@/types";
 
 export interface SelectedElement {
   sectionId: string;
@@ -15,6 +15,7 @@ interface SectionBlockProps {
   onDataChange: (sectionId: string, placeholderId: string, newValue: string) => void;
   onElementSelect?: (element: SelectedElement | null) => void;
   selectedPlaceholderId?: string | null;
+  backgroundConfig?: SectionBg;
 }
 
 function escapeHtml(text: string | null | undefined): string {
@@ -31,20 +32,13 @@ function toKebab(prop: string): string {
   return prop.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`);
 }
 
-export function SectionBlock({ section, onDataChange, onElementSelect, selectedPlaceholderId }: SectionBlockProps) {
+export function SectionBlock({ section, onDataChange, onElementSelect, selectedPlaceholderId, backgroundConfig }: SectionBlockProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const editingRef = useRef<HTMLElement | null>(null);
   const lastClickRef = useRef<{ time: number; phId: string }>({ time: 0, phId: "" });
 
   const propsRef = useRef({ onDataChange, onElementSelect, section });
   propsRef.current = { onDataChange, onElementSelect, section };
-
-  // Add data-section-id attribute for scrolling navigation
-  useEffect(() => {
-    if (containerRef.current) {
-      containerRef.current.setAttribute('data-section-id', section.section_id);
-    }
-  }, [section.section_id]);
 
   const renderedHtml = useMemo(() => {
     let html = section.html_template;
@@ -90,6 +84,18 @@ export function SectionBlock({ section, onDataChange, onElementSelect, selectedP
     }
     return css;
   }, [section.css, section.data]);
+
+  const bgOverrideCss = useMemo(() => {
+    if (!backgroundConfig || backgroundConfig.type === "none") return "";
+    const selector = `[data-section-id="${section.section_id}"] .section-inner > *:first-child`;
+    if (backgroundConfig.type === "solid" && backgroundConfig.hex_color) {
+      return `${selector} { background-color: ${backgroundConfig.hex_color} !important; background-image: none !important; }`;
+    }
+    if (backgroundConfig.type === "ai" && backgroundConfig.ai_image_url) {
+      return `${selector} { background-image: url(${backgroundConfig.ai_image_url}) !important; background-size: cover !important; background-position: center !important; }`;
+    }
+    return "";
+  }, [backgroundConfig, section.section_id]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -205,10 +211,11 @@ export function SectionBlock({ section, onDataChange, onElementSelect, selectedP
   }, []);
 
   return (
-    <div ref={containerRef} className="section-block">
+    <div ref={containerRef} className="section-block" data-section-id={section.section_id}>
       <style dangerouslySetInnerHTML={{ __html: renderedCss }} />
       {overrideCss && <style dangerouslySetInnerHTML={{ __html: overrideCss }} />}
-      <div dangerouslySetInnerHTML={{ __html: renderedHtml }} />
+      {bgOverrideCss && <style dangerouslySetInnerHTML={{ __html: bgOverrideCss }} />}
+      <div className="section-inner" dangerouslySetInnerHTML={{ __html: renderedHtml }} />
     </div>
   );
 }

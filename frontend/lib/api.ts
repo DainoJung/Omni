@@ -116,6 +116,15 @@ export const sectionsApi = {
     ),
 };
 
+// === Background ===
+export const backgroundApi = {
+  generate: (projectId: string, prompt: string, sectionType?: string, width?: number, height?: number) =>
+    request<{ image_url: string }>(`/api/projects/${projectId}/generate-background`, {
+      method: "POST",
+      body: JSON.stringify({ prompt, section_type: sectionType, width, height }),
+    }),
+};
+
 // === Auth ===
 export const authApi = {
   login: async (id: string, password: string) => {

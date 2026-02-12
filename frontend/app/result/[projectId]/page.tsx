@@ -5,13 +5,14 @@ import { useParams, useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { SectionRenderer } from "@/components/editor/SectionRenderer";
 import { NewProjectModal } from "@/components/modals/NewProjectModal";
-import { projectsApi, sectionsApi, authApi, uploadApi, imagesApi, generateApi } from "@/lib/api";
+import { projectsApi, sectionsApi, authApi, uploadApi, imagesApi, generateApi, backgroundApi } from "@/lib/api";
+import { BackgroundPanel } from "@/components/editor/BackgroundPanel";
 import { exportImage, inlineImages } from "@/lib/export";
 import { toPng } from "html-to-image";
-import { ZoomIn, ChevronLeft, ChevronRight, Minus, Plus, GripVertical, Image as ImageIcon, Send, ImagePlus, Download, Upload, User, LogOut, X, Eraser, Loader2, Check, Undo2, Redo2 } from "lucide-react";
+import { ZoomIn, ChevronLeft, ChevronRight, Minus, Plus, GripVertical, Image as ImageIcon, Send, ImagePlus, Download, Upload, User, LogOut, X, Eraser, Loader2, Check, Undo2, Redo2, Paintbrush } from "lucide-react";
 import { useHistory } from "@/hooks/useHistory";
 import { toast } from "sonner";
-import type { Project, RenderedSection } from "@/types";
+import type { Project, RenderedSection, BackgroundSettings } from "@/types";
 import type { SelectedElement } from "@/components/editor/SectionBlock";
 
 type GenerationStepStatus = "pending" | "running" | "done";
@@ -44,7 +45,7 @@ export default function ResultPage() {
   const [showZoomMenu, setShowZoomMenu] = useState(false);
   const [showSectionList, setShowSectionList] = useState(true);
   const [sectionThumbnails, setSectionThumbnails] = useState<Record<string, string>>({});
-  const [activeTab, setActiveTab] = useState<"pages" | "image">("pages");
+  const [activeTab, setActiveTab] = useState<"pages" | "image" | "background">("pages");
   const [projectList, setProjectList] = useState<Project[]>([]);
   const [expandedSteps, setExpandedSteps] = useState<Record<number, boolean>>({});
   const [expandedInputInfo, setExpandedInputInfo] = useState(false);
@@ -67,6 +68,15 @@ export default function ResultPage() {
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
   const [colorPickerSection, setColorPickerSection] = useState<string | null>(null);
   const colorPickerRef = useRef<HTMLDivElement>(null);
+
+  // Background settings state
+  const [backgroundSettings, setBackgroundSettings] = useState<BackgroundSettings>({
+    scope: "all",
+    global: { type: "none" },
+    per_section: {},
+  });
+  const [bgGenerating, setBgGenerating] = useState(false);
+  const bgSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Generation states
   const [generating, setGenerating] = useState(false);
@@ -174,6 +184,11 @@ export default function ResultPage() {
       try {
         const proj = await projectsApi.get(projectId);
         setProject(proj);
+
+        // Load background settings from project
+        if (proj.background_settings) {
+          setBackgroundSettings(proj.background_settings as BackgroundSettings);
+        }
 
         if (proj.rendered_sections?.length) {
           // 이미 생성 완료된 프로젝트
@@ -933,6 +948,76 @@ export default function ResultPage() {
     setZoom((prev) => Math.max(prev - 10, 25));
   };
 
+  // Background settings handlers
+  const handleBackgroundSettingsChange = useCallback(
+    (newSettings: BackgroundSettings) => {
+      setBackgroundSettings(newSettings);
+      // Debounced save
+      if (bgSaveTimerRef.current) clearTimeout(bgSaveTimerRef.current);
+      bgSaveTimerRef.current = setTimeout(async () => {
+        try {
+          await projectsApi.update(projectId, { background_settings: newSettings });
+        } catch {
+          toast.error("배경 설정 저장에 실패했습니다.");
+        }
+      }, 500);
+    },
+    [projectId]
+  );
+
+  const handleGenerateBackgroundAI = useCallback(
+    async (prompt: string, sectionId?: string, sectionType?: string) => {
+      setBgGenerating(true);
+      try {
+        const result = await backgroundApi.generate(projectId, prompt, sectionType);
+        const imageUrl = result.image_url;
+
+        setBackgroundSettings((prev) => {
+          let updated: BackgroundSettings;
+          if (sectionId) {
+            // Per-section
+            const sectionBg = prev.per_section[sectionId] || { type: "ai" };
+            updated = {
+              ...prev,
+              per_section: {
+                ...prev.per_section,
+                [sectionId]: {
+                  ...sectionBg,
+                  type: "ai",
+                  ai_prompt: prompt,
+                  ai_image_url: imageUrl,
+                },
+              },
+            };
+          } else {
+            // Global
+            updated = {
+              ...prev,
+              global: {
+                ...prev.global,
+                type: "ai",
+                ai_prompt: prompt,
+                ai_image_url: imageUrl,
+              },
+            };
+          }
+          // Save immediately
+          projectsApi.update(projectId, { background_settings: updated }).catch(() => {
+            toast.error("배경 설정 저장에 실패했습니다.");
+          });
+          return updated;
+        });
+
+        toast.success("배경 이미지가 생성되었습니다.");
+      } catch {
+        toast.error("배경 이미지 생성에 실패했습니다.");
+      } finally {
+        setBgGenerating(false);
+      }
+    },
+    [projectId]
+  );
+
   // 줌 메뉴 외부 클릭 감지
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -1055,6 +1140,23 @@ export default function ResultPage() {
                 <ImageIcon size={20} />
                 <span className="text-[10px]">사진</span>
               </button>
+              <button
+                onClick={() => {
+                  if (activeTab === "background" && showSectionList) {
+                    setShowSectionList(false);
+                  } else {
+                    setActiveTab("background");
+                    setShowSectionList(true);
+                  }
+                }}
+                className={`flex flex-col items-center gap-1.5 py-4 transition-colors ${activeTab === "background" && showSectionList
+                  ? "text-accent bg-accent/10 border-l-2 border-accent"
+                  : "text-text-tertiary hover:text-text-primary hover:bg-bg-secondary/50"
+                  }`}
+              >
+                <Paintbrush size={20} />
+                <span className="text-[10px]">배경</span>
+              </button>
             </div>
 
             {/* Profile Button - Bottom */}
@@ -1152,54 +1254,6 @@ export default function ResultPage() {
                             </p>
                           </div>
 
-                          {/* Background Color Button */}
-                          {'bg_color' in section.data && section.data.bg_color && (
-                            <div className="relative shrink-0">
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setColorPickerSection(
-                                    colorPickerSection === section.section_id ? null : section.section_id
-                                  );
-                                }}
-                                className="w-6 h-6 rounded-full border-2 border-white shadow-sm hover:scale-110 transition-transform"
-                                style={{ backgroundColor: section.data.bg_color }}
-                                title="배경색 변경"
-                              />
-                              {colorPickerSection === section.section_id && (
-                                <div
-                                  ref={colorPickerRef}
-                                  className="absolute right-0 top-8 z-50 bg-white rounded-lg shadow-xl border border-border p-3 space-y-2"
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  <p className="text-xs font-medium text-text-secondary">배경색</p>
-                                  <div className="flex items-center gap-2">
-                                    <input
-                                      type="color"
-                                      value={section.data.bg_color}
-                                      onChange={(e) => {
-                                        handleDataChange(section.section_id, "bg_color", e.target.value);
-                                      }}
-                                      className="w-8 h-8 rounded border border-border cursor-pointer"
-                                    />
-                                    <input
-                                      type="text"
-                                      value={section.data.bg_color}
-                                      onChange={(e) => {
-                                        const v = e.target.value;
-                                        if (/^#[0-9A-Fa-f]{0,6}$/.test(v)) {
-                                          handleDataChange(section.section_id, "bg_color", v);
-                                        }
-                                      }}
-                                      className="w-20 h-8 px-2 border border-border rounded text-xs font-mono"
-                                      maxLength={7}
-                                    />
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          )}
                         </div>
                       </div>
                       {/* Drop indicator after last item */}
@@ -1332,6 +1386,17 @@ export default function ResultPage() {
                     )}
                   </button>
                 </div>
+              )}
+
+              {activeTab === "background" && (
+                <BackgroundPanel
+                  sections={sections}
+                  settings={backgroundSettings}
+                  onSettingsChange={handleBackgroundSettingsChange}
+                  onGenerateAI={handleGenerateBackgroundAI}
+                  generating={bgGenerating}
+                  sectionThumbnails={sectionThumbnails}
+                />
               )}
 
             </div>
@@ -1500,6 +1565,7 @@ export default function ResultPage() {
                       onMoveDown={handleSectionMoveDown}
                       onDuplicate={handleSectionDuplicate}
                       onDelete={handleSectionDelete}
+                      backgroundSettings={backgroundSettings}
                     />
                   </div>
                 </div>

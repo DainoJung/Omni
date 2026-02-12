@@ -185,7 +185,7 @@ def bind_section_data(
                 data[ph_id] = products[idx]["name"] if idx < len(products) else ""
             elif base_ph_id == "product_price":
                 raw_price = products[idx]["price"] if idx < len(products) else ""
-                data[ph_id] = raw_price if raw_price else ""
+                data[ph_id] = _format_price(raw_price) if raw_price else ""
             elif base_ph_id == "brand_name":
                 data[ph_id] = products[idx].get("brand_name", "") if idx < len(products) else ""
             else:

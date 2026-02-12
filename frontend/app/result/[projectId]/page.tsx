@@ -274,59 +274,39 @@ export default function ResultPage() {
     }
   }, [projectList.length]);
 
-  // Generate section thumbnails (batched + progressive)
+  // Generate section thumbnails
   useEffect(() => {
     if (sections.length === 0) return;
     let cancelled = false;
 
-    const generateOneThumbnail = async (section: typeof sections[number]) => {
-      const element = document.querySelector(`[data-section-id="${section.section_id}"]`) as HTMLElement;
-      if (!element) return;
-
-      // 섹션 내 이미지가 로드될 때까지 대기
-      const imgs = element.querySelectorAll("img");
-      await Promise.all(
-        Array.from(imgs).map(
-          (img) =>
-            img.complete ||
-            new Promise((r) => {
-              img.onload = r;
-              img.onerror = r;
-            })
-        )
-      );
-
-      const restore = await inlineImages(element);
-      try {
-        const dataUrl = await toPng(element, {
-          quality: 0.5,
-          pixelRatio: 0.3,
-          cacheBust: true,
-          imagePlaceholder: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
-        });
-        if (!cancelled) {
-          setSectionThumbnails((prev) => ({ ...prev, [section.section_id]: dataUrl }));
-        }
-      } finally {
-        restore();
-      }
-    };
-
     const generateAll = async () => {
-      // 3개씩 배치 처리 (캔버스 리소스 한계 방지)
-      const BATCH_SIZE = 3;
-      for (let i = 0; i < sections.length; i += BATCH_SIZE) {
+      for (const section of sections) {
         if (cancelled) break;
-        const batch = sections.slice(i, i + BATCH_SIZE);
-        await Promise.allSettled(batch.map(generateOneThumbnail));
+        const element = document.querySelector(`[data-section-id="${section.section_id}"]`) as HTMLElement;
+        if (!element) continue;
+        try {
+          const restore = await inlineImages(element);
+          try {
+            const dataUrl = await toPng(element, {
+              quality: 0.5,
+              pixelRatio: 0.3,
+              cacheBust: true,
+              imagePlaceholder: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+            });
+            if (!cancelled) {
+              setSectionThumbnails((prev) => ({ ...prev, [section.section_id]: dataUrl }));
+            }
+          } finally {
+            restore();
+          }
+        } catch {
+          // skip failed thumbnail
+        }
       }
     };
 
-    const timer = setTimeout(generateAll, 500);
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
+    generateAll();
+    return () => { cancelled = true; };
   }, [sections]);
 
   // Update text toolbar when selection changes

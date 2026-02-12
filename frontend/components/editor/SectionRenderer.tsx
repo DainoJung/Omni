@@ -29,7 +29,7 @@ export const SectionRenderer = forwardRef<HTMLDivElement, SectionRendererProps>(
       "w-[34px] h-[34px] flex items-center justify-center bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors shadow-sm";
 
     return (
-      <div ref={ref} className="w-full max-w-[860px] mx-auto">
+      <div ref={ref} className="w-full max-w-[860px] mx-auto flex flex-col">
         {sorted.map((section, index) => (
           <div key={section.section_id} className="relative group/section">
             <SectionBlock

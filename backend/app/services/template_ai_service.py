@@ -60,10 +60,13 @@ async def generate_section_image(
     if brand_name:
         brand_style = f"브랜드: {brand_name}. 이 브랜드의 시그니처 스타일, 미학, 분위기를 반영하세요. "
 
-    # 콘셉트 컨텍스트
+    # 콘셉트 컨텍스트 — 프롬프트의 핵심 지시문으로 강조
     concept_context = ""
     if concept:
-        concept_context = f"콘셉트: {concept}. 이 콘셉트의 분위기와 감성을 이미지에 반영하세요. "
+        concept_context = (
+            f"[핵심 콘셉트: \"{concept}\"] "
+            f"이 사진의 전체 분위기, 색감, 소품, 배경, 조명 모두 반드시 '{concept}' 콘셉트에 맞춰 연출하세요. "
+        )
 
     # 섹션 텍스트에서 컨텍스트 추출
     section_context = ""

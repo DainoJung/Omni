@@ -353,7 +353,7 @@ class GenerateOrchestrator:
                         resp.raise_for_status()
                         original_bytes = resp.content
 
-                    removed_bytes = await remove_background(original_bytes)
+                    removed_bytes = await remove_background(original_bytes, raise_on_error=True)
 
                     filename = f"{label}_bg_removed.png"
                     path = await self.storage.upload_image(
@@ -367,8 +367,8 @@ class GenerateOrchestrator:
                     return new_url
                 except Exception as e:
                     if attempt < max_retries:
-                        wait = 2 * (attempt + 1)
-                        logger.warning(f"누끼 제거 재시도 ({label}), {wait}초 대기: {e}")
+                        wait = 5 * (attempt + 1)
+                        logger.warning(f"누끼 제거 재시도 ({label}), attempt {attempt+1}/{max_retries}, {wait}초 대기: {e}")
                         await asyncio.sleep(wait)
                     else:
                         logger.warning(f"누끼 제거 최종 실패 ({label}), 원본 사용: {e}")
@@ -386,8 +386,8 @@ class GenerateOrchestrator:
                             img_url, f"r{r_idx}_{food_key}"
                         )
                         food["image_url"] = new_url
-                        # Bedrock throttling 방지: 호출 간 1초 대기
-                        await asyncio.sleep(1)
+                        # Bedrock throttling 방지: 호출 간 3초 대기
+                        await asyncio.sleep(3)
 
         # 와인 이미지 누끼 제거
         if wines:
@@ -398,9 +398,9 @@ class GenerateOrchestrator:
                 if img_url:
                     new_url = await _bg_remove_url(img_url, f"wine_{w_idx}")
                     wine["image_url"] = new_url
-                    # Bedrock throttling 방지: 호출 간 1초 대기
+                    # Bedrock throttling 방지: 호출 간 3초 대기
                     if w_idx < len(wines) - 1:
-                        await asyncio.sleep(1)
+                        await asyncio.sleep(3)
                 else:
                     logger.warning(f"[와인 누끼] wine[{w_idx}] image_url 비어있음 — 누끼 건너뜀")
 

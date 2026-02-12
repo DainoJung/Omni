@@ -87,7 +87,7 @@ PAGE_TYPES: dict[str, dict] = {
     },
     "gourmet": {
         "id": "gourmet",
-        "name": "고메트립",
+        "name": "맛집 기획전",
         "icon": "🍽️",
         "description": "미식 여행/다이닝 프로모션 페이지",
         "min_restaurants": 1,

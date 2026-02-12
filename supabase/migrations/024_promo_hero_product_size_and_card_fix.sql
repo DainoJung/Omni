@@ -102,7 +102,7 @@ UPDATE section_templates
 SET css_template = '.s-pcard, .s-pcard * { box-sizing: border-box; }
 .s-pcard {
   width: 860px;
-  padding: 40px 60px;
+  padding: 16px 60px;
 }
 .s-pcard__inner {
   display: flex;

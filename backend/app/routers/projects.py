@@ -1,5 +1,8 @@
 import logging
+import uuid as _uuid
 import httpx
+from typing import Optional
+from pydantic import BaseModel
 from fastapi import APIRouter, HTTPException
 from uuid import UUID
 
@@ -244,6 +247,69 @@ async def regenerate_section_image(project_id: UUID, section_id: str, body: Imag
     if not result.data:
         raise HTTPException(status_code=500, detail="이미지 재생성 업데이트 실패")
     return result.data[0]
+
+
+class BackgroundGenerateRequest(BaseModel):
+    prompt: str
+    section_type: Optional[str] = None
+    width: Optional[int] = None
+    height: Optional[int] = None
+
+
+@router.post("/{project_id}/generate-background")
+async def generate_background_image(project_id: UUID, body: BackgroundGenerateRequest):
+    """배경 이미지를 AI로 생성한다."""
+    db = get_supabase()
+    storage = StorageService()
+
+    project = db.table("projects").select("products").eq("id", str(project_id)).single().execute()
+    if not project.data:
+        raise HTTPException(status_code=404, detail="PROJECT_NOT_FOUND")
+
+    products = project.data.get("products") or []
+    product_names = [p["name"] for p in products]
+
+    # 이미지 크기 결정
+    image_size_map = {
+        "hero_banner": (860, 1400),
+        "description": (860, 860),
+        "feature_point": (860, 957),
+        "fit_hero": (860, 625),
+        "fit_event_info": (860, 1220),
+        "fit_product_trio": (860, 1133),
+        "vip_special_hero": (860, 500),
+        "vip_private_hero": (860, 480),
+        "gourmet_hero": (860, 780),
+        "gourmet_restaurant": (860, 480),
+        "shinsegae_hero": (860, 500),
+        "promo_hero": (860, 500),
+        "product_card": (860, 860),
+        "feature_badges": (860, 860),
+    }
+
+    w = body.width or 860
+    h = body.height or 860
+    if body.section_type and body.section_type in image_size_map:
+        w, h = image_size_map[body.section_type]
+
+    image_bytes, prompt_used = await generate_section_image(
+        product_names=product_names,
+        section_type="background",
+        width=w,
+        height=h,
+        custom_prompt=body.prompt,
+    )
+
+    filename = f"bg_{_uuid.uuid4().hex[:8]}.png"
+    path = await storage.upload_image(
+        file_bytes=image_bytes,
+        project_id=str(project_id),
+        image_type="background",
+        filename=filename,
+    )
+    new_url = storage.get_public_url(path)
+
+    return {"image_url": new_url}
 
 
 @router.delete("/{project_id}", status_code=204)

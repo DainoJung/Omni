@@ -23,6 +23,7 @@ class ProjectUpdate(BaseModel):
     restaurants: Optional[List[dict]] = None
     background_config: Optional[dict] = None
     input_data: Optional[dict] = None
+    background_settings: Optional[dict] = None
 
 
 class SectionDataUpdateRequest(BaseModel):
@@ -47,6 +48,7 @@ class ProjectResponse(BaseModel):
     pipeline_result: Optional[dict] = None
     output_url: Optional[str] = None
     background_config: Optional[dict] = None
+    background_settings: Optional[dict] = None
     restaurants: Optional[List[dict]] = None
     created_at: datetime
     updated_at: datetime

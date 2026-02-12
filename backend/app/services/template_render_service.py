@@ -57,6 +57,8 @@ def bind_section_data(
     section_image_urls: dict[str, str] | None = None,
     instance_index: int | None = None,
     product_bg_removed_urls: dict[int, str] | None = None,
+    restaurants: list[dict] | None = None,
+    wines: list[dict] | None = None,
 ) -> dict[str, str]:
     """placeholder 메타 정보를 기반으로 데이터를 매핑한다.
 
@@ -69,6 +71,7 @@ def bind_section_data(
         section_image_urls: 섹션별 AI 생성 이미지 URL
         instance_index: 중복 섹션의 인스턴스 인덱스 (None이면 단일 섹션)
         product_bg_removed_urls: 배경 제거된 상품 이미지 {인덱스: URL}
+        restaurants: 고메트립 레스토랑 딕셔너리 목록 (name, food1, food2 포함)
 
     Returns:
         placeholder id → 값 매핑 딕셔너리
@@ -78,6 +81,8 @@ def bind_section_data(
     accent_color = theme.get("accent_color", "#FF0000")
     section_image_urls = section_image_urls or {}
     products = products or []
+    restaurants = restaurants or []
+    wines = wines or []
     product_bg_removed_urls = product_bg_removed_urls or {}
     data: dict[str, str] = {}
 
@@ -180,9 +185,43 @@ def bind_section_data(
                 data[ph_id] = products[idx]["name"] if idx < len(products) else ""
             elif base_ph_id == "product_price":
                 raw_price = products[idx]["price"] if idx < len(products) else ""
-                data[ph_id] = _format_price(raw_price) if raw_price else ""
+                data[ph_id] = raw_price if raw_price else ""
             elif base_ph_id == "brand_name":
                 data[ph_id] = products[idx].get("brand_name", "") if idx < len(products) else ""
+            else:
+                data[ph_id] = ""
+
+        elif source == "restaurant_food":
+            # 고메트립 레스토랑 음식 데이터 바인딩
+            r_idx = instance_index if instance_index is not None else 0
+            restaurant = restaurants[r_idx] if r_idx < len(restaurants) else {}
+
+            if ph_id == "product_name":
+                data[ph_id] = restaurant.get("name", "")
+            elif ph_id == "food1_name":
+                food1 = restaurant.get("food1", {})
+                data[ph_id] = food1.get("name", "")
+            elif ph_id == "food1_image":
+                food1 = restaurant.get("food1", {})
+                data[ph_id] = food1.get("image_url", "")
+            elif ph_id == "food2_name":
+                food2 = restaurant.get("food2", {})
+                data[ph_id] = food2.get("name", "")
+            elif ph_id == "food2_image":
+                food2 = restaurant.get("food2", {})
+                data[ph_id] = food2.get("image_url", "")
+            else:
+                data[ph_id] = ""
+
+        elif source == "wine":
+            # 고메트립 와인 데이터 바인딩
+            w_idx = instance_index if instance_index is not None else 0
+            wine = wines[w_idx] if w_idx < len(wines) else {}
+
+            if ph_id == "wine_name":
+                data[ph_id] = wine.get("name", "")
+            elif ph_id == "wine_image":
+                data[ph_id] = wine.get("image_url", "")
             else:
                 data[ph_id] = ""
 

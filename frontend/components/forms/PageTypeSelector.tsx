@@ -16,7 +16,7 @@ const FALLBACK_PAGE_TYPES: PageType[] = [
   { id: "brand_promotion", name: "브랜드 기획전", icon: "👜", description: "단일 브랜드 상품 3개 기획전", min_products: 3, max_products: 3, requires_price: true, requires_brand: true, accent_color: "#2c2e35", catalog_bg_color: "#2c2e35", background_prompt: "", copy_keywords: [] },
   { id: "vip_special", name: "VIP 스페셜위크", icon: "💎", description: "VIP 스페셜위크 프로모션", min_products: 2, max_products: 6, requires_price: true, accent_color: "#8B5CF6", catalog_bg_color: "#4c1d95", background_prompt: "", copy_keywords: [] },
   { id: "vip_private", name: "VIP 프라이빗위크", icon: "🖤", description: "VIP 프라이빗위크 프로모션", min_products: 2, max_products: 6, requires_price: true, accent_color: "#1F2937", catalog_bg_color: "#111827", background_prompt: "", copy_keywords: [] },
-  { id: "gourmet", name: "고메트립", icon: "🍽️", description: "레스토랑 3 + 와인 3~6", min_products: 6, max_products: 9, requires_price: false, accent_color: "#D97706", catalog_bg_color: "#78350f", background_prompt: "", copy_keywords: [] },
+  { id: "gourmet", name: "고메트립", icon: "🍽️", description: "가게별 음식 사진", min_restaurants: 1, max_restaurants: 5, foods_per_restaurant: 2, requires_price: false, accent_color: "#D97706", catalog_bg_color: "#78350f", background_prompt: "", copy_keywords: [] },
   { id: "shinsegae", name: "뱅드신세계", icon: "🏬", description: "신세계백화점 뱅크 프로모션", min_products: 2, max_products: 6, requires_price: true, accent_color: "#DC2626", catalog_bg_color: "#7f1d1d", background_prompt: "", copy_keywords: [] },
   { id: "custom", name: "섹션 직접 선택", icon: "🧩", description: "섹션별 테스트", min_products: 1, max_products: 9, requires_price: false, accent_color: "#6366F1", catalog_bg_color: "#312e81", background_prompt: "", copy_keywords: [] },
 ];
@@ -73,9 +73,11 @@ export function PageTypeSelector({ value, onChange, error }: PageTypeSelectorPro
               {pt.name}
             </span>
             <span className="text-[10px] text-text-tertiary text-center leading-tight">
-              {pt.min_products === pt.max_products
-                ? `${pt.min_products}개 상품`
-                : `${pt.min_products}~${pt.max_products}개 상품`}
+              {pt.min_restaurants != null
+                ? `${pt.min_restaurants}~${pt.max_restaurants}개 가게`
+                : pt.min_products === pt.max_products
+                  ? `${pt.min_products}개 상품`
+                  : `${pt.min_products}~${pt.max_products}개 상품`}
               {pt.requires_price ? " · 가격 필요" : ""}
               {pt.requires_brand ? " · 브랜드 선택" : ""}
             </span>

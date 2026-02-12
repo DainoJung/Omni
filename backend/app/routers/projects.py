@@ -29,6 +29,18 @@ async def create_project(data: ProjectCreate):
     }
     if data.selected_sections:
         insert_data["selected_sections"] = data.selected_sections
+    if data.background:
+        insert_data["background_config"] = data.background.model_dump()
+    if data.restaurants:
+        insert_data["restaurants"] = [r.model_dump() for r in data.restaurants]
+    # 고메트립 와인 데이터 저장
+    if data.include_wine or data.wines:
+        input_data = {}
+        if data.include_wine:
+            input_data["include_wine"] = data.include_wine
+        if data.wines:
+            input_data["wines"] = [w.model_dump() for w in data.wines]
+        insert_data["input_data"] = input_data
     result = db.table("projects").insert(insert_data).execute()
     if not result.data:
         raise HTTPException(status_code=500, detail="프로젝트 생성 실패")
@@ -144,6 +156,7 @@ async def regenerate_section_image(project_id: UUID, section_id: str, body: Imag
         "vip_special_hero": (860, 500),
         "vip_private_hero": (860, 480),
         "gourmet_hero": (860, 780),
+        "gourmet_restaurant": (860, 480),
         "shinsegae_hero": (860, 500),
     }
 

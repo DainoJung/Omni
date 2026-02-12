@@ -10,6 +10,25 @@ export interface ExportOptions {
 const TRANSPARENT_PIXEL =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
 
+// 이미지 data URL 캐시 (같은 URL 중복 fetch 방지)
+const imageDataUrlCache = new Map<string, string>();
+
+async function fetchAsDataUrl(src: string): Promise<string> {
+  const cached = imageDataUrlCache.get(src);
+  if (cached) return cached;
+
+  const resp = await fetch(src, { mode: "cors" });
+  const blob = await resp.blob();
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+  imageDataUrlCache.set(src, dataUrl);
+  return dataUrl;
+}
+
 /**
  * 외부/크로스오리진 이미지를 data URL로 변환하여
  * html-to-image가 캔버스에 그릴 수 있도록 한다.
@@ -26,15 +45,7 @@ export async function inlineImages(root: HTMLElement): Promise<() => void> {
       originals.push({ img, src });
 
       try {
-        const resp = await fetch(src, { mode: "cors" });
-        const blob = await resp.blob();
-        const dataUrl = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = reject;
-          reader.readAsDataURL(blob);
-        });
-        img.src = dataUrl;
+        img.src = await fetchAsDataUrl(src);
       } catch {
         // CORS 실패 시 transparent pixel로 대체
         img.src = TRANSPARENT_PIXEL;

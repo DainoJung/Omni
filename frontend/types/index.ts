@@ -15,8 +15,11 @@ export interface PageType {
   name: string;
   icon: string;
   description: string;
-  min_products: number;
-  max_products: number;
+  min_products?: number;
+  max_products?: number;
+  min_restaurants?: number;
+  max_restaurants?: number;
+  foods_per_restaurant?: number;
   requires_price: boolean;
   requires_brand?: boolean;
   accent_color: string;
@@ -68,6 +71,8 @@ export interface Project {
   input_data?: Record<string, unknown>;
   pipeline_result?: Record<string, unknown>;
   output_url?: string;
+  background_config?: BackgroundConfig;
+  restaurants?: RestaurantInput[];
   created_at: string;
   updated_at: string;
 }
@@ -91,11 +96,17 @@ export interface ProjectCreate {
   products: ProductInput[];
   page_type: string;
   selected_sections?: string[];
+  background?: BackgroundConfig;
+  restaurants?: RestaurantInput[];
+  include_wine?: boolean;
+  wines?: WineInput[];
 }
 
 export interface ProjectUpdate {
   rendered_sections?: RenderedSection[];
   generated_data?: Record<string, unknown>;
+  restaurants?: RestaurantInput[];
+  background_config?: BackgroundConfig;
 }
 
 // === Product ===
@@ -107,11 +118,40 @@ export interface ProductInput {
   image_url?: string;
 }
 
+// === Background ===
+export interface BackgroundConfig {
+  mode: "solid" | "ai";
+  hex_color: string;
+  ai_prompt?: string;
+}
+
+// === Gourmet ===
+export interface FoodInput {
+  name: string;
+  image_id?: string;
+}
+
+export interface RestaurantInput {
+  name: string;
+  food1: FoodInput;
+  food2: FoodInput;
+}
+
+export interface WineInput {
+  name: string;
+  image_id?: string;
+  image_url?: string;
+}
+
 // === Generate ===
 export interface GenerateRequest {
   project_id: string;
   products: ProductInput[];
   page_type: string;
+  background?: BackgroundConfig;
+  restaurants?: RestaurantInput[];
+  include_wine?: boolean;
+  wines?: WineInput[];
 }
 
 export interface GenerateResponse {

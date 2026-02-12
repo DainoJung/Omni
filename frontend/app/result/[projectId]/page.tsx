@@ -214,10 +214,16 @@ export default function ResultPage() {
             updateGenerationStep(2, "running");
             setGenerationProgress(30);
 
+            const inputData = (proj.input_data || {}) as Record<string, unknown>;
+
             await generateApi.generate({
               project_id: projectId,
               products,
               page_type: pageType,
+              ...(proj.background_config ? { background: proj.background_config } : {}),
+              ...(proj.restaurants ? { restaurants: proj.restaurants } : {}),
+              ...(inputData.include_wine ? { include_wine: true } : {}),
+              ...(inputData.wines ? { wines: inputData.wines as Array<{ name: string }> } : {}),
             });
 
             updateGenerationStep(1, "done");
@@ -266,40 +272,59 @@ export default function ResultPage() {
     }
   }, [projectList.length]);
 
-  // Generate section thumbnails
+  // Generate section thumbnails (batched + progressive)
   useEffect(() => {
-    const generateThumbnails = async () => {
-      const thumbnails: Record<string, string> = {};
+    if (sections.length === 0) return;
+    let cancelled = false;
 
-      for (const section of sections) {
-        const element = document.querySelector(`[data-section-id="${section.section_id}"]`) as HTMLElement;
-        if (element) {
-          try {
-            const restore = await inlineImages(element);
-            try {
-              const dataUrl = await toPng(element, {
-                quality: 0.5,
-                pixelRatio: 0.3,
-                cacheBust: true,
-                imagePlaceholder: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
-              });
-              thumbnails[section.section_id] = dataUrl;
-            } finally {
-              restore();
-            }
-          } catch (error) {
-            console.error(`Failed to generate thumbnail for ${section.section_id}:`, error);
-          }
+    const generateOneThumbnail = async (section: typeof sections[number]) => {
+      const element = document.querySelector(`[data-section-id="${section.section_id}"]`) as HTMLElement;
+      if (!element) return;
+
+      // 섹션 내 이미지가 로드될 때까지 대기
+      const imgs = element.querySelectorAll("img");
+      await Promise.all(
+        Array.from(imgs).map(
+          (img) =>
+            img.complete ||
+            new Promise((r) => {
+              img.onload = r;
+              img.onerror = r;
+            })
+        )
+      );
+
+      const restore = await inlineImages(element);
+      try {
+        const dataUrl = await toPng(element, {
+          quality: 0.5,
+          pixelRatio: 0.3,
+          cacheBust: true,
+          imagePlaceholder: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+        });
+        if (!cancelled) {
+          setSectionThumbnails((prev) => ({ ...prev, [section.section_id]: dataUrl }));
         }
+      } finally {
+        restore();
       }
-
-      setSectionThumbnails(thumbnails);
     };
 
-    // 섹션이 로드되고 DOM에 렌더링된 후 썸네일 생성
-    if (sections.length > 0) {
-      setTimeout(generateThumbnails, 1000);
-    }
+    const generateAll = async () => {
+      // 3개씩 배치 처리 (캔버스 리소스 한계 방지)
+      const BATCH_SIZE = 3;
+      for (let i = 0; i < sections.length; i += BATCH_SIZE) {
+        if (cancelled) break;
+        const batch = sections.slice(i, i + BATCH_SIZE);
+        await Promise.allSettled(batch.map(generateOneThumbnail));
+      }
+    };
+
+    const timer = setTimeout(generateAll, 500);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [sections]);
 
   // Update text toolbar when selection changes

@@ -11,10 +11,36 @@ class ProductInput(BaseModel):
     image_id: Optional[str] = None
 
 
+class BackgroundConfig(BaseModel):
+    mode: str = Field(..., pattern=r"^(solid|ai)$")  # "solid" | "ai"
+    hex_color: str = Field("#FFFFFF", max_length=7)
+    ai_prompt: Optional[str] = Field(None, max_length=500)
+
+
+class FoodInput(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+    image_id: Optional[str] = None
+
+
+class RestaurantInput(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+    food1: FoodInput
+    food2: FoodInput
+
+
+class WineInput(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+    image_id: Optional[str] = None
+
+
 class GenerateRequest(BaseModel):
     project_id: UUID
-    products: List[ProductInput] = Field(..., min_length=1, max_length=9)
+    products: List[ProductInput] = Field(default_factory=list, max_length=20)
     page_type: str = Field(..., min_length=1, max_length=50)
+    background: Optional[BackgroundConfig] = None
+    restaurants: Optional[List[RestaurantInput]] = Field(None, max_length=5)
+    include_wine: Optional[bool] = False
+    wines: Optional[List[WineInput]] = Field(None, max_length=6)
 
 
 class RenderedSectionResponse(BaseModel):

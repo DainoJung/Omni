@@ -6,6 +6,15 @@ import Image from "next/image";
 import { Download, ChevronDown, Check, Plus, Trash2 } from "lucide-react";
 import type { Project } from "@/types";
 
+function getProjectDisplayName(project?: Project): string | undefined {
+  if (!project) return undefined;
+  // 고메트립: 첫 번째 레스토랑 이름 사용
+  if (project.theme_id === "gourmet" && project.restaurants?.length) {
+    return project.restaurants[0].name;
+  }
+  return project.products?.[0]?.name || project.brand_name || undefined;
+}
+
 interface HeaderProps {
   onDownload?: () => void;
   showDownload?: boolean;
@@ -29,7 +38,7 @@ export function Header({
   const menuRef = useRef<HTMLDivElement>(null);
 
   const currentProject = projects?.find((p) => p.id === currentProjectId);
-  const projectName = currentProject?.products?.[0]?.name || currentProject?.brand_name || "프로젝트 선택";
+  const projectName = getProjectDisplayName(currentProject) || "프로젝트 선택";
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -75,7 +84,7 @@ export function Header({
                 <div className="max-h-64 overflow-y-auto py-1">
                   {projects.map((project) => {
                     const isSelected = project.id === currentProjectId;
-                    const name = project.products?.[0]?.name || project.brand_name || "프로젝트";
+                    const name = getProjectDisplayName(project) || "프로젝트";
                     return (
                       <div
                         key={project.id}

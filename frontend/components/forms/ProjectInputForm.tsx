@@ -4,11 +4,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { PageTypeSelector } from "./PageTypeSelector";
+import { BackgroundSettings } from "./BackgroundSettings";
 import { projectsApi, uploadApi } from "@/lib/api";
 import { toast } from "sonner";
-import { Plus, Trash2, Upload, X, GripVertical } from "lucide-react";
+import { Plus, Trash2, Upload, X } from "lucide-react";
 import { useDropzone } from "react-dropzone";
-import type { PageType } from "@/types";
+import type { PageType, BackgroundConfig } from "@/types";
 
 // ── 섹션 직접 선택용 섹션 목록 ──
 const AVAILABLE_SECTIONS = [
@@ -36,6 +37,24 @@ interface ProductEntry {
   brand_name: string;
   image: File | null;
   imagePreview: string | null;
+}
+
+interface GourmetFoodEntry {
+  name: string;
+  image: File | null;
+  imagePreview: string | null;
+}
+
+interface GourmetWineEntry {
+  name: string;
+  image: File | null;
+  imagePreview: string | null;
+}
+
+interface GourmetRestaurantEntry {
+  name: string;
+  food1: GourmetFoodEntry;
+  food2: GourmetFoodEntry;
 }
 
 function ProductImageUploader({
@@ -96,90 +115,260 @@ function ProductImageUploader({
 // ── 고메트립 전용 폼 ──
 const WINE_COUNT_OPTIONS = [3, 6] as const;
 
+function emptyFood(): GourmetFoodEntry {
+  return { name: "", image: null, imagePreview: null };
+}
+
+function emptyWine(): GourmetWineEntry {
+  return { name: "", image: null, imagePreview: null };
+}
+
+function emptyRestaurant(): GourmetRestaurantEntry {
+  return { name: "", food1: emptyFood(), food2: emptyFood() };
+}
+
 function GourmetForm({
-  restaurants,
-  wines,
+  gourmetRestaurants,
+  onUpdate,
+  onAdd,
+  onRemove,
+  includeWine,
+  onWineToggle,
+  wineEntries,
   wineCount,
-  onRestaurantChange,
-  onWineChange,
+  onWineEntryChange,
   onWineCountChange,
+  maxRestaurants,
   errors,
 }: {
-  restaurants: string[];
-  wines: string[];
+  gourmetRestaurants: GourmetRestaurantEntry[];
+  onUpdate: (idx: number, entry: GourmetRestaurantEntry) => void;
+  onAdd: () => void;
+  onRemove: (idx: number) => void;
+  includeWine: boolean;
+  onWineToggle: (v: boolean) => void;
+  wineEntries: GourmetWineEntry[];
   wineCount: 3 | 6;
-  onRestaurantChange: (idx: number, value: string) => void;
-  onWineChange: (idx: number, value: string) => void;
+  onWineEntryChange: (idx: number, field: keyof GourmetWineEntry, value: string | File | null) => void;
   onWineCountChange: (count: 3 | 6) => void;
+  maxRestaurants: number;
   errors: Record<string, string>;
 }) {
+  const updateFood = (
+    rIdx: number,
+    foodKey: "food1" | "food2",
+    field: keyof GourmetFoodEntry,
+    value: string | File | null
+  ) => {
+    const entry = { ...gourmetRestaurants[rIdx] };
+    const food = { ...entry[foodKey] };
+    if (field === "image") {
+      const file = value as File | null;
+      food.image = file;
+      food.imagePreview = file ? URL.createObjectURL(file) : null;
+    } else {
+      (food as Record<string, unknown>)[field] = value;
+    }
+    entry[foodKey] = food;
+    onUpdate(rIdx, entry);
+  };
+
   return (
-    <div className="space-y-5">
-      {/* 레스토랑 섹션 */}
-      <div className="space-y-3">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-text-primary">
-            🍽️ 레스토랑 <span className="text-error">*</span>
-          </span>
-          <span className="text-xs text-text-tertiary">3개 고정</span>
-        </div>
-        {restaurants.map((name, i) => (
-          <div key={`r-${i}`}>
-            <input
-              placeholder={`레스토랑 ${i + 1} 이름`}
-              value={name}
-              onChange={(e) => onRestaurantChange(i, e.target.value)}
-              className={`w-full h-9 px-3 border rounded-sm text-sm focus:border-border-focus ${
-                errors[`restaurant_${i}`] ? "border-error" : "border-border"
-              }`}
-            />
-            {errors[`restaurant_${i}`] && (
-              <p className="text-xs text-error mt-1">{errors[`restaurant_${i}`]}</p>
-            )}
-          </div>
-        ))}
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-medium text-text-primary">
+          가게 정보 <span className="text-error">*</span>
+        </span>
+        <span className="text-xs text-text-tertiary">
+          {gourmetRestaurants.length}/{maxRestaurants}개
+        </span>
       </div>
 
-      {/* 와인 섹션 */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-text-primary">
-              🍷 와인 <span className="text-error">*</span>
+      {gourmetRestaurants.map((restaurant, rIdx) => (
+        <div
+          key={rIdx}
+          className="border border-border rounded-sm p-4 space-y-3"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-text-secondary">
+              가게 {rIdx + 1}
             </span>
-          </div>
-          <div className="flex gap-1">
-            {WINE_COUNT_OPTIONS.map((n) => (
+            {gourmetRestaurants.length > 1 && (
               <button
-                key={n}
                 type="button"
-                onClick={() => onWineCountChange(n)}
-                className={`px-3 py-1 text-xs rounded-sm border transition-colors ${
-                  wineCount === n
-                    ? "border-accent bg-accent/10 text-accent font-medium"
-                    : "border-border text-text-tertiary hover:border-text-secondary"
-                }`}
+                onClick={() => onRemove(rIdx)}
+                className="p-1 text-text-tertiary hover:text-error transition-colors"
               >
-                {n}개
+                <Trash2 size={14} />
               </button>
-            ))}
-          </div>
-        </div>
-        {wines.slice(0, wineCount).map((name, i) => (
-          <div key={`w-${i}`}>
-            <input
-              placeholder={`와인 ${i + 1} 이름`}
-              value={name}
-              onChange={(e) => onWineChange(i, e.target.value)}
-              className={`w-full h-9 px-3 border rounded-sm text-sm focus:border-border-focus ${
-                errors[`wine_${i}`] ? "border-error" : "border-border"
-              }`}
-            />
-            {errors[`wine_${i}`] && (
-              <p className="text-xs text-error mt-1">{errors[`wine_${i}`]}</p>
             )}
           </div>
-        ))}
+
+          {/* 가게명 */}
+          <input
+            placeholder="가게명"
+            value={restaurant.name}
+            onChange={(e) =>
+              onUpdate(rIdx, { ...restaurant, name: e.target.value })
+            }
+            className={`w-full h-9 px-3 border rounded-sm text-sm focus:border-border-focus ${
+              errors[`restaurant_${rIdx}_name`]
+                ? "border-error"
+                : "border-border"
+            }`}
+          />
+          {errors[`restaurant_${rIdx}_name`] && (
+            <p className="text-xs text-error">
+              {errors[`restaurant_${rIdx}_name`]}
+            </p>
+          )}
+
+          {/* 음식 1 */}
+          <div className="flex items-start gap-3">
+            <div className="shrink-0">
+              <ProductImageUploader
+                image={restaurant.food1.image}
+                preview={restaurant.food1.imagePreview}
+                onSelect={(file) => updateFood(rIdx, "food1", "image", file)}
+                onRemove={() => updateFood(rIdx, "food1", "image", null)}
+              />
+              {errors[`restaurant_${rIdx}_food1_image`] && (
+                <p className="text-xs text-error mt-1">
+                  {errors[`restaurant_${rIdx}_food1_image`]}
+                </p>
+              )}
+            </div>
+            <div className="flex-1 space-y-1.5">
+              <span className="text-xs text-text-tertiary">음식 1</span>
+              <input
+                placeholder="음식 이름"
+                value={restaurant.food1.name}
+                onChange={(e) =>
+                  updateFood(rIdx, "food1", "name", e.target.value)
+                }
+                className={`w-full h-8 px-2 border rounded-sm text-sm focus:border-border-focus ${
+                  errors[`restaurant_${rIdx}_food1_name`]
+                    ? "border-error"
+                    : "border-border"
+                }`}
+              />
+            </div>
+          </div>
+
+          {/* 음식 2 */}
+          <div className="flex items-start gap-3">
+            <div className="shrink-0">
+              <ProductImageUploader
+                image={restaurant.food2.image}
+                preview={restaurant.food2.imagePreview}
+                onSelect={(file) => updateFood(rIdx, "food2", "image", file)}
+                onRemove={() => updateFood(rIdx, "food2", "image", null)}
+              />
+              {errors[`restaurant_${rIdx}_food2_image`] && (
+                <p className="text-xs text-error mt-1">
+                  {errors[`restaurant_${rIdx}_food2_image`]}
+                </p>
+              )}
+            </div>
+            <div className="flex-1 space-y-1.5">
+              <span className="text-xs text-text-tertiary">음식 2</span>
+              <input
+                placeholder="음식 이름"
+                value={restaurant.food2.name}
+                onChange={(e) =>
+                  updateFood(rIdx, "food2", "name", e.target.value)
+                }
+                className={`w-full h-8 px-2 border rounded-sm text-sm focus:border-border-focus ${
+                  errors[`restaurant_${rIdx}_food2_name`]
+                    ? "border-error"
+                    : "border-border"
+                }`}
+              />
+            </div>
+          </div>
+        </div>
+      ))}
+
+      {gourmetRestaurants.length < maxRestaurants && (
+        <button
+          type="button"
+          onClick={onAdd}
+          className="w-full h-10 border-2 border-dashed border-border rounded-sm text-sm text-text-secondary hover:border-accent hover:text-accent transition-colors flex items-center justify-center gap-1.5"
+        >
+          <Plus size={16} />
+          가게 추가
+        </button>
+      )}
+
+      {/* 와인 섹션 토글 */}
+      <div className="border-t border-border pt-4 space-y-3">
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={includeWine}
+            onChange={(e) => onWineToggle(e.target.checked)}
+            className="accent-accent"
+          />
+          <span className="text-sm font-medium text-text-primary">
+            와인 섹션 포함
+          </span>
+        </label>
+
+        {includeWine && (
+          <div className="space-y-3 pl-6">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-text-secondary">와인 수</span>
+              <div className="flex gap-1">
+                {WINE_COUNT_OPTIONS.map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => onWineCountChange(n)}
+                    className={`px-3 py-1 text-xs rounded-sm border transition-colors ${
+                      wineCount === n
+                        ? "border-accent bg-accent/10 text-accent font-medium"
+                        : "border-border text-text-tertiary hover:border-text-secondary"
+                    }`}
+                  >
+                    {n}개
+                  </button>
+                ))}
+              </div>
+            </div>
+            {wineEntries.slice(0, wineCount).map((wine, i) => (
+              <div key={`w-${i}`} className="flex items-start gap-3">
+                <div className="shrink-0">
+                  <ProductImageUploader
+                    image={wine.image}
+                    preview={wine.imagePreview}
+                    onSelect={(file) => onWineEntryChange(i, "image", file)}
+                    onRemove={() => onWineEntryChange(i, "image", null)}
+                  />
+                  {errors[`wine_${i}_image`] && (
+                    <p className="text-xs text-error mt-1">
+                      {errors[`wine_${i}_image`]}
+                    </p>
+                  )}
+                </div>
+                <div className="flex-1">
+                  <input
+                    placeholder={`와인 ${i + 1} 이름`}
+                    value={wine.name}
+                    onChange={(e) => onWineEntryChange(i, "name", e.target.value)}
+                    className={`w-full h-9 px-3 border rounded-sm text-sm focus:border-border-focus ${
+                      errors[`wine_${i}`] ? "border-error" : "border-border"
+                    }`}
+                  />
+                  {errors[`wine_${i}`] && (
+                    <p className="text-xs text-error mt-1">
+                      {errors[`wine_${i}`]}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -211,7 +400,7 @@ function CustomSectionForm({
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <span className="text-sm font-medium text-text-primary">
-            🧩 섹션 선택 <span className="text-error">*</span>
+            섹션 선택 <span className="text-error">*</span>
           </span>
           <span className="text-xs text-text-tertiary">
             클릭하여 추가
@@ -333,9 +522,20 @@ export function ProjectInputForm({ onSuccess, compact }: ProjectInputFormProps) 
   ]);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // 배경 설정 state
+  const [backgroundConfig, setBackgroundConfig] = useState<BackgroundConfig>({
+    mode: "solid",
+    hex_color: "#FFFFFF",
+  });
+
   // 고메트립 전용 state
-  const [restaurants, setRestaurants] = useState<string[]>(["", "", ""]);
-  const [wines, setWines] = useState<string[]>(["", "", "", "", "", ""]);
+  const [gourmetRestaurants, setGourmetRestaurants] = useState<
+    GourmetRestaurantEntry[]
+  >([emptyRestaurant()]);
+  const [includeWine, setIncludeWine] = useState(false);
+  const [wineEntries, setWineEntries] = useState<GourmetWineEntry[]>(
+    Array.from({ length: 6 }, () => emptyWine())
+  );
   const [wineCount, setWineCount] = useState<3 | 6>(3);
 
   // 커스텀 섹션 선택 state
@@ -348,16 +548,23 @@ export function ProjectInputForm({ onSuccess, compact }: ProjectInputFormProps) 
   const requiresBrand = pageTypeConfig?.requires_brand ?? false;
   const minProducts = pageTypeConfig?.min_products ?? 1;
   const maxProducts = pageTypeConfig?.max_products ?? 6;
+  const maxRestaurants = pageTypeConfig?.max_restaurants ?? 5;
 
   const handlePageTypeChange = (pt: PageType) => {
     setPageTypeId(pt.id);
     setPageTypeConfig(pt);
     setErrors({});
 
+    // 배경 기본 컬러를 페이지 타입의 accent_color로 초기화
+    setBackgroundConfig({
+      mode: "solid",
+      hex_color: "#FFFFFF",
+    });
+
     if (pt.id === "gourmet") {
-      // 고메트립은 별도 state 사용
-      setRestaurants(["", "", ""]);
-      setWines(["", "", "", "", "", ""]);
+      setGourmetRestaurants([emptyRestaurant()]);
+      setIncludeWine(false);
+      setWineEntries(Array.from({ length: 6 }, () => emptyWine()));
       setWineCount(3);
       return;
     }
@@ -369,8 +576,10 @@ export function ProjectInputForm({ onSuccess, compact }: ProjectInputFormProps) 
     }
 
     // 상품 수를 페이지 타입의 min/max에 맞게 조정
-    if (products.length < pt.min_products) {
-      const toAdd = pt.min_products - products.length;
+    const min = pt.min_products ?? 1;
+    const max = pt.max_products ?? 6;
+    if (products.length < min) {
+      const toAdd = min - products.length;
       setProducts([
         ...products,
         ...Array.from({ length: toAdd }, () => ({
@@ -381,8 +590,8 @@ export function ProjectInputForm({ onSuccess, compact }: ProjectInputFormProps) 
           imagePreview: null,
         })),
       ]);
-    } else if (products.length > pt.max_products) {
-      setProducts(products.slice(0, pt.max_products));
+    } else if (products.length > max) {
+      setProducts(products.slice(0, max));
     }
   };
 
@@ -424,12 +633,24 @@ export function ProjectInputForm({ onSuccess, compact }: ProjectInputFormProps) 
     if (!pageTypeId) newErrors.page_type = "페이지 유형을 선택하세요.";
 
     if (isGourmet) {
-      restaurants.forEach((r, i) => {
-        if (!r.trim()) newErrors[`restaurant_${i}`] = "레스토랑명을 입력하세요.";
+      gourmetRestaurants.forEach((r, i) => {
+        if (!r.name.trim())
+          newErrors[`restaurant_${i}_name`] = "가게명을 입력하세요.";
+        if (!r.food1.name.trim())
+          newErrors[`restaurant_${i}_food1_name`] = "음식 이름을 입력하세요.";
+        if (!r.food1.image)
+          newErrors[`restaurant_${i}_food1_image`] = "이미지를 추가하세요.";
+        if (!r.food2.name.trim())
+          newErrors[`restaurant_${i}_food2_name`] = "음식 이름을 입력하세요.";
+        if (!r.food2.image)
+          newErrors[`restaurant_${i}_food2_image`] = "이미지를 추가하세요.";
       });
-      wines.slice(0, wineCount).forEach((w, i) => {
-        if (!w.trim()) newErrors[`wine_${i}`] = "와인명을 입력하세요.";
-      });
+      if (includeWine) {
+        wineEntries.slice(0, wineCount).forEach((w, i) => {
+          if (!w.name.trim()) newErrors[`wine_${i}`] = "와인명을 입력하세요.";
+          if (!w.image) newErrors[`wine_${i}_image`] = "와인 이미지를 추가하세요.";
+        });
+      }
     } else if (isCustom) {
       if (customSections.length === 0)
         newErrors.sections = "최소 1개 섹션을 선택하세요.";
@@ -460,17 +681,107 @@ export function ProjectInputForm({ onSuccess, compact }: ProjectInputFormProps) 
 
     setLoading(true);
     try {
-      // 모드별 products 변환
-      let submitProducts;
       if (isGourmet) {
-        submitProducts = [
-          ...restaurants.map((name) => ({ name })),
-          ...wines.slice(0, wineCount).map((name) => ({ name })),
-        ];
+        // 고메트립 제출: 프로젝트 생성 → 이미지 업로드 → 데이터 구성
+        const wineData: Array<{ name: string; image_url: string }> = [];
+
+        // 와인 데이터를 먼저 준비 (ProjectCreate에 wines 전달)
+        const wineSubmitData = includeWine
+          ? wineEntries.slice(0, wineCount).map((w) => ({ name: w.name }))
+          : undefined;
+
+        const project = await projectsApi.create({
+          products: [],
+          page_type: pageTypeId,
+          background: backgroundConfig,
+          include_wine: includeWine,
+          ...(wineSubmitData ? { wines: wineSubmitData } : {}),
+        });
+
+        // 각 가게의 음식 이미지를 순서대로 업로드하고 restaurant 데이터 구성
+        const restaurantData: Array<{
+          name: string;
+          food1: { name: string; image_url: string };
+          food2: { name: string; image_url: string };
+        }> = [];
+
+        for (const r of gourmetRestaurants) {
+          let food1Url = "";
+          let food2Url = "";
+
+          if (r.food1.image) {
+            const res = await uploadApi.uploadImage(
+              project.id,
+              r.food1.image,
+              "input"
+            );
+            food1Url = res.public_url || "";
+          }
+          if (r.food2.image) {
+            const res = await uploadApi.uploadImage(
+              project.id,
+              r.food2.image,
+              "input"
+            );
+            food2Url = res.public_url || "";
+          }
+
+          restaurantData.push({
+            name: r.name,
+            food1: { name: r.food1.name, image_url: food1Url },
+            food2: { name: r.food2.name, image_url: food2Url },
+          });
+        }
+
+        // 와인 이미지 업로드
+        if (includeWine) {
+          for (const w of wineEntries.slice(0, wineCount)) {
+            let wineUrl = "";
+            if (w.image) {
+              const res = await uploadApi.uploadImage(
+                project.id,
+                w.image,
+                "input"
+              );
+              wineUrl = res.public_url || "";
+            }
+            wineData.push({ name: w.name, image_url: wineUrl });
+          }
+        }
+
+        // 프로젝트 업데이트: restaurants + wines 저장
+        const updatePayload: Record<string, unknown> = {
+          restaurants: restaurantData,
+        };
+        if (includeWine && wineData.length > 0) {
+          updatePayload.input_data = {
+            include_wine: true,
+            wines: wineData,
+          };
+        }
+        await projectsApi.update(project.id, updatePayload);
+
+        if (onSuccess) {
+          onSuccess(project.id);
+        } else {
+          router.push(`/result/${project.id}`);
+        }
       } else if (isCustom) {
-        submitProducts = customProducts.map((name) => ({ name }));
+        const submitProducts = customProducts.map((name) => ({ name }));
+        const project = await projectsApi.create({
+          products: submitProducts,
+          page_type: pageTypeId,
+          selected_sections: customSections,
+        });
+
+        if (onSuccess) {
+          onSuccess(project.id);
+        } else {
+          router.push(`/result/${project.id}`);
+        }
       } else {
-        submitProducts = products.map((p) => {
+        // 일반 모드
+        const submitProducts = products.map((p) => {
           const effectiveBrand = requiresBrand ? brandName : p.brand_name;
           return {
             name: p.name,
@@ -478,29 +789,25 @@ export function ProjectInputForm({ onSuccess, compact }: ProjectInputFormProps) 
             ...(effectiveBrand ? { brand_name: effectiveBrand } : {}),
           };
         });
-      }
 
-      // 1. 프로젝트 생성
-      const project = await projectsApi.create({
-        products: submitProducts,
-        page_type: pageTypeId,
-        ...(isCustom ? { selected_sections: customSections } : {}),
-      });
+        const project = await projectsApi.create({
+          products: submitProducts,
+          page_type: pageTypeId,
+          background: backgroundConfig,
+        });
 
-      // 2. 각 상품 이미지 업로드 (고메트립/커스텀은 이미지 없음)
-      if (!isGourmet && !isCustom) {
+        // 상품 이미지 업로드
         for (const prod of products) {
           if (prod.image) {
             await uploadApi.uploadImage(project.id, prod.image, "input");
           }
         }
-      }
 
-      // 3. 생성 페이지로 이동
-      if (onSuccess) {
-        onSuccess(project.id);
-      } else {
-        router.push(`/result/${project.id}`);
+        if (onSuccess) {
+          onSuccess(project.id);
+        } else {
+          router.push(`/result/${project.id}`);
+        }
       }
     } catch (err) {
       toast.error(
@@ -529,23 +836,49 @@ export function ProjectInputForm({ onSuccess, compact }: ProjectInputFormProps) 
         error={errors.page_type}
       />
 
+      {/* 배경 설정 (custom 제외) */}
+      {pageTypeId && !isCustom && (
+        <BackgroundSettings
+          value={backgroundConfig}
+          onChange={setBackgroundConfig}
+        />
+      )}
+
       {/* 고메트립 전용 폼 */}
       {isGourmet && (
         <GourmetForm
-          restaurants={restaurants}
-          wines={wines}
-          wineCount={wineCount}
-          onRestaurantChange={(i, v) => {
-            const updated = [...restaurants];
-            updated[i] = v;
-            setRestaurants(updated);
+          gourmetRestaurants={gourmetRestaurants}
+          onUpdate={(idx, entry) => {
+            const updated = [...gourmetRestaurants];
+            updated[idx] = entry;
+            setGourmetRestaurants(updated);
           }}
-          onWineChange={(i, v) => {
-            const updated = [...wines];
-            updated[i] = v;
-            setWines(updated);
+          onAdd={() =>
+            setGourmetRestaurants((prev) => [...prev, emptyRestaurant()])
+          }
+          onRemove={(idx) =>
+            setGourmetRestaurants((prev) => prev.filter((_, i) => i !== idx))
+          }
+          includeWine={includeWine}
+          onWineToggle={setIncludeWine}
+          wineEntries={wineEntries}
+          wineCount={wineCount}
+          onWineEntryChange={(i, field, value) => {
+            const updated = [...wineEntries];
+            if (field === "image") {
+              const file = value as File | null;
+              updated[i] = {
+                ...updated[i],
+                image: file,
+                imagePreview: file ? URL.createObjectURL(file) : null,
+              };
+            } else {
+              updated[i] = { ...updated[i], [field]: value };
+            }
+            setWineEntries(updated);
           }}
           onWineCountChange={setWineCount}
+          maxRestaurants={maxRestaurants}
           errors={errors}
         />
       )}

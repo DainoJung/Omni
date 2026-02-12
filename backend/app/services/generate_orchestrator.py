@@ -36,7 +36,7 @@ _SECTION_TEXT_KEY_MAP: dict[str, list[str]] = {
     "vip_special_hero": ["vip_badge", "event_title", "event_subtitle", "benefit_text", "event_period"],
     "vip_private_hero": ["private_label", "event_title", "event_desc", "cta_text"],
     "gourmet_hero": ["hero_title", "hero_subtitle", "restaurant_heading", "hero_desc"],
-    "gourmet_restaurant": ["travel_tag", "travel_desc", "restaurant_floor", "restaurant_desc", "menu1_name", "menu1_desc", "menu2_name", "menu2_desc", "event1", "event2"],
+    "gourmet_restaurant": ["travel_tag", "travel_desc", "restaurant_floor", "restaurant_desc", "food1_desc", "food2_desc", "event1", "event2"],
     "gourmet_wine_intro": ["wine_desc", "wine_heading"],
     "gourmet_wine": ["wine_note"],
     "shinsegae_hero": ["event_title", "benefit_1", "benefit_2", "benefit_3", "event_period"],
@@ -59,6 +59,10 @@ class GenerateOrchestrator:
         project_id: str,
         products: list[dict],
         page_type_id: str,
+        background_config: dict | None = None,
+        restaurants: list[dict] | None = None,
+        include_wine: bool = False,
+        wines: list[dict] | None = None,
     ) -> GenerateResponse:
         """HTML 템플릿 기반 POP 생성 파이프라인을 실행한다."""
 
@@ -75,12 +79,30 @@ class GenerateOrchestrator:
                 "copy_keywords": page_type["copy_keywords"],
             }
 
+            # 1.5. 배경 설정 처리
+            if background_config:
+                if background_config.get("mode") == "solid":
+                    theme["background_color"] = background_config.get("hex_color", "#FFFFFF")
+                # AI 배경은 이미지 생성 단계에서 처리
+
             # 2. 페이지 타입 + 상품 수 기반 섹션 자동 결정
             stored_sections = None
             if page_type_id == "custom":
                 proj = self.db.table("projects").select("selected_sections").eq("id", project_id).single().execute()
                 stored_sections = (proj.data or {}).get("selected_sections")
-            selected_sections = resolve_sections(page_type_id, len(products), stored_sections)
+
+            # 고메트립: 레스토랑 수 기반 섹션 결정
+            restaurant_count = len(restaurants) if restaurants else 0
+            wine_count = len(wines) if wines else 0
+
+            selected_sections = resolve_sections(
+                page_type_id,
+                len(products),
+                stored_sections,
+                restaurant_count=restaurant_count,
+                include_wine=include_wine,
+                wine_count=wine_count,
+            )
             logger.info(f"페이지 타입 '{page_type['name']}' → 섹션: {selected_sections}")
             section_templates = compose_sections(selected_sections)
 
@@ -89,7 +111,13 @@ class GenerateOrchestrator:
             reference_image, ref_mime_type = await self._download_reference_image(product_image_urls)
 
             # 4. 텍스트 생성 (이미지와 병렬 불가 — rate limit)
-            product_names = [p["name"] for p in products]
+            # 고메트립: 레스토랑 이름을 product_names로 사용
+            if page_type_id == "gourmet" and restaurants:
+                product_names = [r["name"] for r in restaurants]
+                if include_wine and wines:
+                    product_names += [w["name"] for w in wines]
+            else:
+                product_names = [p["name"] for p in products]
 
             # 섹션 타입별 인스턴스 수 집계 (중복 섹션 지원)
             section_counts = dict(Counter(
@@ -104,18 +132,16 @@ class GenerateOrchestrator:
             )
 
             # 5. 섹션 이미지 순차 생성 (인스턴스별 개별 이미지)
+            # AI 이미지 생성은 배경/분위기 섹션만 (상품 이미지는 사용자 업로드 직접 사용)
             image_size_map = {
                 "hero_banner": (860, 1400),
-                "description": (860, 860),
-                "feature_point": (860, 957),
                 "promo_hero": (860, 645),
                 "fit_hero": (860, 625),
                 "fit_event_info": (860, 1220),
-                "fit_product_trio": (860, 1133),
                 "vip_special_hero": (860, 500),
                 "vip_private_hero": (860, 480),
+                "gourmet_hero": (860, 780),
                 "gourmet_restaurant": (860, 480),
-                "gourmet_wine": (860, 860),
                 "shinsegae_hero": (860, 500),
             }
 
@@ -135,104 +161,6 @@ class GenerateOrchestrator:
 
                 is_duplicate = section_counts.get(sec_type, 1) > 1
                 w, h = image_size_map[sec_type]
-
-                # fit_product_trio: 상품별 개별 모델 이미지 3장 생성
-                if sec_type == "fit_product_trio":
-                    for slot in range(3):
-                        p_idx = inst_idx * 3 + slot
-                        if p_idx >= len(product_names):
-                            continue
-                        slot_name = [product_names[p_idx]]
-                        slot_filename = f"{sec_type}_{inst_idx}_p{slot}.png"
-                        logger.info(f"{sec_type} 상품별 모델 이미지 생성 (인스턴스 {inst_idx}, 슬롯 {slot}, 상품: {slot_name[0]})")
-                        img_bytes, p_used = await generate_section_image(
-                            product_names=slot_name,
-                            section_type=sec_type,
-                            width=w,
-                            height=h,
-                            reference_image=reference_image,
-                            reference_mime_type=ref_mime_type,
-                            section_texts={},
-                            theme=theme,
-                            brand_name=brand_name if page_type_id == "brand_promotion" else None,
-                        )
-                        path = await self.storage.upload_image(
-                            file_bytes=img_bytes,
-                            project_id=project_id,
-                            image_type="generated",
-                            filename=slot_filename,
-                        )
-                        url = self.storage.get_public_url(path)
-                        slot_key = f"{sec_type}__{inst_idx}__p{slot}"
-                        section_image_urls[slot_key] = url
-                        image_prompts[slot_key] = p_used
-                    continue
-
-                # gourmet_restaurant: 레스토랑별 장면 이미지 생성
-                if sec_type == "gourmet_restaurant":
-                    p_name = [product_names[inst_idx]] if inst_idx < len(product_names) else product_names
-                    gr_filename = f"{sec_type}_{inst_idx}.png"
-                    logger.info(f"{sec_type} 레스토랑 장면 이미지 생성 (인스턴스 {inst_idx}, 레스토랑: {p_name[0]})")
-
-                    gr_texts: dict[str, str] = {}
-                    for tk in _get_section_text_keys(sec_type):
-                        suffixed = f"{tk}__{inst_idx}" if is_duplicate else tk
-                        if suffixed in section_texts:
-                            gr_texts[tk] = section_texts[suffixed]
-
-                    img_bytes, p_used = await generate_section_image(
-                        product_names=p_name,
-                        section_type=sec_type,
-                        width=w,
-                        height=h,
-                        section_texts=gr_texts,
-                        theme=theme,
-                    )
-                    path = await self.storage.upload_image(
-                        file_bytes=img_bytes,
-                        project_id=project_id,
-                        image_type="generated",
-                        filename=gr_filename,
-                    )
-                    url = self.storage.get_public_url(path)
-                    key = f"{sec_type}__{inst_idx}" if is_duplicate else sec_type
-                    section_image_urls[key] = url
-                    image_prompts[key] = p_used
-                    continue
-
-                # gourmet_wine: 와인별 보틀 이미지 생성 (상품 인덱스 +3 오프셋)
-                if sec_type == "gourmet_wine":
-                    wine_offset = 3
-                    wine_idx = inst_idx + wine_offset
-                    p_name = [product_names[wine_idx]] if wine_idx < len(product_names) else product_names[-1:]
-                    gw_filename = f"{sec_type}_{inst_idx}.png"
-                    logger.info(f"{sec_type} 와인 보틀 이미지 생성 (인스턴스 {inst_idx}, 와인: {p_name[0]})")
-
-                    gw_texts: dict[str, str] = {}
-                    for tk in _get_section_text_keys(sec_type):
-                        suffixed = f"{tk}__{inst_idx}" if is_duplicate else tk
-                        if suffixed in section_texts:
-                            gw_texts[tk] = section_texts[suffixed]
-
-                    img_bytes, p_used = await generate_section_image(
-                        product_names=p_name,
-                        section_type=sec_type,
-                        width=w,
-                        height=h,
-                        section_texts=gw_texts,
-                        theme=theme,
-                    )
-                    path = await self.storage.upload_image(
-                        file_bytes=img_bytes,
-                        project_id=project_id,
-                        image_type="generated",
-                        filename=gw_filename,
-                    )
-                    url = self.storage.get_public_url(path)
-                    key = f"{sec_type}__{inst_idx}" if is_duplicate else sec_type
-                    section_image_urls[key] = url
-                    image_prompts[key] = p_used
-                    continue
 
                 filename = f"{sec_type}_{inst_idx}.png" if is_duplicate else f"{sec_type}.png"
 
@@ -276,6 +204,14 @@ class GenerateOrchestrator:
                 project_id=project_id,
             )
 
+            # 5.6. 고메트립 음식/와인 이미지 누끼 제거
+            if page_type_id == "gourmet":
+                restaurants, wines = await self._preprocess_gourmet_bg_removal(
+                    restaurants=restaurants,
+                    wines=wines,
+                    project_id=project_id,
+                )
+
             # 6. 각 섹션 데이터 바인딩 + 렌더링
             rendered_sections = []
             instance_counter: dict[str, int] = {}
@@ -296,6 +232,8 @@ class GenerateOrchestrator:
                     section_image_urls=section_image_urls,
                     instance_index=passed_instance_index,
                     product_bg_removed_urls=product_bg_removed_urls,
+                    restaurants=restaurants,
+                    wines=wines,
                 )
                 section = render_section(
                     section_template=st,
@@ -316,13 +254,18 @@ class GenerateOrchestrator:
                 "generated_at": datetime.now().isoformat(),
             }
 
-            self.db.table("projects").update({
+            update_payload = {
                 "theme_id": page_type_id,
                 "template_used": template_used,
                 "generated_data": generated_data,
                 "rendered_sections": rendered_sections,
                 "products": products,
-            }).eq("id", project_id).execute()
+            }
+            if background_config:
+                update_payload["background_config"] = background_config
+            if restaurants:
+                update_payload["restaurants"] = restaurants
+            self.db.table("projects").update(update_payload).eq("id", project_id).execute()
 
             # 8. 응답 반환
             return GenerateResponse(
@@ -373,6 +316,85 @@ class GenerateOrchestrator:
         except Exception as e:
             logger.warning(f"참조 이미지 다운로드 실패, 텍스트 기반 생성으로 대체: {e}")
             return None, None
+
+    async def _preprocess_gourmet_bg_removal(
+        self,
+        restaurants: list[dict] | None,
+        wines: list[dict] | None,
+        project_id: str,
+    ) -> tuple[list[dict] | None, list[dict] | None]:
+        """고메트립 음식/와인 이미지에 누끼(배경 제거)를 적용한다.
+
+        각 음식/와인 이미지 URL을 다운로드 → 배경 제거 → 업로드 후
+        image_url을 배경 제거된 URL로 교체한다.
+
+        Returns:
+            (수정된 restaurants, 수정된 wines) 튜플
+        """
+        async def _bg_remove_url(url: str, label: str, max_retries: int = 2) -> str:
+            """URL에서 이미지를 다운로드하여 배경 제거 후 업로드, 새 URL 반환.
+            Bedrock throttling 대비 재시도 로직 포함."""
+            if not url:
+                return url
+            for attempt in range(max_retries + 1):
+                try:
+                    async with httpx.AsyncClient(timeout=30.0) as http:
+                        resp = await http.get(url)
+                        resp.raise_for_status()
+                        original_bytes = resp.content
+
+                    removed_bytes = await remove_background(original_bytes)
+
+                    filename = f"{label}_bg_removed.png"
+                    path = await self.storage.upload_image(
+                        file_bytes=removed_bytes,
+                        project_id=project_id,
+                        image_type="bg_removed",
+                        filename=filename,
+                    )
+                    new_url = self.storage.get_public_url(path)
+                    logger.info(f"누끼 제거 완료: {label}")
+                    return new_url
+                except Exception as e:
+                    if attempt < max_retries:
+                        wait = 2 * (attempt + 1)
+                        logger.warning(f"누끼 제거 재시도 ({label}), {wait}초 대기: {e}")
+                        await asyncio.sleep(wait)
+                    else:
+                        logger.warning(f"누끼 제거 최종 실패 ({label}), 원본 사용: {e}")
+                        return url
+            return url
+
+        # 음식 이미지 누끼 제거
+        if restaurants:
+            for r_idx, restaurant in enumerate(restaurants):
+                for food_key in ("food1", "food2"):
+                    food = restaurant.get(food_key, {})
+                    img_url = food.get("image_url", "")
+                    if img_url:
+                        new_url = await _bg_remove_url(
+                            img_url, f"r{r_idx}_{food_key}"
+                        )
+                        food["image_url"] = new_url
+                        # Bedrock throttling 방지: 호출 간 1초 대기
+                        await asyncio.sleep(1)
+
+        # 와인 이미지 누끼 제거
+        if wines:
+            logger.info(f"[와인 누끼] wines 전체 데이터: {wines}")
+            for w_idx, wine in enumerate(wines):
+                img_url = wine.get("image_url", "")
+                logger.info(f"[와인 누끼] wine[{w_idx}] image_url={img_url!r}")
+                if img_url:
+                    new_url = await _bg_remove_url(img_url, f"wine_{w_idx}")
+                    wine["image_url"] = new_url
+                    # Bedrock throttling 방지: 호출 간 1초 대기
+                    if w_idx < len(wines) - 1:
+                        await asyncio.sleep(1)
+                else:
+                    logger.warning(f"[와인 누끼] wine[{w_idx}] image_url 비어있음 — 누끼 건너뜀")
+
+        return restaurants, wines
 
     async def _preprocess_bg_removal(
         self,

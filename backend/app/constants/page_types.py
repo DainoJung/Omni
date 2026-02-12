@@ -90,8 +90,9 @@ PAGE_TYPES: dict[str, dict] = {
         "name": "고메트립",
         "icon": "🍽️",
         "description": "미식 여행/다이닝 프로모션 페이지",
-        "min_products": 6,
-        "max_products": 9,
+        "min_restaurants": 1,
+        "max_restaurants": 5,
+        "foods_per_restaurant": 2,
         "requires_price": False,
         "accent_color": "#D97706",
         "catalog_bg_color": "#78350f",
@@ -153,6 +154,9 @@ def resolve_sections(
     page_type_id: str,
     product_count: int,
     selected_sections: list[str] | None = None,
+    restaurant_count: int | None = None,
+    include_wine: bool = False,
+    wine_count: int = 0,
 ) -> list[str]:
     """페이지 타입과 상품 수에 따라 섹션 목록을 자동 결정한다."""
     # 커스텀: 프로젝트에 저장된 섹션 목록 사용
@@ -185,16 +189,13 @@ def resolve_sections(
     if page_type_id == "vip_private":
         return ["vip_private_hero"] + ["product_card"] * product_count
 
-    # 고메트립: 레스토랑 3개 고정 + 와인 (product_count - 3)개
+    # 고메트립: 레스토랑 N개 + 선택적 와인 섹션
     if page_type_id == "gourmet":
-        restaurant_count = 3
-        wine_count = product_count - restaurant_count
-        return (
-            ["gourmet_hero"]
-            + ["gourmet_restaurant"] * restaurant_count
-            + ["gourmet_wine_intro"]
-            + ["gourmet_wine"] * wine_count
-        )
+        r_count = restaurant_count or 1
+        sections = ["gourmet_hero"] + ["gourmet_restaurant"] * r_count
+        if include_wine and wine_count > 0:
+            sections += ["gourmet_wine_intro"] + ["gourmet_wine"] * wine_count
+        return sections
 
     # 뱅드신세계
     if page_type_id == "shinsegae":

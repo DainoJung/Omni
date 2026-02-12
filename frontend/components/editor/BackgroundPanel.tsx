@@ -209,6 +209,29 @@ export function BackgroundPanel({
               )}
             </div>
           )}
+
+          {/* Global Opacity Slider */}
+          {settings.global.type !== "none" && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-medium text-text-secondary">투명도</p>
+                <span className="text-xs text-text-tertiary tabular-nums">{settings.global.opacity ?? 100}%</span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={settings.global.opacity ?? 100}
+                onChange={(e) =>
+                  onSettingsChange({
+                    ...settings,
+                    global: { ...settings.global, opacity: parseInt(e.target.value) },
+                  })
+                }
+                className="w-full h-1.5 bg-bg-secondary rounded-full appearance-none cursor-pointer accent-accent"
+              />
+            </div>
+          )}
         </>
       )}
 
@@ -384,6 +407,28 @@ export function BackgroundPanel({
                               />
                             </div>
                           )}
+                        </div>
+                      )}
+
+                      {/* Section Opacity Slider */}
+                      {sectionBg.type !== "none" && (
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <p className="text-[11px] font-medium text-text-secondary">투명도</p>
+                            <span className="text-[11px] text-text-tertiary tabular-nums">{sectionBg.opacity ?? 100}%</span>
+                          </div>
+                          <input
+                            type="range"
+                            min={0}
+                            max={100}
+                            value={sectionBg.opacity ?? 100}
+                            onChange={(e) =>
+                              updateSectionBg(section.section_id, {
+                                opacity: parseInt(e.target.value),
+                              })
+                            }
+                            className="w-full h-1.5 bg-bg-secondary rounded-full appearance-none cursor-pointer accent-accent"
+                          />
                         </div>
                       )}
                     </div>

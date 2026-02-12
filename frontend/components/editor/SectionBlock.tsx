@@ -87,12 +87,17 @@ export function SectionBlock({ section, onDataChange, onElementSelect, selectedP
 
   const bgOverrideCss = useMemo(() => {
     if (!backgroundConfig || backgroundConfig.type === "none") return "";
-    const selector = `[data-section-id="${section.section_id}"] .section-inner > *:first-child`;
+    const sel = `[data-section-id="${section.section_id}"] .section-inner > *:first-child`;
+    const opacity = (backgroundConfig.opacity ?? 100) / 100;
+
+    // ::before 오버레이로 배경을 깔아 opacity가 콘텐츠에 영향 없이 적용
+    const base = `${sel} { position: relative !important; } ${sel}::before { content: '' !important; position: absolute !important; inset: 0 !important; z-index: 0 !important; pointer-events: none !important; opacity: ${opacity} !important;`;
+
     if (backgroundConfig.type === "solid" && backgroundConfig.hex_color) {
-      return `${selector} { background-color: ${backgroundConfig.hex_color} !important; background-image: none !important; }`;
+      return `${base} background-color: ${backgroundConfig.hex_color} !important; background-image: none !important; } ${sel} > * { position: relative !important; z-index: 1 !important; }`;
     }
     if (backgroundConfig.type === "ai" && backgroundConfig.ai_image_url) {
-      return `${selector} { background-image: url(${backgroundConfig.ai_image_url}) !important; background-size: cover !important; background-position: center !important; }`;
+      return `${base} background-image: url(${backgroundConfig.ai_image_url}) !important; background-size: cover !important; background-position: center !important; } ${sel} > * { position: relative !important; z-index: 1 !important; }`;
     }
     return "";
   }, [backgroundConfig, section.section_id]);

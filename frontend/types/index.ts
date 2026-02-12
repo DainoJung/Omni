@@ -133,6 +133,7 @@ export interface SectionBg {
   hex_color?: string;
   ai_prompt?: string;
   ai_image_url?: string;
+  opacity?: number; // 0~100, default 100
 }
 
 export interface BackgroundSettings {

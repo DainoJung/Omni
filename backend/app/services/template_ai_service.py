@@ -31,6 +31,7 @@ async def generate_section_image(
     section_texts: dict[str, str] | None = None,
     theme: dict | None = None,
     brand_name: str | None = None,
+    concept: str | None = None,
 ) -> tuple[bytes, str]:
     """섹션별 상품 컨텍스트 AI 이미지를 생성한다.
 
@@ -59,6 +60,11 @@ async def generate_section_image(
     if brand_name:
         brand_style = f"브랜드: {brand_name}. 이 브랜드의 시그니처 스타일, 미학, 분위기를 반영하세요. "
 
+    # 콘셉트 컨텍스트
+    concept_context = ""
+    if concept:
+        concept_context = f"콘셉트: {concept}. 이 콘셉트의 분위기와 감성을 이미지에 반영하세요. "
+
     # 섹션 텍스트에서 컨텍스트 추출
     section_context = ""
     if section_texts:
@@ -74,6 +80,7 @@ async def generate_section_image(
         "products": products_str,
         "theme": theme_context.rstrip(". ") if theme_context else "",
         "brand_style": brand_style.rstrip(". ") if brand_style else "",
+        "concept": concept_context.rstrip(". ") if concept_context else "",
         "section_context": section_context.rstrip(". ") if section_context else "",
         "style_hint": style_hint,
         "no_text_rule": no_text_rule,
@@ -84,6 +91,7 @@ async def generate_section_image(
         "products": products_str,
         "theme": theme_context,
         "brand_style": brand_style,
+        "concept": concept_context,
         "section_context": section_context,
         "style_hint": style_hint,
         "no_text_rule": no_text_rule,

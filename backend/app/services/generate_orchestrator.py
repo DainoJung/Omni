@@ -194,6 +194,7 @@ class GenerateOrchestrator:
                     section_texts=relevant_texts,
                     theme=theme,
                     brand_name=brand_name if page_type_id == "brand_promotion" else None,
+                    concept=concept,
                 )
                 path = await self.storage.upload_image(
                     file_bytes=image_bytes,

@@ -2,12 +2,12 @@
   "no_text_rule": "절대로 이미지에 텍스트, 글자, 문자, 로고, 워터마크를 포함하지 마세요. 순수한 사진만 생성하세요.",
 
   "templates": {
-    "default": "이커머스 상세페이지용 고퀄리티 상품 사진. 상품: {products}. {brand_style}{theme}{section_context}{style_hint}, 4K 품질, 상업 사진 스타일. {no_text_rule}",
-    "reference": "첨부한 사진 속 상품과 동일한 상품의 새로운 연출 사진을 만들어줘. 반드시 첨부 이미지의 상품 외형, 색상, 디자인을 그대로 유지해야 해. 상품명: {products}. {brand_style}{theme}{section_context}연출 스타일: {style_hint}, 4K 품질, 상업 사진. {no_text_rule}",
+    "default": "이커머스 상세페이지용 고퀄리티 상품 사진. 상품: {products}. {brand_style}{concept}{theme}{section_context}{style_hint}, 4K 품질, 상업 사진 스타일. {no_text_rule}",
+    "reference": "첨부한 사진 속 상품과 동일한 상품의 새로운 연출 사진을 만들어줘. 반드시 첨부 이미지의 상품 외형, 색상, 디자인을 그대로 유지해야 해. 상품명: {products}. {brand_style}{concept}{theme}{section_context}연출 스타일: {style_hint}, 4K 품질, 상업 사진. {no_text_rule}",
     "fit_hero": "하이엔드 패션 매거진 커버 스타일 사진. 외국인 여성 모델의 가슴 위로 클로즈업 포트레이트. 상품 카테고리: {products}. {brand_style}{theme}{section_context}모델이 고급 패션 아이템을 착용하고 정면 또는 살짝 측면을 응시, 얼굴과 상반신 상단만 프레임에 포함, 배경은 단색 또는 부드러운 그라디언트로 심플하게 처리, 스튜디오 조명, 피부 질감이 살아있는 고해상도, 하단 40%는 텍스트 오버레이를 위해 어둡거나 여유 공간 확보, 4K 품질, 상업 패션 포토그래피. {no_text_rule}",
     "fit_event_info": "패션 에디토리얼 스타일 전신 워킹 사진. 외국인 모델이 런웨이 또는 도심 거리를 걸어오는 전신샷. 상품 카테고리: {products}. {brand_style}{theme}{section_context}모델 전신이 머리부터 발끝까지 프레임에 포함, 자연스러운 워킹 포즈, 고급 패션 아이템 착용, 어두운 톤의 배경(도심 야경 또는 어두운 스튜디오), 세로 비율, 드라마틱한 조명, 4K 품질, 상업 패션 포토그래피. {no_text_rule}",
     "fit_product_trio": "패션 룩북 스타일 모델 사진. 외국인 모델의 허벅지부터 시작되는 전신샷. 모델이 착용한 상품: {products}. {brand_style}{theme}{section_context}카메라 앵글은 허벅지 높이에서 위를 올려다보는 로우앵글, 모델 전신이 허벅지부터 머리까지 프레임에 포함, 상품의 디테일이 선명하게 보이도록 연출, 밝은 스튜디오 또는 깔끔한 배경, 자연스러운 포즈, 4K 품질, 상업 패션 포토그래피. {no_text_rule}",
-    "promo_hero": "이커머스 프로모션 배너용 추상적 배경 이미지. {theme}{section_context}절대로 상품, 물건, 제품을 그리지 마세요. 상품이 전혀 없는 깨끗한 배경만 생성하세요. 부드러운 그라디언트, 보케 빛 효과, 은은한 파티클, 따뜻한 톤의 홀리데이/프로모션 분위기. 중앙에 상품을 올릴 수 있도록 넓은 여유 공간을 확보하세요. 4K 품질, 상업 배너 배경. {no_text_rule}",
+    "promo_hero": "이커머스 프로모션 배너용 추상적 배경 이미지. {concept}{theme}{section_context}절대로 상품, 물건, 제품을 그리지 마세요. 상품이 전혀 없는 깨끗한 배경만 생성하세요. 부드러운 그라디언트, 보케 빛 효과, 은은한 파티클, 따뜻한 톤의 홀리데이/프로모션 분위기. 중앙에 상품을 올릴 수 있도록 넓은 여유 공간을 확보하세요. 4K 품질, 상업 배너 배경. {no_text_rule}",
     "gourmet_restaurant": "고급 다이닝 레스토랑 실내 사진. 레스토랑: {products}. {theme}{section_context}이 레스토랑의 요리 스타일과 어울리는 분위기 있는 인테리어, 따뜻한 캔들라이트 조명, 테이블 세팅, 손님들이 식사를 즐기는 생생한 장면, 하단 30%는 어두운 그라디언트 영역 확보, 16:9 와이드 비율, 4K 품질, 상업 레스토랑 포토그래피. {no_text_rule}",
     "gourmet_wine": "고급 와인 보틀 프로필 사진. 와인: {products}. {theme}{section_context}와인 보틀이 중앙에 위치, 어두운 와이너리 셀러 또는 고급 테이블 배경, 드라마틱한 사이드 조명으로 보틀의 형태와 색상이 돋보이는 연출, 세로 3:4 비율, 4K 품질, 상업 와인 포토그래피. {no_text_rule}"
   },

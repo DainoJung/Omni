@@ -208,7 +208,6 @@ _SECTION_TEXT_KEYS: dict[str, list[tuple[str, str]]] = {
         ("hashtags", '["#태그1", "#태그2", "#태그3", "#태그4"]'),
     ],
     "feature_point": [
-        ("point_title_accent", "10자 이내 해당 상품의 매력 포인트 강조 문구"),
         ("point_body", "60자 이내 해당 상품의 매력 포인트 설명"),
     ],
     "promo_hero": [

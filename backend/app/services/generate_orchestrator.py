@@ -30,7 +30,7 @@ _INDEXED_PH_RE = re.compile(r"^(.+)_(\d+)$")
 _SECTION_TEXT_KEY_MAP: dict[str, list[str]] = {
     "hero_banner": ["category", "title", "subtitle"],
     "description": ["desc_title_main", "desc_title_accent", "desc_body"],
-    "feature_point": ["point_title_accent", "point_body"],
+    "feature_point": ["point_body"],
     "promo_hero": ["script_title", "category_title", "subtitle", "location"],
     "fit_hero": ["event_title", "event_period", "event_subtitle", "event_desc", "event_hashtags"],
     "fit_event_info": ["info_period", "event_subtitle"],

@@ -205,10 +205,8 @@ _SECTION_TEXT_KEYS: dict[str, list[tuple[str, str]]] = {
         ("hashtags", '["#태그1", "#태그2", "#태그3", "#태그4"]'),
     ],
     "feature_point": [
-        ("point_label", "8자 이내, 예: Point 1"),
-        ("point_title_main", "10자 이내 포인트 제목"),
-        ("point_title_accent", "10자 이내 포인트 강조"),
-        ("point_body", "60자 이내 포인트 설명"),
+        ("point_title_accent", "10자 이내 해당 상품의 매력 포인트 강조 문구"),
+        ("point_body", "60자 이내 해당 상품의 매력 포인트 설명"),
     ],
     "promo_hero": [
         ("script_title", "10자 이내 필기체 타이틀, 예: Holiday Gift"),
@@ -358,6 +356,19 @@ async def generate_section_texts(
 
     concept_line = f"- 콘셉트: {concept}\n" if concept else ""
 
+    # feature_point가 여러 개일 때 상품별 매핑 지시 생성
+    fp_count = (section_counts or {}).get("feature_point", 0)
+    product_mapping_line = ""
+    if fp_count >= 2 and len(product_names) >= 2:
+        mapping_parts = [
+            f"feature_point__{i}은 '{product_names[i]}'"
+            for i in range(min(fp_count, len(product_names)))
+        ]
+        product_mapping_line = (
+            f"중요: feature_point가 여러 개인 경우, 각 feature_point는 특정 상품에 대한 포인트입니다.\n"
+            f"{', '.join(mapping_parts)}에 대한 매력 포인트를 작성하세요.\n"
+        )
+
     prompt = (
         f"당신은 한국 이커머스 POP(상품 상세 페이지) 카피라이터입니다.\n"
         f"다음 조건으로 POP의 각 섹션에 들어갈 한국어 텍스트를 JSON으로 생성해주세요.\n\n"
@@ -366,6 +377,7 @@ async def generate_section_texts(
         f"- 테마: {theme_name}\n"
         f"- 키워드: {keywords_str}\n"
         f"{concept_line}\n"
+        f"{product_mapping_line}"
         f"중요: 같은 섹션이 여러 개인 경우 각각 서로 다른 관점/내용으로 작성하세요.\n"
         f"bg_color는 콘셉트와 테마 분위기에 어울리는 어두운 배경색을 HEX로 지정하세요.\n\n"
         f"반드시 아래 JSON 형식으로만 출력하세요 (설명 없이 JSON만):\n"

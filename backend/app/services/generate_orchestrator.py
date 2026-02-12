@@ -30,7 +30,7 @@ _INDEXED_PH_RE = re.compile(r"^(.+)_(\d+)$")
 _SECTION_TEXT_KEY_MAP: dict[str, list[str]] = {
     "hero_banner": ["category", "title", "subtitle"],
     "description": ["desc_title_main", "desc_title_accent", "desc_body"],
-    "feature_point": ["point_label", "point_title_main", "point_title_accent", "point_body"],
+    "feature_point": ["point_title_accent", "point_body"],
     "promo_hero": ["script_title", "category_title", "subtitle", "location"],
     "fit_hero": ["event_title", "event_period", "event_subtitle", "event_desc", "event_hashtags"],
     "fit_event_info": ["info_period", "event_subtitle"],
@@ -110,7 +110,15 @@ class GenerateOrchestrator:
 
             # 3. 상품 이미지 URL 수집 + 참조 이미지 다운로드
             product_image_urls = await self._get_product_image_urls(project_id)
-            reference_image, ref_mime_type = await self._download_reference_image(product_image_urls)
+
+            # 섹션별 참조 이미지 매핑 (product_detail: hero→1번째, description→2번째)
+            section_ref_map: dict[str, tuple[bytes, str] | tuple[None, None]] = {}
+            if page_type_id == "product_detail":
+                default_ref = await self._download_reference_image(product_image_urls, 0)
+                if len(product_image_urls) > 1:
+                    section_ref_map["description"] = await self._download_reference_image(product_image_urls, 1)
+            else:
+                default_ref = await self._download_reference_image(product_image_urls, 0)
 
             # 4. 텍스트 생성 (이미지와 병렬 불가 — rate limit)
             # 고메트립: 레스토랑 이름을 product_names로 사용
@@ -144,6 +152,7 @@ class GenerateOrchestrator:
             # AI 이미지 생성은 배경/분위기 섹션만 (상품 이미지는 사용자 업로드 직접 사용)
             image_size_map = {
                 "hero_banner": (860, 1400),
+                "description": (860, 860),
                 "promo_hero": (860, 645),
                 "fit_hero": (860, 625),
                 "fit_event_info": (860, 1220),
@@ -183,14 +192,18 @@ class GenerateOrchestrator:
                     elif tk in section_texts:
                         relevant_texts[tk] = section_texts[tk]
 
+                # 섹션별 참조 이미지 선택
+                ref_pair = section_ref_map.get(sec_type, default_ref)
+                ref_img, ref_mime = ref_pair if ref_pair else (None, None)
+
                 logger.info(f"{sec_type} 이미지 생성 시작 (인스턴스 {inst_idx})")
                 image_bytes, prompt_used = await generate_section_image(
                     product_names=product_names,
                     section_type=sec_type,
                     width=w,
                     height=h,
-                    reference_image=reference_image,
-                    reference_mime_type=ref_mime_type,
+                    reference_image=ref_img,
+                    reference_mime_type=ref_mime,
                     section_texts=relevant_texts,
                     theme=theme,
                     brand_name=brand_name if page_type_id == "brand_promotion" else None,
@@ -310,21 +323,23 @@ class GenerateOrchestrator:
 
         return urls
 
-    async def _download_reference_image(self, product_image_urls: list[str]) -> tuple[bytes, str] | tuple[None, None]:
-        """첫 번째 상품 이미지를 다운로드하여 (bytes, mime_type)을 반환한다."""
-        if not product_image_urls:
+    async def _download_reference_image(
+        self, product_image_urls: list[str], index: int = 0,
+    ) -> tuple[bytes, str] | tuple[None, None]:
+        """지정 인덱스의 상품 이미지를 다운로드하여 (bytes, mime_type)을 반환한다."""
+        if not product_image_urls or index >= len(product_image_urls):
             return None, None
         try:
             async with httpx.AsyncClient(timeout=15.0) as http:
-                resp = await http.get(product_image_urls[0])
+                resp = await http.get(product_image_urls[index])
                 resp.raise_for_status()
                 content_type = resp.headers.get("content-type", "image/jpeg").split(";")[0].strip()
                 if content_type not in ("image/png", "image/jpeg", "image/webp"):
                     content_type = "image/jpeg"
-                logger.info(f"참조 이미지 다운로드 완료: {len(resp.content)} bytes, {content_type}")
+                logger.info(f"참조 이미지 다운로드 완료 (idx={index}): {len(resp.content)} bytes, {content_type}")
                 return resp.content, content_type
         except Exception as e:
-            logger.warning(f"참조 이미지 다운로드 실패, 텍스트 기반 생성으로 대체: {e}")
+            logger.warning(f"참조 이미지 다운로드 실패 (idx={index}), 텍스트 기반 생성으로 대체: {e}")
             return None, None
 
     async def _preprocess_gourmet_bg_removal(

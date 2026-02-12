@@ -27,7 +27,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
 const DISPLAY_ORDER = ["product_detail", "promotion", "gourmet", "brand_promotion", "vip_special", "vip_private", "shinsegae", "custom"];
 
 const FALLBACK_PAGE_TYPES: PageType[] = [
-  { id: "product_detail", name: "상품 상세", icon: "📦", description: "단일 상품의 상세 정보", min_products: 1, max_products: 1, requires_price: false, accent_color: "#2563EB", catalog_bg_color: "#1e3a5f", background_prompt: "", copy_keywords: [] },
+  { id: "product_detail", name: "상품 포인트", icon: "📦", description: "상품별 매력 포인트를 보여주는 기획전", min_products: 2, max_products: 6, requires_price: false, accent_color: "#2563EB", catalog_bg_color: "#1e3a5f", background_prompt: "", copy_keywords: [] },
   { id: "promotion", name: "상품 기획전", icon: "🎪", description: "여러 상품을 모아 만드는 기획전", min_products: 2, max_products: 6, requires_price: true, accent_color: "#E91E90", catalog_bg_color: "#9d174d", background_prompt: "", copy_keywords: [] },
   { id: "gourmet", name: "맛집 기획전", icon: "🍽️", description: "가게별 음식 사진", min_restaurants: 1, max_restaurants: 5, foods_per_restaurant: 2, requires_price: false, accent_color: "#D97706", catalog_bg_color: "#78350f", background_prompt: "", copy_keywords: [] },
   { id: "brand_promotion", name: "브랜드 기획전", icon: "👜", description: "단일 브랜드 상품 3개 기획전", min_products: 3, max_products: 3, requires_price: true, requires_brand: true, accent_color: "#2c2e35", catalog_bg_color: "#2c2e35", background_prompt: "", copy_keywords: [] },

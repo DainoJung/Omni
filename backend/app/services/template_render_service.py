@@ -172,6 +172,11 @@ def bind_section_data(
                 # Apply product offset (e.g., gourmet_wine products start at index 3)
                 idx += ph.get("product_offset", 0)
 
+            # bind_to: placeholder ID와 다른 product 필드에 매핑
+            bind_to = ph.get("bind_to")
+            if bind_to:
+                base_ph_id = bind_to
+
             if ph_type == "image":
                 use_bg_removed = ph.get("bg_remove") is True and idx in product_bg_removed_urls
                 if use_bg_removed:

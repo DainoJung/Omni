@@ -5,11 +5,11 @@ import math
 PAGE_TYPES: dict[str, dict] = {
     "product_detail": {
         "id": "product_detail",
-        "name": "상품 상세",
+        "name": "상품 포인트",
         "icon": "📦",
-        "description": "단일 상품의 상세 정보를 보여주는 페이지",
-        "min_products": 1,
-        "max_products": 1,
+        "description": "상품별 매력 포인트를 보여주는 기획전 페이지",
+        "min_products": 2,
+        "max_products": 6,
         "requires_price": False,
         "accent_color": "#2563EB",
         "catalog_bg_color": "#1e3a5f",
@@ -170,10 +170,7 @@ def resolve_sections(
             "hero_banner",
             "feature_badges",
             "description",
-            "feature_point",
-            "feature_point",
-            "feature_point",
-        ]
+        ] + ["feature_point"] * product_count
 
     if page_type_id == "promotion":
         return ["promo_hero"] + ["product_card"] * product_count

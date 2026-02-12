@@ -65,6 +65,8 @@ export default function ResultPage() {
   const [uploadedImages, setUploadedImages] = useState<{ url: string; type: "upload" | "bg_removed" }[]>([]);
   const [originalAiImages, setOriginalAiImages] = useState<{ sectionId: string; key: string; url: string }[]>([]);
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
+  const [colorPickerSection, setColorPickerSection] = useState<string | null>(null);
+  const colorPickerRef = useRef<HTMLDivElement>(null);
 
   // Generation states
   const [generating, setGenerating] = useState(false);
@@ -983,6 +985,22 @@ export default function ResultPage() {
     }
   }, [showProfileMenu]);
 
+  // 컬러피커 외부 클릭 감지
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (colorPickerRef.current && !colorPickerRef.current.contains(event.target as Node)) {
+        setColorPickerSection(null);
+      }
+    };
+
+    if (colorPickerSection) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [colorPickerSection]);
+
   const handleLogout = async () => {
     const token = sessionStorage.getItem("auth_token");
     if (token) {
@@ -1153,6 +1171,55 @@ export default function ResultPage() {
                               섹션 {index + 1}
                             </p>
                           </div>
+
+                          {/* Background Color Button */}
+                          {'bg_color' in section.data && section.data.bg_color && (
+                            <div className="relative shrink-0">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setColorPickerSection(
+                                    colorPickerSection === section.section_id ? null : section.section_id
+                                  );
+                                }}
+                                className="w-6 h-6 rounded-full border-2 border-white shadow-sm hover:scale-110 transition-transform"
+                                style={{ backgroundColor: section.data.bg_color }}
+                                title="배경색 변경"
+                              />
+                              {colorPickerSection === section.section_id && (
+                                <div
+                                  ref={colorPickerRef}
+                                  className="absolute right-0 top-8 z-50 bg-white rounded-lg shadow-xl border border-border p-3 space-y-2"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <p className="text-xs font-medium text-text-secondary">배경색</p>
+                                  <div className="flex items-center gap-2">
+                                    <input
+                                      type="color"
+                                      value={section.data.bg_color}
+                                      onChange={(e) => {
+                                        handleDataChange(section.section_id, "bg_color", e.target.value);
+                                      }}
+                                      className="w-8 h-8 rounded border border-border cursor-pointer"
+                                    />
+                                    <input
+                                      type="text"
+                                      value={section.data.bg_color}
+                                      onChange={(e) => {
+                                        const v = e.target.value;
+                                        if (/^#[0-9A-Fa-f]{0,6}$/.test(v)) {
+                                          handleDataChange(section.section_id, "bg_color", v);
+                                        }
+                                      }}
+                                      className="w-20 h-8 px-2 border border-border rounded text-xs font-mono"
+                                      maxLength={7}
+                                    />
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                       {/* Drop indicator after last item */}

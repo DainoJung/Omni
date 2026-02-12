@@ -97,6 +97,7 @@ export interface ProjectCreate {
   page_type: string;
   selected_sections?: string[];
   background?: BackgroundConfig;
+  concept?: string;
   restaurants?: RestaurantInput[];
   include_wine?: boolean;
   wines?: WineInput[];
@@ -149,6 +150,7 @@ export interface GenerateRequest {
   products: ProductInput[];
   page_type: string;
   background?: BackgroundConfig;
+  concept?: string;
   restaurants?: RestaurantInput[];
   include_wine?: boolean;
   wines?: WineInput[];

@@ -38,6 +38,7 @@ class GenerateRequest(BaseModel):
     products: List[ProductInput] = Field(default_factory=list, max_length=20)
     page_type: str = Field(..., min_length=1, max_length=50)
     background: Optional[BackgroundConfig] = None
+    concept: Optional[str] = Field(None, max_length=500)
     restaurants: Optional[List[RestaurantInput]] = Field(None, max_length=5)
     include_wine: Optional[bool] = False
     wines: Optional[List[WineInput]] = Field(None, max_length=6)

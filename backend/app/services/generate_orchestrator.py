@@ -14,6 +14,7 @@ from app.constants.page_types import get_page_type, resolve_sections
 from app.services.template_ai_service import (
     generate_section_texts,
     generate_section_image,
+    validate_bg_color,
 )
 from app.services.section_compose_service import compose_sections
 from app.services.template_render_service import render_section, bind_section_data
@@ -63,6 +64,7 @@ class GenerateOrchestrator:
         restaurants: list[dict] | None = None,
         include_wine: bool = False,
         wines: list[dict] | None = None,
+        concept: str | None = None,
     ) -> GenerateResponse:
         """HTML 템플릿 기반 POP 생성 파이프라인을 실행한다."""
 
@@ -129,7 +131,14 @@ class GenerateOrchestrator:
                 theme_name=theme["name"],
                 copy_keywords=theme["copy_keywords"],
                 section_counts=section_counts,
+                concept=concept,
             )
+
+            # AI가 생성한 bg_color 추출 및 테마 반영
+            ai_bg_color = section_texts.pop("bg_color", None)
+            validated_bg_color = validate_bg_color(ai_bg_color, theme["catalog_bg_color"])
+            theme["catalog_bg_color"] = validated_bg_color
+            logger.info(f"AI bg_color: {ai_bg_color} → validated: {validated_bg_color}")
 
             # 5. 섹션 이미지 순차 생성 (인스턴스별 개별 이미지)
             # AI 이미지 생성은 배경/분위기 섹션만 (상품 이미지는 사용자 업로드 직접 사용)

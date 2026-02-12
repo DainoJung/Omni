@@ -22,6 +22,7 @@ async def generate(data: GenerateRequest):
         # restaurants/wines는 항상 DB에서 로드 (image_url 필드가 Pydantic에서 누락되므로)
         restaurants = None
         wines = None
+        concept = None
         if proj.data:
             if not background_config and proj.data.get("background_config"):
                 background_config = proj.data["background_config"]
@@ -32,6 +33,8 @@ async def generate(data: GenerateRequest):
                 wines = input_data["wines"]
             if not include_wine and input_data.get("include_wine"):
                 include_wine = input_data["include_wine"]
+            if input_data.get("concept"):
+                concept = input_data["concept"]
 
         result = await orchestrator.generate(
             project_id=str(data.project_id),
@@ -41,6 +44,7 @@ async def generate(data: GenerateRequest):
             restaurants=restaurants,
             include_wine=include_wine,
             wines=wines,
+            concept=concept,
         )
         return result
     except ValueError as e:

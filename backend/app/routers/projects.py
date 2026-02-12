@@ -33,13 +33,15 @@ async def create_project(data: ProjectCreate):
         insert_data["background_config"] = data.background.model_dump()
     if data.restaurants:
         insert_data["restaurants"] = [r.model_dump() for r in data.restaurants]
-    # 고메트립 와인 데이터 저장
-    if data.include_wine or data.wines:
-        input_data = {}
-        if data.include_wine:
-            input_data["include_wine"] = data.include_wine
-        if data.wines:
-            input_data["wines"] = [w.model_dump() for w in data.wines]
+    # input_data 저장 (concept, 와인 등)
+    input_data = {}
+    if data.concept:
+        input_data["concept"] = data.concept
+    if data.include_wine:
+        input_data["include_wine"] = data.include_wine
+    if data.wines:
+        input_data["wines"] = [w.model_dump() for w in data.wines]
+    if input_data:
         insert_data["input_data"] = input_data
     result = db.table("projects").insert(insert_data).execute()
     if not result.data:

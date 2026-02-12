@@ -4,12 +4,11 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { PageTypeSelector } from "./PageTypeSelector";
-import { BackgroundSettings } from "./BackgroundSettings";
 import { projectsApi, uploadApi } from "@/lib/api";
 import { toast } from "sonner";
 import { Plus, Trash2, Upload, X } from "lucide-react";
 import { useDropzone } from "react-dropzone";
-import type { PageType, BackgroundConfig } from "@/types";
+import type { PageType } from "@/types";
 
 // ── 섹션 직접 선택용 섹션 목록 ──
 const AVAILABLE_SECTIONS = [
@@ -522,11 +521,8 @@ export function ProjectInputForm({ onSuccess, compact }: ProjectInputFormProps) 
   ]);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // 배경 설정 state
-  const [backgroundConfig, setBackgroundConfig] = useState<BackgroundConfig>({
-    mode: "solid",
-    hex_color: "#FFFFFF",
-  });
+  // 콘셉트 state
+  const [concept, setConcept] = useState("");
 
   // 고메트립 전용 state
   const [gourmetRestaurants, setGourmetRestaurants] = useState<
@@ -554,12 +550,7 @@ export function ProjectInputForm({ onSuccess, compact }: ProjectInputFormProps) 
     setPageTypeId(pt.id);
     setPageTypeConfig(pt);
     setErrors({});
-
-    // 배경 기본 컬러를 페이지 타입의 accent_color로 초기화
-    setBackgroundConfig({
-      mode: "solid",
-      hex_color: "#FFFFFF",
-    });
+    setConcept("");
 
     if (pt.id === "gourmet") {
       setGourmetRestaurants([emptyRestaurant()]);
@@ -693,7 +684,7 @@ export function ProjectInputForm({ onSuccess, compact }: ProjectInputFormProps) 
         const project = await projectsApi.create({
           products: [],
           page_type: pageTypeId,
-          background: backgroundConfig,
+          concept: concept || undefined,
           include_wine: includeWine,
           ...(wineSubmitData ? { wines: wineSubmitData } : {}),
         });
@@ -793,7 +784,7 @@ export function ProjectInputForm({ onSuccess, compact }: ProjectInputFormProps) 
         const project = await projectsApi.create({
           products: submitProducts,
           page_type: pageTypeId,
-          background: backgroundConfig,
+          concept: concept || undefined,
         });
 
         // 상품 이미지 업로드
@@ -836,12 +827,21 @@ export function ProjectInputForm({ onSuccess, compact }: ProjectInputFormProps) 
         error={errors.page_type}
       />
 
-      {/* 배경 설정 (custom 제외) */}
+      {/* 콘셉트 설명 (custom 제외) */}
       {pageTypeId && !isCustom && (
-        <BackgroundSettings
-          value={backgroundConfig}
-          onChange={setBackgroundConfig}
-        />
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-text-primary">
+            콘셉트 <span className="text-xs text-text-tertiary">(선택)</span>
+          </label>
+          <textarea
+            value={concept}
+            onChange={(e) => setConcept(e.target.value)}
+            placeholder="예: 크리스마스 선물 기획전, 여름 쿨링 특가"
+            rows={2}
+            className="w-full px-3 py-2 border border-border rounded-sm text-sm resize-none focus:border-border-focus"
+            maxLength={500}
+          />
+        </div>
       )}
 
       {/* 고메트립 전용 폼 */}

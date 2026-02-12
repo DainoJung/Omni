@@ -2,6 +2,7 @@
 
 import json
 import logging
+import re
 from pathlib import Path
 
 from google import genai
@@ -269,6 +270,16 @@ _SECTION_TEXT_KEYS: dict[str, list[tuple[str, str]]] = {
 }
 
 
+_HEX_COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
+
+
+def validate_bg_color(color: str | None, fallback: str) -> str:
+    """HEX 색상코드 검증. 유효하지 않으면 fallback 반환."""
+    if isinstance(color, str) and _HEX_COLOR_RE.match(color.strip()):
+        return color.strip()
+    return fallback
+
+
 def _build_text_prompt_schema(section_counts: dict[str, int] | None) -> str:
     """section_counts를 기반으로 JSON 스키마 문자열을 생성한다.
 
@@ -277,7 +288,9 @@ def _build_text_prompt_schema(section_counts: dict[str, int] | None) -> str:
     - 3개: "point_label__0": "...", "point_label__1": "...", "point_label__2": "..."
     """
     counts = section_counts or {k: 1 for k in _SECTION_TEXT_KEYS}
-    lines = []
+    lines = [
+        '  "bg_color": "(7자리 HEX 색상코드, 예: #2C1810. 콘셉트와 테마에 어울리는 어두운 배경색. 흰색 텍스트가 잘 보이도록 명도가 낮은 색상)"'
+    ]
     for sec_type, keys in _SECTION_TEXT_KEYS.items():
         n = counts.get(sec_type, 0)
         if n == 0:
@@ -321,6 +334,7 @@ async def generate_section_texts(
     theme_name: str,
     copy_keywords: list[str],
     section_counts: dict[str, int] | None = None,
+    concept: str | None = None,
 ) -> dict:
     """Gemini 1회 호출로 전 섹션 텍스트를 JSON으로 생성한다.
 
@@ -331,14 +345,18 @@ async def generate_section_texts(
     keywords_str = ", ".join(copy_keywords)
     schema = _build_text_prompt_schema(section_counts)
 
+    concept_line = f"- 콘셉트: {concept}\n" if concept else ""
+
     prompt = (
         f"당신은 한국 이커머스 POP(상품 상세 페이지) 카피라이터입니다.\n"
         f"다음 조건으로 POP의 각 섹션에 들어갈 한국어 텍스트를 JSON으로 생성해주세요.\n\n"
         f"조건:\n"
         f"- 상품: {products_str}\n"
         f"- 테마: {theme_name}\n"
-        f"- 키워드: {keywords_str}\n\n"
-        f"중요: 같은 섹션이 여러 개인 경우 각각 서로 다른 관점/내용으로 작성하세요.\n\n"
+        f"- 키워드: {keywords_str}\n"
+        f"{concept_line}\n"
+        f"중요: 같은 섹션이 여러 개인 경우 각각 서로 다른 관점/내용으로 작성하세요.\n"
+        f"bg_color는 콘셉트와 테마 분위기에 어울리는 어두운 배경색을 HEX로 지정하세요.\n\n"
         f"반드시 아래 JSON 형식으로만 출력하세요 (설명 없이 JSON만):\n"
         f"{schema}"
     )

@@ -11,6 +11,7 @@ class ProjectCreate(BaseModel):
     page_type: str = Field(..., min_length=1, max_length=50)
     selected_sections: Optional[List[str]] = None
     background: Optional[BackgroundConfig] = None
+    concept: Optional[str] = Field(None, max_length=500)
     restaurants: Optional[List[RestaurantInput]] = Field(None, max_length=5)
     include_wine: Optional[bool] = False
     wines: Optional[List[WineInput]] = Field(None, max_length=6)

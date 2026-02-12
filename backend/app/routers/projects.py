@@ -1,6 +1,7 @@
 import logging
 import uuid as _uuid
 import httpx
+from pathlib import Path
 from typing import Optional
 from pydantic import BaseModel
 from fastapi import APIRouter, HTTPException
@@ -292,12 +293,23 @@ async def generate_background_image(project_id: UUID, body: BackgroundGenerateRe
     if body.section_type and body.section_type in image_size_map:
         w, h = image_size_map[body.section_type]
 
+    # 레퍼런스 배경 이미지 로드 (톤온톤 패턴 스타일 가이드)
+    ref_image = None
+    ref_mime = None
+    ref_path = Path(__file__).resolve().parent.parent / "constants" / "bg_reference.png"
+    if ref_path.exists():
+        ref_image = ref_path.read_bytes()
+        ref_mime = "image/png"
+        logger.info(f"배경 레퍼런스 이미지 로드 완료: {len(ref_image)} bytes")
+
     image_bytes, prompt_used = await generate_section_image(
         product_names=product_names,
         section_type="background",
         width=w,
         height=h,
-        custom_prompt=body.prompt,
+        reference_image=ref_image,
+        reference_mime_type=ref_mime,
+        concept=body.prompt,
     )
 
     filename = f"bg_{_uuid.uuid4().hex[:8]}.png"

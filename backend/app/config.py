@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     # Auth (JWT)
     AUTH_SECRET: str = "change-this-secret-key"
     JWT_EXPIRY_HOURS: int = 72
-    ADMIN_DEFAULT_PASSWORD: str = "admin"
+    ADMIN_DEFAULT_PASSWORD: str = "ssg2026!"
 
     # Storage
     STORAGE_BUCKET_PROJECTS: str = "project-images"

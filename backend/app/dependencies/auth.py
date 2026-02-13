@@ -2,6 +2,7 @@
 
 import jwt
 from dataclasses import dataclass
+from typing import Optional
 from fastapi import Depends, HTTPException, Header
 
 from app.config import settings
@@ -14,10 +15,10 @@ class CurrentUser:
     is_admin: bool
 
 
-async def get_current_user(authorization: str = Header(...)) -> CurrentUser:
+async def get_current_user(authorization: Optional[str] = Header(None)) -> CurrentUser:
     """Authorization: Bearer <token> 헤더에서 JWT를 디코딩하여 현재 사용자 반환"""
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header")
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Authorization header required")
 
     token = authorization[7:]
     try:

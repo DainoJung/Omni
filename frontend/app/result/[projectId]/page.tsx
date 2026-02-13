@@ -84,7 +84,7 @@ export default function ResultPage() {
   const [generationProgress, setGenerationProgress] = useState(0);
   const [generationSteps, setGenerationSteps] = useState<GenerationStep[]>([
     { label: "입력 분석", detail: "상품 이미지 및 정보를 분석하고 있습니다.", status: "pending" },
-    { label: "HTML 템플릿 조회", detail: "최적의 레이아웃 템플릿을 선택하고 있습니다.", status: "pending" },
+    { label: "HTML 디자인 레이아웃 조회", detail: "최적의 레이아웃 템플릿을 선택하고 있습니다.", status: "pending" },
     { label: "AI 배경 & 텍스트 생성", detail: "AI가 배경 이미지와 텍스트를 생성하고 있습니다.", status: "pending" },
     { label: "템플릿 데이터 바인딩", detail: "생성된 콘텐츠를 템플릿에 적용하고 있습니다.", status: "pending" },
   ]);
@@ -1424,9 +1424,8 @@ export default function ResultPage() {
                           <Download size={12} className="text-text-primary" />
                         </button>
                         {/* 이미지 타입 badge - right */}
-                        <span className={`absolute top-1.5 right-1.5 px-1.5 py-0.5 text-white text-[10px] font-medium rounded shadow-sm ${
-                          img.type === "bg_removed" ? "bg-purple-500" : img.type === "background" ? "bg-amber-500" : "bg-emerald-500"
-                        }`}>
+                        <span className={`absolute top-1.5 right-1.5 px-1.5 py-0.5 text-white text-[10px] font-medium rounded shadow-sm ${img.type === "bg_removed" ? "bg-purple-500" : img.type === "background" ? "bg-amber-500" : "bg-emerald-500"
+                          }`}>
                           {img.type === "bg_removed" ? "누끼" : img.type === "background" ? "배경" : "업로드"}
                         </span>
                       </div>
@@ -1766,7 +1765,7 @@ export default function ResultPage() {
             {!isContentReady && (
               <div className="space-y-6">
                 <div>
-                  <h3 className="text-lg font-bold mb-1">AI 상세페이지 생성 중</h3>
+                  <h3 className="text-lg font-bold mb-1">AI 광고페이지 생성 중</h3>
                   <p className="text-xs text-text-secondary">
                     입력하신 정보로 상세페이지를 생성하고 있습니다.
                   </p>
@@ -1805,15 +1804,13 @@ export default function ResultPage() {
                             style={{ animationDelay: `${i * 80}ms`, opacity: 0 }}
                           >
                             <div
-                              className={`bg-white rounded-lg border transition-all duration-300 ${
-                                isRunning ? "border-accent/30 shadow-sm" : "border-border"
-                              }`}
+                              className={`bg-white rounded-lg border transition-all duration-300 ${isRunning ? "border-accent/30 shadow-sm" : "border-border"
+                                }`}
                             >
                               <div className="p-3 flex items-start gap-3">
                                 <div
-                                  className={`mt-0.5 flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center ${
-                                    isDone ? "bg-text-primary" : "bg-accent/10"
-                                  }`}
+                                  className={`mt-0.5 flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center ${isDone ? "bg-text-primary" : "bg-accent/10"
+                                    }`}
                                 >
                                   {isDone ? (
                                     <Check size={12} className="text-white" />
@@ -1827,11 +1824,10 @@ export default function ResultPage() {
                                       {step.label}
                                     </span>
                                     <span
-                                      className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
-                                        isDone
-                                          ? "bg-gray-100 text-gray-600"
-                                          : "bg-blue-50 text-blue-600"
-                                      }`}
+                                      className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${isDone
+                                        ? "bg-gray-100 text-gray-600"
+                                        : "bg-blue-50 text-blue-600"
+                                        }`}
                                     >
                                       {isDone ? "완료됨" : "진행 중"}
                                     </span>
@@ -1894,292 +1890,292 @@ export default function ResultPage() {
 
             {/* 생성 완료 후 기존 UI */}
             {isContentReady && (<>
-            <div className="space-y-4">
-              {/* 입력한 정보 */}
-              <div className="bg-white rounded-lg border border-border">
-                <button
-                  onClick={() => setExpandedInputInfo(!expandedInputInfo)}
-                  className="w-full p-3 flex items-center justify-between hover:bg-bg-secondary/50 transition-colors"
-                >
-                  <h3 className="text-sm font-bold text-text-primary">입력한 정보</h3>
-                  <ChevronLeft
-                    size={16}
-                    className={`text-text-tertiary transition-transform ${expandedInputInfo ? 'rotate-90' : '-rotate-90'}`}
-                  />
-                </button>
+              <div className="space-y-4">
+                {/* 입력한 정보 */}
+                <div className="bg-white rounded-lg border border-border">
+                  <button
+                    onClick={() => setExpandedInputInfo(!expandedInputInfo)}
+                    className="w-full p-3 flex items-center justify-between hover:bg-bg-secondary/50 transition-colors"
+                  >
+                    <h3 className="text-sm font-bold text-text-primary">입력한 정보</h3>
+                    <ChevronLeft
+                      size={16}
+                      className={`text-text-tertiary transition-transform ${expandedInputInfo ? 'rotate-90' : '-rotate-90'}`}
+                    />
+                  </button>
 
-                {expandedInputInfo && (
-                  <div className="px-4 pb-4 space-y-4">
-                    {/* 테마 */}
-                    <div className="space-y-2">
-                      <label className="text-xs font-medium text-text-secondary">테마</label>
-                      <div className="px-3 py-2 bg-bg-secondary rounded-md border border-border flex items-center gap-2">
-                        {generatedData?.theme?.accent_color && (
-                          <span
-                            className="w-3 h-3 rounded-full shrink-0 border border-border"
-                            style={{ backgroundColor: generatedData.theme.accent_color }}
-                          />
-                        )}
-                        <p className="text-sm text-text-primary">
-                          {generatedData?.theme?.name || project?.theme_id || "-"}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* 상품 정보 */}
-                    <div className="space-y-2">
-                      <label className="text-xs font-medium text-text-secondary">
-                        상품 정보 ({products.length}개)
-                      </label>
+                  {expandedInputInfo && (
+                    <div className="px-4 pb-4 space-y-4">
+                      {/* 테마 */}
                       <div className="space-y-2">
-                        {products.map((prod, i) => (
-                          <div
-                            key={i}
-                            className="flex items-start gap-3 px-3 py-2.5 bg-bg-secondary rounded-md border border-border"
-                          >
-                            {prod.image_url && (
-                              <div className="w-12 h-12 rounded border border-border overflow-hidden shrink-0">
-                                <img
-                                  src={prod.image_url}
-                                  alt={prod.name}
-                                  className="w-full h-full object-cover"
-                                />
-                              </div>
-                            )}
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-text-primary truncate">
-                                {prod.name || "-"}
-                              </p>
-                              {prod.price && (
-                                <p className="text-xs text-text-secondary mt-0.5">
-                                  {prod.price}
-                                </p>
-                              )}
-                              {prod.brand_name && (
-                                <p className="text-xs text-text-tertiary mt-0.5">
-                                  {prod.brand_name}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* 선택된 섹션 */}
-                    {project?.selected_sections && project.selected_sections.length > 0 && (
-                      <div className="space-y-2">
-                        <label className="text-xs font-medium text-text-secondary">선택된 섹션</label>
-                        <div className="flex flex-wrap gap-1.5">
-                          {project.selected_sections.map((sec) => (
+                        <label className="text-xs font-medium text-text-secondary">테마</label>
+                        <div className="px-3 py-2 bg-bg-secondary rounded-md border border-border flex items-center gap-2">
+                          {generatedData?.theme?.accent_color && (
                             <span
-                              key={sec}
-                              className="px-2.5 py-1 bg-bg-secondary rounded-full text-xs text-text-primary border border-border"
+                              className="w-3 h-3 rounded-full shrink-0 border border-border"
+                              style={{ backgroundColor: generatedData.theme.accent_color }}
+                            />
+                          )}
+                          <p className="text-sm text-text-primary">
+                            {generatedData?.theme?.name || project?.theme_id || "-"}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* 상품 정보 */}
+                      <div className="space-y-2">
+                        <label className="text-xs font-medium text-text-secondary">
+                          상품 정보 ({products.length}개)
+                        </label>
+                        <div className="space-y-2">
+                          {products.map((prod, i) => (
+                            <div
+                              key={i}
+                              className="flex items-start gap-3 px-3 py-2.5 bg-bg-secondary rounded-md border border-border"
                             >
-                              {sec.replace(/_/g, " ")}
-                            </span>
+                              {prod.image_url && (
+                                <div className="w-12 h-12 rounded border border-border overflow-hidden shrink-0">
+                                  <img
+                                    src={prod.image_url}
+                                    alt={prod.name}
+                                    className="w-full h-full object-cover"
+                                  />
+                                </div>
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-text-primary truncate">
+                                  {prod.name || "-"}
+                                </p>
+                                {prod.price && (
+                                  <p className="text-xs text-text-secondary mt-0.5">
+                                    {prod.price}
+                                  </p>
+                                )}
+                                {prod.brand_name && (
+                                  <p className="text-xs text-text-tertiary mt-0.5">
+                                    {prod.brand_name}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
                           ))}
                         </div>
                       </div>
-                    )}
 
-                    {/* 판매 포인트 */}
-                    {(generatedData?.selling_points || generatedData?.user_input_points) && (
-                      <div className="space-y-2">
-                        <label className="text-xs font-medium text-text-secondary">판매 포인트</label>
-                        <div className="px-3 py-2 bg-bg-secondary rounded-md border border-border">
-                          <p className="text-sm text-text-primary whitespace-pre-wrap">
-                            {generatedData?.selling_points || generatedData?.user_input_points}
-                          </p>
+                      {/* 선택된 섹션 */}
+                      {project?.selected_sections && project.selected_sections.length > 0 && (
+                        <div className="space-y-2">
+                          <label className="text-xs font-medium text-text-secondary">선택된 섹션</label>
+                          <div className="flex flex-wrap gap-1.5">
+                            {project.selected_sections.map((sec) => (
+                              <span
+                                key={sec}
+                                className="px-2.5 py-1 bg-bg-secondary rounded-full text-xs text-text-primary border border-border"
+                              >
+                                {sec.replace(/_/g, " ")}
+                              </span>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
-                    {/* 타겟 고객 */}
-                    {generatedData?.target_audience && (
-                      <div className="space-y-2">
-                        <label className="text-xs font-medium text-text-secondary">타겟 고객</label>
-                        <div className="px-3 py-2 bg-bg-secondary rounded-md border border-border">
-                          <p className="text-sm text-text-primary">
-                            {generatedData.target_audience}
-                          </p>
+                      {/* 판매 포인트 */}
+                      {(generatedData?.selling_points || generatedData?.user_input_points) && (
+                        <div className="space-y-2">
+                          <label className="text-xs font-medium text-text-secondary">판매 포인트</label>
+                          <div className="px-3 py-2 bg-bg-secondary rounded-md border border-border">
+                            <p className="text-sm text-text-primary whitespace-pre-wrap">
+                              {generatedData?.selling_points || generatedData?.user_input_points}
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
-                    {/* 스타일 & 톤 */}
-                    {(generatedData?.style || generatedData?.tone) && (
-                      <div className="space-y-2">
-                        <label className="text-xs font-medium text-text-secondary">스타일 & 톤</label>
-                        <div className="flex flex-wrap gap-1.5">
-                          {generatedData?.style && (
-                            <span className="px-2.5 py-1 bg-bg-secondary rounded-full text-xs text-text-primary border border-border">
-                              {generatedData.style}
-                            </span>
-                          )}
-                          {generatedData?.tone && (
-                            <span className="px-2.5 py-1 bg-bg-secondary rounded-full text-xs text-text-primary border border-border">
-                              {generatedData.tone}
-                            </span>
-                          )}
+                      {/* 타겟 고객 */}
+                      {generatedData?.target_audience && (
+                        <div className="space-y-2">
+                          <label className="text-xs font-medium text-text-secondary">타겟 고객</label>
+                          <div className="px-3 py-2 bg-bg-secondary rounded-md border border-border">
+                            <p className="text-sm text-text-primary">
+                              {generatedData.target_audience}
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
-                    {/* 사용 템플릿 */}
-                    {(project?.template_used || generatedData?.template_used) && (
-                      <div className="space-y-2">
-                        <label className="text-xs font-medium text-text-secondary">사용 템플릿</label>
-                        <div className="px-3 py-2 bg-bg-secondary rounded-md border border-border">
-                          <p className="text-sm text-text-primary">
-                            {project?.template_used || generatedData?.template_used}
-                          </p>
+                      {/* 스타일 & 톤 */}
+                      {(generatedData?.style || generatedData?.tone) && (
+                        <div className="space-y-2">
+                          <label className="text-xs font-medium text-text-secondary">스타일 & 톤</label>
+                          <div className="flex flex-wrap gap-1.5">
+                            {generatedData?.style && (
+                              <span className="px-2.5 py-1 bg-bg-secondary rounded-full text-xs text-text-primary border border-border">
+                                {generatedData.style}
+                              </span>
+                            )}
+                            {generatedData?.tone && (
+                              <span className="px-2.5 py-1 bg-bg-secondary rounded-full text-xs text-text-primary border border-border">
+                                {generatedData.tone}
+                              </span>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
+                      )}
 
-              <div className="h-px bg-border" />
-
-              {/* 생성 진행 단계 */}
-              <div className="space-y-1">
-                {[
-                  {
-                    name: "이미지 분석",
-                    completed: true,
-                    detail: "상품 이미지에서 주요 특징과 색상을 분석했습니다."
-                  },
-                  {
-                    name: "템플릿 선택",
-                    completed: true,
-                    detail: `${project?.template_used || "템플릿"} 선택됨 - ${generatedData?.theme?.name || "스타일"}에 적합한 레이아웃`
-                  },
-                  {
-                    name: "톤앤매너 추출",
-                    completed: true,
-                    detail: `${generatedData?.theme?.name || "테마"} 스타일로 통일된 디자인 적용`
-                  },
-                  {
-                    name: "콘텐츠 제작",
-                    completed: true,
-                    detail: "텍스트 및 이미지 콘텐츠 생성 완료"
-                  }
-                ].map((step, i) => (
-                  <div key={i}>
-                    <div className="bg-white rounded-lg border border-border">
-                      <button
-                        onClick={() => setExpandedSteps(prev => ({ ...prev, [i]: !prev[i] }))}
-                        className="w-full p-2.5 flex items-center gap-2 hover:bg-bg-secondary/50 transition-colors"
-                      >
-                        <div className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 ${step.completed ? "bg-black" : "bg-bg-secondary"
-                          }`}>
-                          {step.completed && (
-                            <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
-                              <path d="M2 6L5 9L10 3" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
-                          )}
-                        </div>
-                        <span className="text-xs font-medium text-text-primary flex-1 text-left">{step.name}</span>
-                        <span className="px-2 py-0.5 bg-bg-secondary rounded-full text-[10px] text-text-secondary border border-border shrink-0">
-                          완료됨
-                        </span>
-                        <ChevronLeft
-                          size={14}
-                          className={`text-text-tertiary transition-transform ${expandedSteps[i] ? 'rotate-90' : '-rotate-90'}`}
-                        />
-                      </button>
-                      {expandedSteps[i] && step.detail && (
-                        <div className="px-2.5 pb-2.5 pt-0">
-                          <p className="text-xs text-text-secondary leading-relaxed pl-6">
-                            {step.detail}
-                          </p>
+                      {/* 사용 템플릿 */}
+                      {(project?.template_used || generatedData?.template_used) && (
+                        <div className="space-y-2">
+                          <label className="text-xs font-medium text-text-secondary">사용 템플릿</label>
+                          <div className="px-3 py-2 bg-bg-secondary rounded-md border border-border">
+                            <p className="text-sm text-text-primary">
+                              {project?.template_used || generatedData?.template_used}
+                            </p>
+                          </div>
                         </div>
                       )}
                     </div>
-                    {i < 4 && (
-                      <div className="w-0.5 h-1 bg-border ml-[8px]"></div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
+                  )}
+                </div>
 
-            {/* 채팅 메시지 — 하단 고정 */}
-            {chatMessages.length > 0 && (
-              <>
-                <div className="h-px bg-border my-4" />
-                <div className="space-y-3">
-                  {chatMessages.map((msg, i) => (
+                <div className="h-px bg-border" />
+
+                {/* 생성 진행 단계 */}
+                <div className="space-y-1">
+                  {[
+                    {
+                      name: "이미지 분석",
+                      completed: true,
+                      detail: "상품 이미지에서 주요 특징과 색상을 분석했습니다."
+                    },
+                    {
+                      name: "템플릿 선택",
+                      completed: true,
+                      detail: `${project?.template_used || "템플릿"} 선택됨 - ${generatedData?.theme?.name || "스타일"}에 적합한 레이아웃`
+                    },
+                    {
+                      name: "톤앤매너 추출",
+                      completed: true,
+                      detail: `${generatedData?.theme?.name || "테마"} 스타일로 통일된 디자인 적용`
+                    },
+                    {
+                      name: "콘텐츠 제작",
+                      completed: true,
+                      detail: "텍스트 및 이미지 콘텐츠 생성 완료"
+                    }
+                  ].map((step, i) => (
                     <div key={i}>
-                      {msg.role === "user" ? (
-                        <div className="flex flex-col items-end gap-1.5">
-                          {msg.attachedImage && (
-                            <div className="w-16 h-16 rounded-lg border border-border overflow-hidden">
-                              <img src={msg.attachedImage.url} alt="" className="w-full h-full object-cover" />
-                            </div>
-                          )}
-                          <div className="bg-accent text-white rounded-2xl rounded-tr-sm px-3.5 py-2 max-w-[85%]">
-                            <p className="text-sm">{msg.text}</p>
+                      <div className="bg-white rounded-lg border border-border">
+                        <button
+                          onClick={() => setExpandedSteps(prev => ({ ...prev, [i]: !prev[i] }))}
+                          className="w-full p-2.5 flex items-center gap-2 hover:bg-bg-secondary/50 transition-colors"
+                        >
+                          <div className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 ${step.completed ? "bg-black" : "bg-bg-secondary"
+                            }`}>
+                            {step.completed && (
+                              <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+                                <path d="M2 6L5 9L10 3" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                              </svg>
+                            )}
                           </div>
-                        </div>
-                      ) : (
-                        <div className="flex flex-col items-start gap-1.5">
-                          <div className="bg-bg-secondary rounded-2xl rounded-tl-sm px-3.5 py-2 max-w-[85%]">
-                            <p className="text-sm text-text-primary">{msg.text}</p>
+                          <span className="text-xs font-medium text-text-primary flex-1 text-left">{step.name}</span>
+                          <span className="px-2 py-0.5 bg-bg-secondary rounded-full text-[10px] text-text-secondary border border-border shrink-0">
+                            완료됨
+                          </span>
+                          <ChevronLeft
+                            size={14}
+                            className={`text-text-tertiary transition-transform ${expandedSteps[i] ? 'rotate-90' : '-rotate-90'}`}
+                          />
+                        </button>
+                        {expandedSteps[i] && step.detail && (
+                          <div className="px-2.5 pb-2.5 pt-0">
+                            <p className="text-xs text-text-secondary leading-relaxed pl-6">
+                              {step.detail}
+                            </p>
                           </div>
-                          {msg.imageVersions && msg.imageVersions.length > 0 && msg.sectionId && msg.placeholderId && (
-                            <div className="w-full">
-                              <p className="text-xs text-text-secondary mb-2">버전 선택 ({msg.imageVersions.length})</p>
-                              <div className="grid grid-cols-3 gap-1.5">
-                                {msg.imageVersions.map((url, vi) => {
-                                  const isLatest = vi === msg.imageVersions!.length - 1;
-                                  const isFirst = vi === 0;
-                                  // 현재 섹션에 적용된 이미지인지 확인
-                                  const currentSec = sections.find((s) => s.section_id === msg.sectionId);
-                                  const isApplied = currentSec?.data[msg.placeholderId!] === url;
-                                  return (
-                                    <button
-                                      key={vi}
-                                      onClick={() => handleSelectVariant(msg.sectionId!, msg.placeholderId!, url)}
-                                      className={`group relative rounded-lg overflow-hidden transition-colors ${isApplied
-                                        ? "border-2 border-accent"
-                                        : "border border-border hover:border-accent"
-                                        }`}
-                                    >
-                                      <img src={url} alt={`v${vi + 1}`} className="w-full aspect-square object-cover" />
-                                      <span className={`absolute bottom-0 inset-x-0 text-white text-[10px] py-0.5 text-center ${isApplied ? "bg-accent" : isFirst ? "bg-black/60" : isLatest ? "bg-blue-500/80" : "bg-black/50"
-                                        }`}>
-                                        {isApplied ? "적용됨" : isFirst ? "원본" : `v${vi}`}
-                                      </span>
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          )}
-                        </div>
+                        )}
+                      </div>
+                      {i < 4 && (
+                        <div className="w-0.5 h-1 bg-border ml-[8px]"></div>
                       )}
                     </div>
                   ))}
-                  {chatLoading && (
-                    <div className="flex items-start gap-1.5">
-                      <div className="bg-bg-secondary rounded-2xl rounded-tl-sm px-3.5 py-2.5">
-                        <div className="flex items-center gap-2">
-                          <div className="w-4 h-4 border-2 border-text-tertiary border-t-accent rounded-full animate-spin" />
-                          <span className="text-sm text-text-secondary">이미지 생성중...</span>
+                </div>
+              </div>
+
+              {/* 채팅 메시지 — 하단 고정 */}
+              {chatMessages.length > 0 && (
+                <>
+                  <div className="h-px bg-border my-4" />
+                  <div className="space-y-3">
+                    {chatMessages.map((msg, i) => (
+                      <div key={i}>
+                        {msg.role === "user" ? (
+                          <div className="flex flex-col items-end gap-1.5">
+                            {msg.attachedImage && (
+                              <div className="w-16 h-16 rounded-lg border border-border overflow-hidden">
+                                <img src={msg.attachedImage.url} alt="" className="w-full h-full object-cover" />
+                              </div>
+                            )}
+                            <div className="bg-accent text-white rounded-2xl rounded-tr-sm px-3.5 py-2 max-w-[85%]">
+                              <p className="text-sm">{msg.text}</p>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-start gap-1.5">
+                            <div className="bg-bg-secondary rounded-2xl rounded-tl-sm px-3.5 py-2 max-w-[85%]">
+                              <p className="text-sm text-text-primary">{msg.text}</p>
+                            </div>
+                            {msg.imageVersions && msg.imageVersions.length > 0 && msg.sectionId && msg.placeholderId && (
+                              <div className="w-full">
+                                <p className="text-xs text-text-secondary mb-2">버전 선택 ({msg.imageVersions.length})</p>
+                                <div className="grid grid-cols-3 gap-1.5">
+                                  {msg.imageVersions.map((url, vi) => {
+                                    const isLatest = vi === msg.imageVersions!.length - 1;
+                                    const isFirst = vi === 0;
+                                    // 현재 섹션에 적용된 이미지인지 확인
+                                    const currentSec = sections.find((s) => s.section_id === msg.sectionId);
+                                    const isApplied = currentSec?.data[msg.placeholderId!] === url;
+                                    return (
+                                      <button
+                                        key={vi}
+                                        onClick={() => handleSelectVariant(msg.sectionId!, msg.placeholderId!, url)}
+                                        className={`group relative rounded-lg overflow-hidden transition-colors ${isApplied
+                                          ? "border-2 border-accent"
+                                          : "border border-border hover:border-accent"
+                                          }`}
+                                      >
+                                        <img src={url} alt={`v${vi + 1}`} className="w-full aspect-square object-cover" />
+                                        <span className={`absolute bottom-0 inset-x-0 text-white text-[10px] py-0.5 text-center ${isApplied ? "bg-accent" : isFirst ? "bg-black/60" : isLatest ? "bg-blue-500/80" : "bg-black/50"
+                                          }`}>
+                                          {isApplied ? "적용됨" : isFirst ? "원본" : `v${vi}`}
+                                        </span>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    {chatLoading && (
+                      <div className="flex items-start gap-1.5">
+                        <div className="bg-bg-secondary rounded-2xl rounded-tl-sm px-3.5 py-2.5">
+                          <div className="flex items-center gap-2">
+                            <div className="w-4 h-4 border-2 border-text-tertiary border-t-accent rounded-full animate-spin" />
+                            <span className="text-sm text-text-secondary">이미지 생성중...</span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
-                  <div ref={chatEndRef} />
-                </div>
-              </>
-            )}
+                    )}
+                    <div ref={chatEndRef} />
+                  </div>
+                </>
+              )}
 
-            {/* 빈 공간으로 채팅을 하단에 밀기 */}
-            <div className="flex-1" />
+              {/* 빈 공간으로 채팅을 하단에 밀기 */}
+              <div className="flex-1" />
             </>)}
           </div>
 

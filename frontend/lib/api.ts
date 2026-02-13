@@ -8,8 +8,6 @@ import type {
   PageType,
   ListResponse,
   ErrorResponse,
-  BackgroundConfig,
-  RestaurantInput,
 } from "@/types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -92,7 +90,7 @@ export const sectionsApi = {
   updateData: (
     projectId: string,
     sectionId: string,
-    data: Record<string, string>,
+    data: Record<string, string | null>,
     styleOverrides?: Record<string, Record<string, string>>
   ) =>
     request<Project>(

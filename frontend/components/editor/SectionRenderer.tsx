@@ -45,8 +45,8 @@ export const SectionRenderer = forwardRef<HTMLDivElement, SectionRendererProps>(
       const opacity = (bg.opacity ?? 100) / 100;
       const brightness = (bg.brightness ?? 100) / 100;
 
-      // 개별 섹션의 기존 배경을 투명하게 (루트 + 1단계 자식까지 커버)
-      const clearSectionBg = `${sel} .section-inner > *, ${sel} .section-inner > * > * { background: none !important; background-color: transparent !important; background-image: none !important; }`;
+      // 개별 섹션의 CSS 배경만 투명하게 (img, overlay 등 콘텐츠 요소는 유지)
+      const clearSectionBg = `${sel} .section-inner > *, ${sel} .section-inner > * > * { background-color: transparent !important; }`;
       const base = `${sel} { position: relative !important; } ${sel}::before { content: '' !important; position: absolute !important; inset: 0 !important; z-index: 0 !important; pointer-events: none !important; opacity: ${opacity} !important; filter: brightness(${brightness}) !important;`;
       const childZ = `${sel} > * { position: relative !important; z-index: 1 !important; }`;
 

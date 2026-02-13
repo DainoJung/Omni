@@ -77,6 +77,7 @@ export default function ResultPage() {
   });
   const [bgGenerating, setBgGenerating] = useState(false);
   const bgSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [bgApplyPopup, setBgApplyPopup] = useState<{ url: string; x: number; y: number } | null>(null);
 
   // Generation states
   const [generating, setGenerating] = useState(false);
@@ -977,6 +978,39 @@ export default function ResultPage() {
     [projectId]
   );
 
+  // 배경 이미지를 전체 또는 특정 섹션에 적용
+  const applyBgImageToAll = useCallback(
+    (imageUrl: string) => {
+      const updated: BackgroundSettings = {
+        ...backgroundSettings,
+        scope: "all",
+        global: { ...backgroundSettings.global, type: "ai", ai_image_url: imageUrl },
+      };
+      handleBackgroundSettingsChange(updated);
+      setBgApplyPopup(null);
+      toast.success("전체 배경에 적용되었습니다.");
+    },
+    [backgroundSettings, handleBackgroundSettingsChange]
+  );
+
+  const applyBgImageToSection = useCallback(
+    (imageUrl: string, sectionId: string) => {
+      const current = backgroundSettings.per_section[sectionId] || { type: "ai" };
+      const updated: BackgroundSettings = {
+        ...backgroundSettings,
+        scope: "per_section",
+        per_section: {
+          ...backgroundSettings.per_section,
+          [sectionId]: { ...current, type: "ai", ai_image_url: imageUrl },
+        },
+      };
+      handleBackgroundSettingsChange(updated);
+      setBgApplyPopup(null);
+      toast.success("섹션 배경에 적용되었습니다.");
+    },
+    [backgroundSettings, handleBackgroundSettingsChange]
+  );
+
   const handleGenerateBackgroundAI = useCallback(
     async (prompt: string, sectionId?: string, sectionType?: string) => {
       setBgGenerating(true);
@@ -1335,7 +1369,14 @@ export default function ResultPage() {
                       <div
                         key={`uploaded-${index}`}
                         className="relative rounded-lg overflow-hidden border border-border hover:border-accent/50 cursor-pointer transition-colors aspect-square"
-                        onClick={() => handleApplyImage(img.url)}
+                        onClick={(e) => {
+                          if (img.type === "background") {
+                            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                            setBgApplyPopup({ url: img.url, x: rect.right + 8, y: rect.top });
+                          } else {
+                            handleApplyImage(img.url);
+                          }
+                        }}
                       >
                         <img
                           src={img.url}
@@ -1425,6 +1466,38 @@ export default function ResultPage() {
           >
             {showSectionList ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
           </button>
+
+          {/* 배경 이미지 적용 팝업 */}
+          {bgApplyPopup && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setBgApplyPopup(null)} />
+              <div
+                className="fixed z-50 bg-white rounded-lg shadow-xl border border-border py-1.5 w-44"
+                style={{ left: bgApplyPopup.x, top: bgApplyPopup.y }}
+              >
+                <p className="px-3 py-1.5 text-[10px] font-medium text-text-tertiary uppercase tracking-wider">배경 적용</p>
+                <button
+                  onClick={() => applyBgImageToAll(bgApplyPopup.url)}
+                  className="w-full px-3 py-2 text-left text-xs font-medium text-text-primary hover:bg-accent/5 transition-colors"
+                >
+                  전체 적용
+                </button>
+                <div className="h-px bg-border mx-2 my-1" />
+                <p className="px-3 py-1.5 text-[10px] font-medium text-text-tertiary uppercase tracking-wider">섹션 선택</p>
+                <div className="max-h-40 overflow-y-auto">
+                  {[...sections].sort((a, b) => a.order - b.order).map((sec, i) => (
+                    <button
+                      key={sec.section_id}
+                      onClick={() => applyBgImageToSection(bgApplyPopup.url, sec.section_id)}
+                      className="w-full px-3 py-1.5 text-left text-xs text-text-secondary hover:bg-accent/5 hover:text-text-primary transition-colors truncate"
+                    >
+                      {i + 1}. {sec.section_type.replace(/_/g, " ")}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
         </aside>
 
         {/* Floating Text Toolbar (Canva-style) */}

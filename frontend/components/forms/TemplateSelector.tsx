@@ -76,6 +76,18 @@ const SECTION_META: Record<
     label: "뱅드신세계",
     description: "브랜드×신세계 콜라보 + 3개 혜택 뱃지",
   },
+  gourmet_restaurant: {
+    label: "고메트립 레스토랑",
+    description: "레스토랑 카드 + 메뉴 + 이벤트",
+  },
+  gourmet_wine_intro: {
+    label: "고메트립 와인 인트로",
+    description: "와인 섹션 소개 타이틀",
+  },
+  gourmet_wine: {
+    label: "고메트립 와인",
+    description: "와인 카드 + 테이스팅 노트",
+  },
 };
 
 interface TemplateSelectorProps {

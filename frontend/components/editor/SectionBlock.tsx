@@ -58,8 +58,9 @@ export function SectionBlock({ section, onDataChange, onElementSelect, selectedP
     }
 
     for (const [key, value] of Object.entries(section.data)) {
+      const safeValue = value ?? "";
       const skipEscape = key.endsWith("_html") || key.endsWith("_image") || key === "theme_accent";
-      const escaped = skipEscape ? value : escapeHtml(value);
+      const escaped = skipEscape ? safeValue : escapeHtml(safeValue);
       html = html.replaceAll(`{{${key}}}`, escaped);
     }
     return html;
@@ -80,7 +81,7 @@ export function SectionBlock({ section, onDataChange, onElementSelect, selectedP
   const renderedCss = useMemo(() => {
     let css = section.css;
     for (const [key, value] of Object.entries(section.data)) {
-      css = css.replaceAll(`{{${key}}}`, value);
+      css = css.replaceAll(`{{${key}}}`, value ?? "");
     }
     return css;
   }, [section.css, section.data]);

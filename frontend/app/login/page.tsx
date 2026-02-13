@@ -21,7 +21,10 @@ export default function LoginPage() {
       const result = await authApi.login(id, password);
 
       if (result.success && result.token) {
-        sessionStorage.setItem("auth_token", result.token);
+        localStorage.setItem("auth_token", result.token);
+        if (result.user) {
+          localStorage.setItem("auth_user", JSON.stringify(result.user));
+        }
         router.push("/");
       } else {
         setError(result.message || "로그인에 실패했습니다.");

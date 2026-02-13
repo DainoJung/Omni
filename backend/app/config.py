@@ -25,10 +25,10 @@ class Settings(BaseSettings):
     CORS_ORIGINS: List[str] = ["http://localhost:3000"]
     LOG_LEVEL: str = "INFO"
 
-    # Auth
-    AUTH_ID: str = "admin"
-    AUTH_PW: str = "admin"
+    # Auth (JWT)
     AUTH_SECRET: str = "change-this-secret-key"
+    JWT_EXPIRY_HOURS: int = 72
+    ADMIN_DEFAULT_PASSWORD: str = "admin"
 
     # Storage
     STORAGE_BUCKET_PROJECTS: str = "project-images"

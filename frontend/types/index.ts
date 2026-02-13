@@ -61,6 +61,7 @@ export interface RenderedSection {
 // === Project ===
 export interface Project {
   id: string;
+  user_id?: string;
   brand_name?: string;
   theme_id?: string;
   template_used?: string;
@@ -110,6 +111,7 @@ export interface ProjectUpdate {
   restaurants?: RestaurantInput[];
   background_config?: BackgroundConfig;
   background_settings?: BackgroundSettings;
+  input_data?: Record<string, unknown>;
 }
 
 // === Product ===

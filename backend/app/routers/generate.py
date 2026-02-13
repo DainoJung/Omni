@@ -1,14 +1,15 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 
 from app.database import get_supabase
 from app.schemas.generate import GenerateRequest, GenerateResponse
 from app.services.generate_orchestrator import GenerateOrchestrator
+from app.dependencies.auth import get_current_user, CurrentUser
 
 router = APIRouter()
 
 
 @router.post("", response_model=GenerateResponse)
-async def generate(data: GenerateRequest):
+async def generate(data: GenerateRequest, current_user: CurrentUser = Depends(get_current_user)):
     orchestrator = GenerateOrchestrator()
     try:
         # background_config는 요청에서 또는 DB에서 로드
@@ -17,7 +18,7 @@ async def generate(data: GenerateRequest):
 
         # DB에서 프로젝트 데이터 로드 (image_url 등 Pydantic에 없는 필드 보존)
         db = get_supabase()
-        proj = db.table("projects").select("background_config, restaurants, input_data").eq("id", str(data.project_id)).single().execute()
+        proj = db.table("projects").select("background_config, restaurants, input_data").eq("id", str(data.project_id)).eq("user_id", current_user.user_id).single().execute()
 
         # restaurants/wines는 항상 DB에서 로드 (image_url 필드가 Pydantic에서 누락되므로)
         restaurants = None

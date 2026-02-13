@@ -33,7 +33,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
     }
 
     const verifyAuth = async () => {
-      const token = sessionStorage.getItem("auth_token");
+      const token = localStorage.getItem("auth_token");
 
       if (!token) {
         router.replace("/login");
@@ -41,11 +41,12 @@ export function AuthGuard({ children }: AuthGuardProps) {
       }
 
       try {
-        const result = await authApi.verify(token);
+        const result = await authApi.verify();
         if (result.valid) {
           setIsAuthenticated(true);
         } else {
-          sessionStorage.removeItem("auth_token");
+          localStorage.removeItem("auth_token");
+          localStorage.removeItem("auth_user");
           router.replace("/login");
         }
       } catch {

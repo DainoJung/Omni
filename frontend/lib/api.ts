@@ -23,14 +23,32 @@ class ApiError extends Error {
   }
 }
 
+function getAuthHeaders(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  const token = localStorage.getItem("auth_token");
+  if (!token) return {};
+  return { Authorization: `Bearer ${token}` };
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`${API_URL}${path}`, {
     headers: {
       "Content-Type": "application/json",
+      ...getAuthHeaders(),
       ...options?.headers,
     },
     ...options,
   });
+
+  if (response.status === 401) {
+    // Token expired or invalid - clear and redirect
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("auth_token");
+      localStorage.removeItem("auth_user");
+      window.location.href = "/login";
+    }
+    throw new ApiError(401, { error: "UNAUTHORIZED", message: "인증이 만료되었습니다." });
+  }
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({
@@ -104,12 +122,12 @@ export const sectionsApi = {
       }
     ),
 
-  regenerateImage: (projectId: string, sectionId: string, prompt: string) =>
+  regenerateImage: (projectId: string, sectionId: string, prompt: string, placeholderId?: string) =>
     request<Project>(
       `/api/projects/${projectId}/sections/${sectionId}/regenerate-image`,
       {
         method: "POST",
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify({ prompt, ...(placeholderId && { placeholder_id: placeholderId }) }),
       }
     ),
 };
@@ -135,25 +153,54 @@ export const authApi = {
       success: boolean;
       token?: string;
       message?: string;
+      user?: { id: string; username: string; display_name?: string; is_admin: boolean };
     }>;
   },
 
-  verify: async (token: string) => {
+  verify: async () => {
+    const token = localStorage.getItem("auth_token");
+    if (!token) return { valid: false };
     const response = await fetch(`${API_URL}/api/auth/verify`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token }),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
     });
-    return response.json() as Promise<{ valid: boolean }>;
+    if (!response.ok) return { valid: false };
+    return response.json() as Promise<{
+      valid: boolean;
+      user?: { id: string; username: string; is_admin: boolean };
+    }>;
   },
 
-  logout: async (token: string) => {
-    await fetch(`${API_URL}/api/auth/logout`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token }),
-    });
+  logout: async () => {
+    const token = localStorage.getItem("auth_token");
+    if (token) {
+      await fetch(`${API_URL}/api/auth/logout`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+    }
   },
+
+  // Admin: user management
+  createUser: (data: { username: string; password: string; display_name?: string; is_admin?: boolean }) =>
+    request<{ id: string; username: string; display_name?: string; is_admin: boolean; created_at: string }>(
+      "/api/auth/users",
+      { method: "POST", body: JSON.stringify(data) }
+    ),
+
+  listUsers: () =>
+    request<Array<{ id: string; username: string; display_name?: string; is_admin: boolean; created_at: string }>>(
+      "/api/auth/users"
+    ),
+
+  deleteUser: (userId: string) =>
+    request<void>(`/api/auth/users/${userId}`, { method: "DELETE" }),
 };
 
 // === Images ===
@@ -165,6 +212,7 @@ export const imagesApi = {
 
     const response = await fetch(`${API_URL}/api/images/remove-bg`, {
       method: "POST",
+      headers: { ...getAuthHeaders() },
       body: formData,
     });
 
@@ -206,6 +254,7 @@ export const uploadApi = {
 
     const response = await fetch(`${API_URL}/api/upload`, {
       method: "POST",
+      headers: { ...getAuthHeaders() },
       body: formData,
     });
 

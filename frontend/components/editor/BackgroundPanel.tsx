@@ -28,7 +28,16 @@ export function BackgroundPanel({
   const sorted = [...sections].sort((a, b) => a.order - b.order);
 
   const updateScope = (scope: "all" | "per_section") => {
-    onSettingsChange({ ...settings, scope });
+    if (scope === "per_section" && settings.scope === "all") {
+      // 전체 → 섹션별: 전체 배경 설정을 각 섹션에 복사
+      const perSection: Record<string, SectionBg> = {};
+      for (const section of sections) {
+        perSection[section.section_id] = settings.per_section[section.section_id] || { ...settings.global };
+      }
+      onSettingsChange({ ...settings, scope, per_section: perSection });
+    } else {
+      onSettingsChange({ ...settings, scope });
+    }
   };
 
   const updateGlobalType = (type: "solid" | "ai") => {

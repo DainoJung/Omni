@@ -3,7 +3,7 @@ import uuid as _uuid
 import httpx
 from typing import Optional
 from pydantic import BaseModel
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from uuid import UUID
 
 logger = logging.getLogger(__name__)
@@ -19,16 +19,18 @@ from app.schemas.project import (
 )
 from app.services.template_ai_service import generate_section_image
 from app.services.storage_service import StorageService
+from app.dependencies.auth import get_current_user, CurrentUser
 
 router = APIRouter()
 
 
 @router.post("", response_model=ProjectResponse, status_code=201)
-async def create_project(data: ProjectCreate):
+async def create_project(data: ProjectCreate, current_user: CurrentUser = Depends(get_current_user)):
     db = get_supabase()
     insert_data = {
         "products": [p.model_dump() for p in data.products],
         "theme_id": data.page_type,
+        "user_id": current_user.user_id,
     }
     if data.selected_sections:
         insert_data["selected_sections"] = data.selected_sections
@@ -54,29 +56,30 @@ async def create_project(data: ProjectCreate):
 
 
 @router.get("", response_model=ProjectListResponse)
-async def list_projects():
+async def list_projects(current_user: CurrentUser = Depends(get_current_user)):
     db = get_supabase()
-    result = db.table("projects").select("*").order("created_at", desc=True).execute()
+    result = db.table("projects").select("*").eq("user_id", current_user.user_id).order("created_at", desc=True).execute()
     return {"items": result.data, "total": len(result.data)}
 
 
 @router.get("/{project_id}", response_model=ProjectResponse)
-async def get_project(project_id: UUID):
+async def get_project(project_id: UUID, current_user: CurrentUser = Depends(get_current_user)):
     db = get_supabase()
-    result = db.table("projects").select("*").eq("id", str(project_id)).single().execute()
+    result = db.table("projects").select("*").eq("id", str(project_id)).eq("user_id", current_user.user_id).single().execute()
     if not result.data:
         raise HTTPException(status_code=404, detail="PROJECT_NOT_FOUND")
     return result.data
 
 
 @router.put("/{project_id}", response_model=ProjectResponse)
-async def update_project(project_id: UUID, data: ProjectUpdate):
+async def update_project(project_id: UUID, data: ProjectUpdate, current_user: CurrentUser = Depends(get_current_user)):
     db = get_supabase()
     update_data = data.model_dump(exclude_none=True)
     result = (
         db.table("projects")
         .update(update_data)
         .eq("id", str(project_id))
+        .eq("user_id", current_user.user_id)
         .execute()
     )
     if not result.data:
@@ -85,13 +88,13 @@ async def update_project(project_id: UUID, data: ProjectUpdate):
 
 
 @router.put("/{project_id}/sections/{section_id}/data", response_model=ProjectResponse)
-async def update_section_data(project_id: UUID, section_id: str, data: SectionDataUpdateRequest):
+async def update_section_data(project_id: UUID, section_id: str, data: SectionDataUpdateRequest, current_user: CurrentUser = Depends(get_current_user)):
     """특정 섹션의 데이터(placeholder 값)를 수정한다."""
     logger.info(f"[update_section_data] project={project_id}, section={section_id}, data_keys={list(data.data.keys())}")
     db = get_supabase()
 
     # 현재 rendered_sections 가져오기
-    project = db.table("projects").select("rendered_sections").eq("id", str(project_id)).single().execute()
+    project = db.table("projects").select("rendered_sections").eq("id", str(project_id)).eq("user_id", current_user.user_id).single().execute()
     if not project.data:
         raise HTTPException(status_code=404, detail="PROJECT_NOT_FOUND")
 
@@ -122,12 +125,12 @@ async def update_section_data(project_id: UUID, section_id: str, data: SectionDa
 
 
 @router.post("/{project_id}/sections/{section_id}/regenerate-image", response_model=ProjectResponse)
-async def regenerate_section_image(project_id: UUID, section_id: str, body: ImageRegenerateRequest):
+async def regenerate_section_image(project_id: UUID, section_id: str, body: ImageRegenerateRequest, current_user: CurrentUser = Depends(get_current_user)):
     """특정 섹션의 이미지를 수정된 프롬프트로 재생성한다."""
     db = get_supabase()
     storage = StorageService()
 
-    project = db.table("projects").select("*").eq("id", str(project_id)).single().execute()
+    project = db.table("projects").select("*").eq("id", str(project_id)).eq("user_id", current_user.user_id).single().execute()
     if not project.data:
         raise HTTPException(status_code=404, detail="PROJECT_NOT_FOUND")
 
@@ -170,16 +173,22 @@ async def regenerate_section_image(project_id: UUID, section_id: str, body: Imag
 
     w, h = image_size_map[sec_type]
 
+    # 교체 대상 이미지 키 결정: placeholder_id가 있으면 정확히 해당 키, 없으면 첫 번째 _image 키
+    target_image_key = None
+    if body.placeholder_id and body.placeholder_id in target_section["data"]:
+        target_image_key = body.placeholder_id
+    else:
+        for key, value in target_section["data"].items():
+            if key.endswith("_image") and isinstance(value, str) and value.startswith("http"):
+                target_image_key = key
+                break
+
     # 기존 이미지를 다운로드하여 reference_image로 전달 (이미지 편집 모드)
-    existing_image_url = None
-    for key, value in target_section["data"].items():
-        if key.endswith("_image") and isinstance(value, str) and value.startswith("http"):
-            existing_image_url = value
-            break
+    existing_image_url = target_section["data"].get(target_image_key, "") if target_image_key else None
 
     reference_image = None
     reference_mime_type = None
-    if existing_image_url:
+    if existing_image_url and isinstance(existing_image_url, str) and existing_image_url.startswith("http"):
         try:
             async with httpx.AsyncClient(timeout=15.0) as http_client:
                 resp = await http_client.get(existing_image_url)
@@ -187,7 +196,7 @@ async def regenerate_section_image(project_id: UUID, section_id: str, body: Imag
                 reference_image = resp.content
                 content_type = resp.headers.get("content-type", "image/png")
                 reference_mime_type = content_type.split(";")[0].strip()
-                logger.info(f"기존 이미지 다운로드 완료: {len(reference_image)} bytes")
+                logger.info(f"기존 이미지 다운로드 완료 ({target_image_key}): {len(reference_image)} bytes")
         except Exception as e:
             logger.warning(f"기존 이미지 다운로드 실패, 새로 생성합니다: {e}")
 
@@ -212,11 +221,9 @@ async def regenerate_section_image(project_id: UUID, section_id: str, body: Imag
     )
     new_url = storage.get_public_url(path)
 
-    # 섹션 data에서 이미지 URL 키 찾아서 교체
-    for key, value in target_section["data"].items():
-        if key.endswith("_image") and isinstance(value, str) and value.startswith("http"):
-            target_section["data"][key] = new_url
-            break
+    # 지정된 이미지 키만 교체
+    if target_image_key:
+        target_section["data"][target_image_key] = new_url
 
     sections[target_idx] = target_section
 
@@ -257,12 +264,12 @@ class BackgroundGenerateRequest(BaseModel):
 
 
 @router.post("/{project_id}/generate-background")
-async def generate_background_image(project_id: UUID, body: BackgroundGenerateRequest):
+async def generate_background_image(project_id: UUID, body: BackgroundGenerateRequest, current_user: CurrentUser = Depends(get_current_user)):
     """배경 이미지를 AI로 생성한다."""
     db = get_supabase()
     storage = StorageService()
 
-    project = db.table("projects").select("products").eq("id", str(project_id)).single().execute()
+    project = db.table("projects").select("products").eq("id", str(project_id)).eq("user_id", current_user.user_id).single().execute()
     if not project.data:
         raise HTTPException(status_code=404, detail="PROJECT_NOT_FOUND")
 
@@ -313,6 +320,6 @@ async def generate_background_image(project_id: UUID, body: BackgroundGenerateRe
 
 
 @router.delete("/{project_id}", status_code=204)
-async def delete_project(project_id: UUID):
+async def delete_project(project_id: UUID, current_user: CurrentUser = Depends(get_current_user)):
     db = get_supabase()
-    db.table("projects").delete().eq("id", str(project_id)).execute()
+    db.table("projects").delete().eq("id", str(project_id)).eq("user_id", current_user.user_id).execute()

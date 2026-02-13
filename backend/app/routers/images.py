@@ -2,12 +2,13 @@ import logging
 from typing import Optional
 from uuid import uuid4
 
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Query
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Query, Depends
 
 from app.config import settings
 from app.database import get_supabase
 from app.services.bg_remove_service import remove_background
 from app.services.storage_service import StorageService
+from app.dependencies.auth import get_current_user, CurrentUser
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +19,7 @@ router = APIRouter()
 async def list_project_images(
     project_id: str,
     image_type: Optional[str] = Query(None, description="Filter by image type (input, bg_removed, generated, etc.)"),
+    current_user: CurrentUser = Depends(get_current_user),
 ):
     """프로젝트의 이미지 목록을 반환한다."""
     db = get_supabase()
@@ -47,6 +49,7 @@ async def list_project_images(
 async def remove_bg(
     project_id: str = Form(...),
     file: UploadFile = File(...),
+    current_user: CurrentUser = Depends(get_current_user),
 ):
     """첨부 이미지의 배경을 제거하고 결과 URL을 반환한다."""
 

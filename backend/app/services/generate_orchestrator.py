@@ -195,6 +195,19 @@ class GenerateOrchestrator:
                 ref_pair = section_ref_map.get(sec_type, default_ref)
                 ref_img, ref_mime = ref_pair if ref_pair else (None, None)
 
+                # gourmet_restaurant: 해당 인스턴스의 레스토랑명 + 음식명을 구조화하여 전달
+                if sec_type == "gourmet_restaurant" and restaurants and inst_idx < len(restaurants):
+                    r = restaurants[inst_idx]
+                    food_names = []
+                    for fk in ("food1", "food2"):
+                        fname = r.get(fk, {}).get("name", "")
+                        if fname:
+                            food_names.append(fname)
+                    formatted = f"레스토랑명: {r['name']}, 음식명: {', '.join(food_names)}"
+                    task_product_names = [formatted]
+                else:
+                    task_product_names = product_names
+
                 key = f"{sec_type}__{inst_idx}" if is_duplicate else sec_type
                 image_tasks.append({
                     "key": key,
@@ -205,6 +218,7 @@ class GenerateOrchestrator:
                     "relevant_texts": relevant_texts,
                     "ref_img": ref_img,
                     "ref_mime": ref_mime,
+                    "product_names": task_product_names,
                 })
 
             # 이미지 생성 코루틴 (세마포어로 동시 2개 제한)
@@ -216,7 +230,7 @@ class GenerateOrchestrator:
                 async with img_sem:
                     logger.info(f"{task_info['sec_type']} 이미지 생성 시작 (인스턴스 {task_info['inst_idx']})")
                     image_bytes, prompt_used = await generate_section_image(
-                        product_names=product_names,
+                        product_names=task_info.get("product_names", product_names),
                         section_type=task_info["sec_type"],
                         width=task_info["w"],
                         height=task_info["h"],

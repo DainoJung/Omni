@@ -20,5 +20,8 @@ supabase==2.11.0
 python-multipart==0.0.20
 Pillow==11.1.0
 
+# Auth
+PyJWT==2.10.1
+
 # Utilities
 orjson==3.10.14

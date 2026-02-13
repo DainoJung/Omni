@@ -2,10 +2,11 @@ import re
 import unicodedata
 from uuid import uuid4
 
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends
 
 from app.config import settings
 from app.services.storage_service import StorageService
+from app.dependencies.auth import get_current_user, CurrentUser
 
 
 def sanitize_filename(filename: str) -> str:
@@ -35,6 +36,7 @@ async def upload_image(
     project_id: str = Form(...),
     image_type: str = Form(default="input"),
     file: UploadFile = File(...),
+    current_user: CurrentUser = Depends(get_current_user),
 ):
     # 파일 타입 검증
     if file.content_type not in settings.ALLOWED_IMAGE_TYPES:

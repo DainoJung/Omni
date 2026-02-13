@@ -188,7 +188,22 @@ export default function ResultPage() {
 
         // Load background settings from project
         if (proj.background_settings) {
-          setBackgroundSettings(proj.background_settings as BackgroundSettings);
+          const bs = proj.background_settings as BackgroundSettings;
+          setBackgroundSettings(bs);
+
+          // 저장된 배경 AI 이미지를 사진 탭에 복원
+          const bgImages: { url: string; type: "background" }[] = [];
+          if (bs.global?.ai_image_url) {
+            bgImages.push({ url: bs.global.ai_image_url, type: "background" });
+          }
+          for (const sectionBg of Object.values(bs.per_section || {})) {
+            if (sectionBg.ai_image_url) {
+              bgImages.push({ url: sectionBg.ai_image_url, type: "background" });
+            }
+          }
+          if (bgImages.length > 0) {
+            setUploadedImages((prev) => [...bgImages, ...prev]);
+          }
         } else if (proj.rendered_sections?.length) {
           // 저장된 설정이 없으면 섹션의 bg_color를 기본값으로 사용
           const firstBgColor = proj.rendered_sections
@@ -613,7 +628,8 @@ export default function ResultPage() {
       const updatedProject = await sectionsApi.regenerateImage(
         projectId,
         sectionId,
-        message
+        message,
+        placeholderId || undefined
       );
 
       // 새 이미지 URL 가져오기
@@ -1116,11 +1132,9 @@ export default function ResultPage() {
   }, [colorPickerSection]);
 
   const handleLogout = async () => {
-    const token = sessionStorage.getItem("auth_token");
-    if (token) {
-      await authApi.logout(token);
-    }
-    sessionStorage.removeItem("auth_token");
+    await authApi.logout();
+    localStorage.removeItem("auth_token");
+    localStorage.removeItem("auth_user");
     router.push("/login");
   };
 
@@ -1147,6 +1161,9 @@ export default function ResultPage() {
         onProjectSelect={(id) => router.push(`/result/${id}`)}
         onNewProject={() => setShowNewProjectModal(true)}
         onProjectDelete={handleProjectDelete}
+        onProjectUpdate={(updated) => {
+          setProjectList((prev) => prev.map((p) => p.id === updated.id ? updated : p));
+        }}
       />
 
       <div className="flex-1 flex min-h-0 overflow-hidden relative">

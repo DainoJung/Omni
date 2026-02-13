@@ -33,10 +33,12 @@ class SectionDataUpdateRequest(BaseModel):
 
 class ImageRegenerateRequest(BaseModel):
     prompt: str
+    placeholder_id: Optional[str] = None
 
 
 class ProjectResponse(BaseModel):
     id: UUID
+    user_id: Optional[UUID] = None
     brand_name: Optional[str] = None
     theme_id: Optional[str] = None
     template_used: Optional[str] = None

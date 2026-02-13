@@ -93,13 +93,15 @@ export function SectionBlock({ section, onDataChange, onElementSelect, selectedP
     const brightness = (backgroundConfig.brightness ?? 100) / 100;
 
     // ::before 오버레이로 배경을 깔아 opacity가 콘텐츠에 영향 없이 적용
-    const base = `${sel} { position: relative !important; } ${sel}::before { content: '' !important; position: absolute !important; inset: 0 !important; z-index: 0 !important; pointer-events: none !important; opacity: ${opacity} !important; filter: brightness(${brightness}) !important;`;
+    // 기존 섹션 배경(gradient 포함)을 투명하게 + ::before로 새 배경 적용
+    const clearBg = `${sel} { position: relative !important; background: transparent !important; } ${sel} > * { position: relative !important; z-index: 1 !important; }`;
+    const base = `${sel}::before { content: '' !important; position: absolute !important; inset: 0 !important; z-index: 0 !important; pointer-events: none !important; opacity: ${opacity} !important; filter: brightness(${brightness}) !important;`;
 
     if (backgroundConfig.type === "solid" && backgroundConfig.hex_color) {
-      return `${base} background-color: ${backgroundConfig.hex_color} !important; background-image: none !important; } ${sel} > * { position: relative !important; z-index: 1 !important; }`;
+      return `${clearBg} ${base} background-color: ${backgroundConfig.hex_color} !important; background-image: none !important; }`;
     }
     if (backgroundConfig.type === "ai" && backgroundConfig.ai_image_url) {
-      return `${base} background-image: url(${backgroundConfig.ai_image_url}) !important; background-size: cover !important; background-position: center !important; } ${sel} > * { position: relative !important; z-index: 1 !important; }`;
+      return `${clearBg} ${base} background-image: url(${backgroundConfig.ai_image_url}) !important; background-size: cover !important; background-position: center !important; }`;
     }
     return "";
   }, [backgroundConfig, section.section_id]);

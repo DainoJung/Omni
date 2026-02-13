@@ -542,6 +542,7 @@ export function ProjectInputForm({ onSuccess, compact }: ProjectInputFormProps) 
   const isCustom = pageTypeId === "custom";
   const requiresPrice = pageTypeConfig?.requires_price ?? true;
   const requiresBrand = pageTypeConfig?.requires_brand ?? false;
+  const requiresConcept = pageTypeId === "promotion" || pageTypeId === "product_detail";
   const minProducts = pageTypeConfig?.min_products ?? 1;
   const maxProducts = pageTypeConfig?.max_products ?? 6;
   const maxRestaurants = pageTypeConfig?.max_restaurants ?? 5;
@@ -650,6 +651,8 @@ export function ProjectInputForm({ onSuccess, compact }: ProjectInputFormProps) 
           newErrors[`custom_product_${i}`] = "상품명을 입력하세요.";
       });
     } else {
+      if (requiresConcept && !concept.trim())
+        newErrors.concept = "콘셉트를 입력하세요.";
       if (requiresBrand && !brandName.trim())
         newErrors.brand_name = "브랜드명을 입력하세요.";
       if (products.length < minProducts)
@@ -831,16 +834,26 @@ export function ProjectInputForm({ onSuccess, compact }: ProjectInputFormProps) 
       {pageTypeId && !isCustom && (
         <div className="space-y-2">
           <label className="block text-sm font-medium text-text-primary">
-            콘셉트 <span className="text-xs text-text-tertiary">(선택)</span>
+            콘셉트{" "}
+            {requiresConcept ? (
+              <span className="text-error">*</span>
+            ) : (
+              <span className="text-xs text-text-tertiary">(선택)</span>
+            )}
           </label>
           <textarea
             value={concept}
             onChange={(e) => setConcept(e.target.value)}
             placeholder="예: 크리스마스 선물 기획전, 여름 쿨링 특가"
             rows={2}
-            className="w-full px-3 py-2 border border-border rounded-sm text-sm resize-none focus:border-border-focus"
+            className={`w-full px-3 py-2 border rounded-sm text-sm resize-none focus:border-border-focus ${
+              errors.concept ? "border-error" : "border-border"
+            }`}
             maxLength={500}
           />
+          {errors.concept && (
+            <p className="text-xs text-error">{errors.concept}</p>
+          )}
         </div>
       )}
 

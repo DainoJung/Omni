@@ -80,7 +80,9 @@
       "Bash(pip3 list:*)",
       "Bash(xargs:*)",
       "Bash(npx:*)",
-      "Bash(python3.11:*)"
+      "Bash(python3.11:*)",
+      "Bash(gh run list:*)",
+      "Bash(md5:*)"
     ]
   }
 }

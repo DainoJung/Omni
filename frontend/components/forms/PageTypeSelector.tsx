@@ -11,7 +11,7 @@ interface PageTypeSelectorProps {
   error?: string;
 }
 
-const ENABLED_TYPE_IDS = ["product_detail", "promotion", "gourmet", "brand_promotion"];
+const ENABLED_TYPE_IDS = ["product_detail", "promotion", "gourmet"];
 
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   product_detail: Package,

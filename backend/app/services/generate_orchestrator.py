@@ -358,7 +358,7 @@ class GenerateOrchestrator:
         """
         async def _bg_remove_url(url: str, label: str, max_retries: int = 2) -> str:
             """URL에서 이미지를 다운로드하여 배경 제거 후 업로드, 새 URL 반환.
-            Bedrock throttling 대비 재시도 로직 포함."""
+            Bedrock throttling 대비 재시도 로직 포함. 400(content filter)은 즉시 실패."""
             if not url:
                 return url
             for attempt in range(max_retries + 1):
@@ -380,9 +380,20 @@ class GenerateOrchestrator:
                     new_url = self.storage.get_public_url(path)
                     logger.info(f"누끼 제거 완료: {label}")
                     return new_url
+                except httpx.HTTPStatusError as e:
+                    if e.response.status_code == 400:
+                        logger.warning(f"누끼 제거 차단 ({label}), content filter — 원본 사용")
+                        return url
+                    if attempt < max_retries:
+                        wait = 3 * (attempt + 1)
+                        logger.warning(f"누끼 제거 재시도 ({label}), attempt {attempt+1}/{max_retries}, {wait}초 대기: {e}")
+                        await asyncio.sleep(wait)
+                    else:
+                        logger.warning(f"누끼 제거 최종 실패 ({label}), 원본 사용: {e}")
+                        return url
                 except Exception as e:
                     if attempt < max_retries:
-                        wait = 5 * (attempt + 1)
+                        wait = 3 * (attempt + 1)
                         logger.warning(f"누끼 제거 재시도 ({label}), attempt {attempt+1}/{max_retries}, {wait}초 대기: {e}")
                         await asyncio.sleep(wait)
                     else:

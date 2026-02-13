@@ -14,3 +14,11 @@ body {
   color: var(--foreground);
   background: var(--background);
 }
+
+/* 섹션 렌더링: Tailwind preflight의 border-style:solid로 인한 hairline gap 제거 */
+.section-renderer-root > *,
+.section-block,
+.section-inner,
+.section-inner > * {
+  border-style: none !important;
+}

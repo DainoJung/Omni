@@ -31,14 +31,15 @@ export const SectionRenderer = forwardRef<HTMLDivElement, SectionRendererProps>(
 
     const getBgForSection = (sectionId: string): SectionBg | undefined => {
       if (!backgroundSettings) return undefined;
-      // 전체 모드에서는 컨테이너 레벨에서 배경을 적용하므로 개별 섹션에는 전달하지 않음
       if (isGlobalScope) return undefined;
-      return backgroundSettings.per_section[sectionId];
+      const sectionBg = backgroundSettings.per_section[sectionId];
+      if (!sectionBg || sectionBg.type === "none") return undefined;
+      return sectionBg;
     };
 
     // 전체 모드: 컨테이너 레벨에서 하나의 연속된 배경으로 적용
     const globalBgCss = useMemo(() => {
-      if (!isGlobalScope || !backgroundSettings) return "";
+      if (!backgroundSettings) return "";
       const bg = backgroundSettings.global;
       if (!bg || bg.type === "none") return "";
 
@@ -60,7 +61,7 @@ export const SectionRenderer = forwardRef<HTMLDivElement, SectionRendererProps>(
         return `${base} background-image: url(${bgUrl}) !important; background-size: 860px auto !important; background-repeat: repeat !important; background-position: top center !important; } ${clearSectionBg}`;
       }
       return "";
-    }, [isGlobalScope, backgroundSettings]);
+    }, [backgroundSettings]);
 
     const inverseScale = 100 / zoom;
     const btnBase =

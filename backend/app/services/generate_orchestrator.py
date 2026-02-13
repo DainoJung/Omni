@@ -192,8 +192,12 @@ class GenerateOrchestrator:
                         relevant_texts[tk] = section_texts[tk]
 
                 # 섹션별 참조 이미지 선택
-                ref_pair = section_ref_map.get(sec_type, default_ref)
-                ref_img, ref_mime = ref_pair if ref_pair else (None, None)
+                # promo_hero: 콘셉트 이미지만 생성하므로 참조 이미지(상품) 제외
+                if sec_type == "promo_hero":
+                    ref_img, ref_mime = None, None
+                else:
+                    ref_pair = section_ref_map.get(sec_type, default_ref)
+                    ref_img, ref_mime = ref_pair if ref_pair else (None, None)
 
                 # gourmet_restaurant: 해당 인스턴스의 레스토랑명 + 음식명을 구조화하여 전달
                 if sec_type == "gourmet_restaurant" and restaurants and inst_idx < len(restaurants):

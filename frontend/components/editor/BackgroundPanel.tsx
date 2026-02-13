@@ -28,16 +28,7 @@ export function BackgroundPanel({
   const sorted = [...sections].sort((a, b) => a.order - b.order);
 
   const updateScope = (scope: "all" | "per_section") => {
-    if (scope === "per_section" && settings.scope === "all") {
-      // 전체 → 섹션별: 전체 배경 설정을 각 섹션에 복사
-      const perSection: Record<string, SectionBg> = {};
-      for (const section of sections) {
-        perSection[section.section_id] = settings.per_section[section.section_id] || { ...settings.global };
-      }
-      onSettingsChange({ ...settings, scope, per_section: perSection });
-    } else {
-      onSettingsChange({ ...settings, scope });
-    }
+    onSettingsChange({ ...settings, scope });
   };
 
   const updateGlobalType = (type: "solid" | "ai") => {
@@ -55,7 +46,7 @@ export function BackgroundPanel({
   };
 
   const getSectionBg = (sectionId: string): SectionBg => {
-    return settings.per_section[sectionId] || { type: "solid" };
+    return settings.per_section[sectionId] || { type: "none" };
   };
 
   const updateSectionBg = (sectionId: string, bg: Partial<SectionBg>) => {
@@ -297,7 +288,7 @@ export function BackgroundPanel({
                       <p className="text-[10px] text-text-tertiary">
                         섹션 {index + 1}
                         <span className="ml-1.5 text-accent">
-                          {sectionBg.type === "solid" ? "단색" : "AI"}
+                          {sectionBg.type === "none" ? "전체" : sectionBg.type === "solid" ? "단색" : "AI"}
                         </span>
                       </p>
                     </div>
@@ -315,6 +306,20 @@ export function BackgroundPanel({
                     <div className="mt-1.5 ml-2 pl-3 border-l-2 border-accent/20 space-y-3 pb-2">
                       {/* Type selector */}
                       <div className="flex gap-1 p-1 bg-bg-secondary rounded-lg">
+                        <button
+                          onClick={() => {
+                            // "전체" 선택 시 per_section에서 해당 섹션 항목 제거
+                            const { [section.section_id]: _, ...rest } = settings.per_section;
+                            onSettingsChange({ ...settings, per_section: rest });
+                          }}
+                          className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                            sectionBg.type === "none"
+                              ? "bg-white text-text-primary shadow-sm"
+                              : "text-text-tertiary hover:text-text-primary"
+                          }`}
+                        >
+                          전체
+                        </button>
                         <button
                           onClick={() => updateSectionBg(section.section_id, { type: "solid" })}
                           className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${

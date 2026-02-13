@@ -148,7 +148,7 @@ class GenerateOrchestrator:
             theme["catalog_bg_color"] = validated_bg_color
             logger.info(f"AI bg_color: {ai_bg_color} → validated: {validated_bg_color}")
 
-            # 5. 섹션 이미지 순차 생성 (인스턴스별 개별 이미지)
+            # 5. 섹션 이미지 병렬 생성 (세마포어로 동시 실행 제한)
             # AI 이미지 생성은 배경/분위기 섹션만 (상품 이미지는 사용자 업로드 직접 사용)
             image_size_map = {
                 "hero_banner": (860, 1400),
@@ -166,9 +166,8 @@ class GenerateOrchestrator:
             # 브랜드명 추출 (브랜드 기획전용: 모든 상품이 동일 브랜드)
             brand_name = products[0].get("brand_name", "") if products else ""
 
-            # 키: "타입__인스턴스인덱스" (중복) 또는 "타입" (단일)
-            section_image_urls: dict[str, str] = {}
-            image_prompts: dict[str, str] = {}
+            # 이미지 생성 작업 목록 준비
+            image_tasks: list[dict] = []
             image_instance_counter: dict[str, int] = {}
             for st in section_templates:
                 sec_type = st["section_type"]
@@ -196,44 +195,73 @@ class GenerateOrchestrator:
                 ref_pair = section_ref_map.get(sec_type, default_ref)
                 ref_img, ref_mime = ref_pair if ref_pair else (None, None)
 
-                logger.info(f"{sec_type} 이미지 생성 시작 (인스턴스 {inst_idx})")
-                image_bytes, prompt_used = await generate_section_image(
-                    product_names=product_names,
-                    section_type=sec_type,
-                    width=w,
-                    height=h,
-                    reference_image=ref_img,
-                    reference_mime_type=ref_mime,
-                    section_texts=relevant_texts,
-                    theme=theme,
-                    brand_name=brand_name if page_type_id == "brand_promotion" else None,
-                    concept=concept,
-                )
-                path = await self.storage.upload_image(
-                    file_bytes=image_bytes,
-                    project_id=project_id,
-                    image_type="generated",
-                    filename=filename,
-                )
-                url = self.storage.get_public_url(path)
                 key = f"{sec_type}__{inst_idx}" if is_duplicate else sec_type
-                section_image_urls[key] = url
-                image_prompts[key] = prompt_used
+                image_tasks.append({
+                    "key": key,
+                    "sec_type": sec_type,
+                    "inst_idx": inst_idx,
+                    "w": w, "h": h,
+                    "filename": filename,
+                    "relevant_texts": relevant_texts,
+                    "ref_img": ref_img,
+                    "ref_mime": ref_mime,
+                })
 
-            # 5.5. 배경 제거 전처리 (bg_remove: true인 placeholder만)
-            product_bg_removed_urls = await self._preprocess_bg_removal(
-                section_templates=section_templates,
-                product_image_urls=product_image_urls,
-                project_id=project_id,
-            )
+            # 이미지 생성 코루틴 (세마포어로 동시 2개 제한)
+            img_sem = asyncio.Semaphore(2)
+            section_image_urls: dict[str, str] = {}
+            image_prompts: dict[str, str] = {}
 
-            # 5.6. 고메트립 음식/와인 이미지 누끼 제거
-            if page_type_id == "gourmet":
-                restaurants, wines = await self._preprocess_gourmet_bg_removal(
-                    restaurants=restaurants,
-                    wines=wines,
+            async def _gen_image(task_info: dict) -> None:
+                async with img_sem:
+                    logger.info(f"{task_info['sec_type']} 이미지 생성 시작 (인스턴스 {task_info['inst_idx']})")
+                    image_bytes, prompt_used = await generate_section_image(
+                        product_names=product_names,
+                        section_type=task_info["sec_type"],
+                        width=task_info["w"],
+                        height=task_info["h"],
+                        reference_image=task_info["ref_img"],
+                        reference_mime_type=task_info["ref_mime"],
+                        section_texts=task_info["relevant_texts"],
+                        theme=theme,
+                        brand_name=brand_name if page_type_id == "brand_promotion" else None,
+                        concept=concept,
+                    )
+                    path = await self.storage.upload_image(
+                        file_bytes=image_bytes,
+                        project_id=project_id,
+                        image_type="generated",
+                        filename=task_info["filename"],
+                    )
+                    url = self.storage.get_public_url(path)
+                    section_image_urls[task_info["key"]] = url
+                    image_prompts[task_info["key"]] = prompt_used
+
+            # 5+5.5+5.6. 이미지 생성, 상품 누끼, 고메트립 누끼를 동시 실행
+            parallel_jobs: list = [
+                asyncio.gather(*[_gen_image(t) for t in image_tasks]),
+                self._preprocess_bg_removal(
+                    section_templates=section_templates,
+                    product_image_urls=product_image_urls,
                     project_id=project_id,
+                ),
+            ]
+
+            if page_type_id == "gourmet":
+                parallel_jobs.append(
+                    self._preprocess_gourmet_bg_removal(
+                        restaurants=restaurants,
+                        wines=wines,
+                        project_id=project_id,
+                    )
                 )
+
+            parallel_results = await asyncio.gather(*parallel_jobs)
+
+            product_bg_removed_urls = parallel_results[1]
+
+            if page_type_id == "gourmet" and len(parallel_results) > 2:
+                restaurants, wines = parallel_results[2]
 
             # 6. 각 섹션 데이터 바인딩 + 렌더링
             rendered_sections = []
@@ -401,34 +429,59 @@ class GenerateOrchestrator:
                         return url
             return url
 
-        # 음식 이미지 누끼 제거
+        # Bedrock throttling 방지를 위한 세마포어 (동시 2개 제한)
+        sem = asyncio.Semaphore(2)
+
+        async def _sem_bg_remove(url: str, label: str) -> str:
+            async with sem:
+                result = await _bg_remove_url(url, label)
+                # 세마포어 내에서 짧은 대기 (throttling 완화)
+                await asyncio.sleep(1)
+                return result
+
+        # 음식 + 와인 이미지 누끼 제거를 병렬로 수집
+        tasks: list[tuple[str, asyncio.Task]] = []
+
         if restaurants:
             for r_idx, restaurant in enumerate(restaurants):
                 for food_key in ("food1", "food2"):
                     food = restaurant.get(food_key, {})
                     img_url = food.get("image_url", "")
                     if img_url:
-                        new_url = await _bg_remove_url(
-                            img_url, f"r{r_idx}_{food_key}"
-                        )
-                        food["image_url"] = new_url
-                        # Bedrock throttling 방지: 호출 간 3초 대기
-                        await asyncio.sleep(3)
+                        key = f"r{r_idx}_{food_key}"
+                        task = asyncio.create_task(_sem_bg_remove(img_url, key))
+                        tasks.append((key, task))
 
-        # 와인 이미지 누끼 제거
         if wines:
             logger.info(f"[와인 누끼] wines 전체 데이터: {wines}")
             for w_idx, wine in enumerate(wines):
                 img_url = wine.get("image_url", "")
-                logger.info(f"[와인 누끼] wine[{w_idx}] image_url={img_url!r}")
                 if img_url:
-                    new_url = await _bg_remove_url(img_url, f"wine_{w_idx}")
-                    wine["image_url"] = new_url
-                    # Bedrock throttling 방지: 호출 간 3초 대기
-                    if w_idx < len(wines) - 1:
-                        await asyncio.sleep(3)
+                    key = f"wine_{w_idx}"
+                    task = asyncio.create_task(_sem_bg_remove(img_url, key))
+                    tasks.append((key, task))
                 else:
                     logger.warning(f"[와인 누끼] wine[{w_idx}] image_url 비어있음 — 누끼 건너뜀")
+
+        # 모든 누끼 제거 완료 대기
+        results: dict[str, str] = {}
+        if tasks:
+            await asyncio.gather(*(t for _, t in tasks))
+            results = {key: task.result() for key, task in tasks}
+
+        # 결과를 원본 데이터에 반영
+        if restaurants:
+            for r_idx, restaurant in enumerate(restaurants):
+                for food_key in ("food1", "food2"):
+                    key = f"r{r_idx}_{food_key}"
+                    if key in results:
+                        restaurant[food_key]["image_url"] = results[key]
+
+        if wines:
+            for w_idx, wine in enumerate(wines):
+                key = f"wine_{w_idx}"
+                if key in results:
+                    wine["image_url"] = results[key]
 
         return restaurants, wines
 

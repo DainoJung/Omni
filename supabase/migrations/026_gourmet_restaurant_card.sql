@@ -45,8 +45,8 @@ SET
   </div>
 </div>$html$,
   css_template = $css$@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
-.s-gr{width:860px;padding:20px 0}
-.s-gr__card{background:#fff;border-radius:20px;margin:0 30px;padding:40px 0 32px;box-shadow:0 2px 16px rgba(0,0,0,.07)}
+.s-gr{width:860px;background:#fff;padding:40px 0}
+.s-gr__card{background:#f5f6f8;border-radius:20px;margin:0 30px;padding:40px 0 32px;box-shadow:0 2px 16px rgba(0,0,0,.07)}
 .s-gr__travel{text-align:center;margin-bottom:6px}
 .s-gr__travel-tag{font-family:'Pretendard',sans-serif;font-weight:500;font-size:16px;letter-spacing:.1em;color:#873a30;text-transform:uppercase}
 .s-gr__travel-desc{font-family:'Pretendard',sans-serif;font-weight:400;font-size:28px;line-height:1.5;color:#222;text-align:center;margin:0 0 20px;padding:0 60px}

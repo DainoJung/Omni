@@ -205,6 +205,14 @@ class GenerateOrchestrator:
                             food_names.append(fname)
                     formatted = f"레스토랑명: {r['name']}, 음식명: {', '.join(food_names)}"
                     task_product_names = [formatted]
+                elif sec_type == "hero_banner":
+                    # hero_banner: 1번째 상품만 전달 (참조 이미지 index 0과 일치)
+                    task_product_names = [product_names[0]] if product_names else product_names
+                elif sec_type == "description":
+                    # description 섹션: 참조 이미지에 해당하는 상품만 전달
+                    # product_detail: 2번째 상품(index 1), 그 외: 1번째 상품(index 0)
+                    desc_idx = 1 if page_type_id == "product_detail" and len(product_names) > 1 else 0
+                    task_product_names = [product_names[desc_idx]] if product_names else product_names
                 else:
                     task_product_names = product_names
 

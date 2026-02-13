@@ -47,7 +47,7 @@ export const SectionRenderer = forwardRef<HTMLDivElement, SectionRendererProps>(
 
       // 개별 섹션의 CSS 배경을 투명하게 (background shorthand + linear-gradient 포함)
       // .s-gr__card 등 내부 카드 레이어는 자체 배경 유지
-      const clearSectionBg = `${sel} .section-inner > *, ${sel} .section-inner > * > *:not(.s-gr__card) { background: transparent !important; }`;
+      const clearSectionBg = `${sel} .section-inner > *, ${sel} .section-inner > * > *:not(.s-gr__card):not(.s-point__badge) { background: transparent !important; }`;
       const base = `${sel} { position: relative !important; } ${sel}::before { content: '' !important; position: absolute !important; inset: 0 !important; z-index: 0 !important; pointer-events: none !important; opacity: ${opacity} !important; filter: brightness(${brightness}) !important;`;
       const childZ = `${sel} > * { position: relative !important; z-index: 1 !important; }`;
 

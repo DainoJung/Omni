@@ -17,6 +17,37 @@ MIN_DIMENSION = 320
 MAX_DIMENSION = 4096
 
 
+def _center_subject(image_bytes: bytes) -> bytes:
+    """투명 배경을 트림하고 피사체를 원본 크기 캔버스 정중앙에 배치한다."""
+    img = Image.open(io.BytesIO(image_bytes))
+
+    if img.mode != "RGBA":
+        img = img.convert("RGBA")
+
+    # 알파 채널에서 불투명 영역(피사체)의 바운딩 박스를 구한다
+    alpha = img.getchannel("A")
+    bbox = alpha.getbbox()
+    if bbox is None:
+        # 전체가 투명이면 원본 그대로 반환
+        return image_bytes
+
+    # 피사체 크롭
+    subject = img.crop(bbox)
+    sw, sh = subject.size
+    cw, ch = img.size
+
+    # 원본 캔버스 크기에 피사체를 정중앙 배치
+    canvas = Image.new("RGBA", (cw, ch), (0, 0, 0, 0))
+    offset_x = (cw - sw) // 2
+    offset_y = (ch - sh) // 2
+    canvas.paste(subject, (offset_x, offset_y), subject)
+
+    output = io.BytesIO()
+    canvas.save(output, format="PNG")
+    logger.info(f"피사체 중앙 정렬: bbox={bbox}, subject={sw}x{sh}, canvas={cw}x{ch}")
+    return output.getvalue()
+
+
 def _ensure_valid_dimensions(image_bytes: bytes) -> bytes:
     """이미지 크기가 Bedrock 요구사항(320-4096px)을 충족하는지 확인하고 필요시 리사이징."""
     img = Image.open(io.BytesIO(image_bytes))
@@ -98,6 +129,9 @@ async def remove_background(image_bytes: bytes, *, raise_on_error: bool = False)
         result = response.json()
         output_b64 = result["images"][0]
         output_bytes = base64.b64decode(output_b64)
+
+        # 피사체를 정중앙에 배치
+        output_bytes = _center_subject(output_bytes)
 
         logger.info(f"배경 제거 완료: {len(image_bytes)} → {len(output_bytes)} bytes")
         return output_bytes

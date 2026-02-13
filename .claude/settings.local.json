@@ -79,7 +79,8 @@
       "Bash(brew list:*)",
       "Bash(pip3 list:*)",
       "Bash(xargs:*)",
-      "Bash(npx:*)"
+      "Bash(npx:*)",
+      "Bash(python3.11:*)"
     ]
   }
 }

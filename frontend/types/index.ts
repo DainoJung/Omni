@@ -134,6 +134,7 @@ export interface SectionBg {
   ai_prompt?: string;
   ai_image_url?: string;
   opacity?: number; // 0~100, default 100
+  brightness?: number; // 0~200, default 100 (100=원본, <100=어둡게, >100=밝게)
 }
 
 export interface BackgroundSettings {

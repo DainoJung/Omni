@@ -89,9 +89,10 @@ export function SectionBlock({ section, onDataChange, onElementSelect, selectedP
     if (!backgroundConfig || backgroundConfig.type === "none") return "";
     const sel = `[data-section-id="${section.section_id}"] .section-inner > *:first-child`;
     const opacity = (backgroundConfig.opacity ?? 100) / 100;
+    const brightness = (backgroundConfig.brightness ?? 100) / 100;
 
     // ::before 오버레이로 배경을 깔아 opacity가 콘텐츠에 영향 없이 적용
-    const base = `${sel} { position: relative !important; } ${sel}::before { content: '' !important; position: absolute !important; inset: 0 !important; z-index: 0 !important; pointer-events: none !important; opacity: ${opacity} !important;`;
+    const base = `${sel} { position: relative !important; } ${sel}::before { content: '' !important; position: absolute !important; inset: 0 !important; z-index: 0 !important; pointer-events: none !important; opacity: ${opacity} !important; filter: brightness(${brightness}) !important;`;
 
     if (backgroundConfig.type === "solid" && backgroundConfig.hex_color) {
       return `${base} background-color: ${backgroundConfig.hex_color} !important; background-image: none !important; } ${sel} > * { position: relative !important; z-index: 1 !important; }`;

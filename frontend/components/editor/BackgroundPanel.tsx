@@ -31,7 +31,7 @@ export function BackgroundPanel({
     onSettingsChange({ ...settings, scope });
   };
 
-  const updateGlobalType = (type: "solid" | "ai" | "none") => {
+  const updateGlobalType = (type: "solid" | "ai") => {
     onSettingsChange({
       ...settings,
       global: { ...settings.global, type },
@@ -46,7 +46,7 @@ export function BackgroundPanel({
   };
 
   const getSectionBg = (sectionId: string): SectionBg => {
-    return settings.per_section[sectionId] || { type: "none" };
+    return settings.per_section[sectionId] || { type: "solid" };
   };
 
   const updateSectionBg = (sectionId: string, bg: Partial<SectionBg>) => {
@@ -107,16 +107,6 @@ export function BackgroundPanel({
           <div className="space-y-2">
             <p className="text-xs font-medium text-text-secondary">배경 타입</p>
             <div className="flex gap-1 p-1 bg-bg-secondary rounded-lg">
-              <button
-                onClick={() => updateGlobalType("none")}
-                className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                  settings.global.type === "none"
-                    ? "bg-white text-text-primary shadow-sm"
-                    : "text-text-tertiary hover:text-text-primary"
-                }`}
-              >
-                없음
-              </button>
               <button
                 onClick={() => updateGlobalType("solid")}
                 className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${
@@ -210,26 +200,47 @@ export function BackgroundPanel({
             </div>
           )}
 
-          {/* Global Opacity Slider */}
-          {settings.global.type !== "none" && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-medium text-text-secondary">투명도</p>
-                <span className="text-xs text-text-tertiary tabular-nums">{settings.global.opacity ?? 100}%</span>
+          {/* Global Opacity & Brightness Sliders */}
+          {(settings.global.type === "solid" || settings.global.type === "ai") && (
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-medium text-text-secondary">투명도</p>
+                  <span className="text-xs text-text-tertiary tabular-nums">{settings.global.opacity ?? 100}%</span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={settings.global.opacity ?? 100}
+                  onChange={(e) =>
+                    onSettingsChange({
+                      ...settings,
+                      global: { ...settings.global, opacity: parseInt(e.target.value) },
+                    })
+                  }
+                  className="w-full h-1.5 bg-bg-secondary rounded-full appearance-none cursor-pointer accent-accent"
+                />
               </div>
-              <input
-                type="range"
-                min={0}
-                max={100}
-                value={settings.global.opacity ?? 100}
-                onChange={(e) =>
-                  onSettingsChange({
-                    ...settings,
-                    global: { ...settings.global, opacity: parseInt(e.target.value) },
-                  })
-                }
-                className="w-full h-1.5 bg-bg-secondary rounded-full appearance-none cursor-pointer accent-accent"
-              />
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-medium text-text-secondary">밝기</p>
+                  <span className="text-xs text-text-tertiary tabular-nums">{settings.global.brightness ?? 100}%</span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={200}
+                  value={settings.global.brightness ?? 100}
+                  onChange={(e) =>
+                    onSettingsChange({
+                      ...settings,
+                      global: { ...settings.global, brightness: parseInt(e.target.value) },
+                    })
+                  }
+                  className="w-full h-1.5 bg-bg-secondary rounded-full appearance-none cursor-pointer accent-accent"
+                />
+              </div>
             </div>
           )}
         </>
@@ -276,11 +287,9 @@ export function BackgroundPanel({
                       </p>
                       <p className="text-[10px] text-text-tertiary">
                         섹션 {index + 1}
-                        {sectionBg.type !== "none" && (
-                          <span className="ml-1.5 text-accent">
-                            {sectionBg.type === "solid" ? "단색" : "AI"}
-                          </span>
-                        )}
+                        <span className="ml-1.5 text-accent">
+                          {sectionBg.type === "solid" ? "단색" : "AI"}
+                        </span>
                       </p>
                     </div>
                     {/* Color indicator */}
@@ -297,16 +306,6 @@ export function BackgroundPanel({
                     <div className="mt-1.5 ml-2 pl-3 border-l-2 border-accent/20 space-y-3 pb-2">
                       {/* Type selector */}
                       <div className="flex gap-1 p-1 bg-bg-secondary rounded-lg">
-                        <button
-                          onClick={() => updateSectionBg(section.section_id, { type: "none" })}
-                          className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                            sectionBg.type === "none"
-                              ? "bg-white text-text-primary shadow-sm"
-                              : "text-text-tertiary hover:text-text-primary"
-                          }`}
-                        >
-                          없음
-                        </button>
                         <button
                           onClick={() => updateSectionBg(section.section_id, { type: "solid" })}
                           className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${
@@ -410,25 +409,45 @@ export function BackgroundPanel({
                         </div>
                       )}
 
-                      {/* Section Opacity Slider */}
-                      {sectionBg.type !== "none" && (
-                        <div className="space-y-1.5">
-                          <div className="flex items-center justify-between">
-                            <p className="text-[11px] font-medium text-text-secondary">투명도</p>
-                            <span className="text-[11px] text-text-tertiary tabular-nums">{sectionBg.opacity ?? 100}%</span>
+                      {/* Section Opacity & Brightness Sliders */}
+                      {(sectionBg.type === "solid" || sectionBg.type === "ai") && (
+                        <div className="space-y-2.5">
+                          <div className="space-y-1.5">
+                            <div className="flex items-center justify-between">
+                              <p className="text-[11px] font-medium text-text-secondary">투명도</p>
+                              <span className="text-[11px] text-text-tertiary tabular-nums">{sectionBg.opacity ?? 100}%</span>
+                            </div>
+                            <input
+                              type="range"
+                              min={0}
+                              max={100}
+                              value={sectionBg.opacity ?? 100}
+                              onChange={(e) =>
+                                updateSectionBg(section.section_id, {
+                                  opacity: parseInt(e.target.value),
+                                })
+                              }
+                              className="w-full h-1.5 bg-bg-secondary rounded-full appearance-none cursor-pointer accent-accent"
+                            />
                           </div>
-                          <input
-                            type="range"
-                            min={0}
-                            max={100}
-                            value={sectionBg.opacity ?? 100}
-                            onChange={(e) =>
-                              updateSectionBg(section.section_id, {
-                                opacity: parseInt(e.target.value),
-                              })
-                            }
-                            className="w-full h-1.5 bg-bg-secondary rounded-full appearance-none cursor-pointer accent-accent"
-                          />
+                          <div className="space-y-1.5">
+                            <div className="flex items-center justify-between">
+                              <p className="text-[11px] font-medium text-text-secondary">밝기</p>
+                              <span className="text-[11px] text-text-tertiary tabular-nums">{sectionBg.brightness ?? 100}%</span>
+                            </div>
+                            <input
+                              type="range"
+                              min={0}
+                              max={200}
+                              value={sectionBg.brightness ?? 100}
+                              onChange={(e) =>
+                                updateSectionBg(section.section_id, {
+                                  brightness: parseInt(e.target.value),
+                                })
+                              }
+                              className="w-full h-1.5 bg-bg-secondary rounded-full appearance-none cursor-pointer accent-accent"
+                            />
+                          </div>
                         </div>
                       )}
                     </div>

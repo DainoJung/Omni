@@ -63,7 +63,7 @@ export default function ResultPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [bgRemoving, setBgRemoving] = useState(false);
-  const [uploadedImages, setUploadedImages] = useState<{ url: string; type: "upload" | "bg_removed" }[]>([]);
+  const [uploadedImages, setUploadedImages] = useState<{ url: string; type: "upload" | "bg_removed" | "background" }[]>([]);
   const [originalAiImages, setOriginalAiImages] = useState<{ sectionId: string; key: string; url: string }[]>([]);
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
   const [colorPickerSection, setColorPickerSection] = useState<string | null>(null);
@@ -72,7 +72,7 @@ export default function ResultPage() {
   // Background settings state
   const [backgroundSettings, setBackgroundSettings] = useState<BackgroundSettings>({
     scope: "all",
-    global: { type: "none" },
+    global: { type: "solid" },
     per_section: {},
   });
   const [bgGenerating, setBgGenerating] = useState(false);
@@ -188,6 +188,18 @@ export default function ResultPage() {
         // Load background settings from project
         if (proj.background_settings) {
           setBackgroundSettings(proj.background_settings as BackgroundSettings);
+        } else if (proj.rendered_sections?.length) {
+          // 저장된 설정이 없으면 섹션의 bg_color를 기본값으로 사용
+          const firstBgColor = proj.rendered_sections
+            .map((s) => s.data?.bg_color)
+            .find((c) => c && typeof c === "string");
+          if (firstBgColor) {
+            setBackgroundSettings({
+              scope: "all",
+              global: { type: "solid", hex_color: firstBgColor },
+              per_section: {},
+            });
+          }
         }
 
         if (proj.rendered_sections?.length) {
@@ -1008,6 +1020,9 @@ export default function ResultPage() {
           return updated;
         });
 
+        // 사진 탭에도 추가
+        setUploadedImages((prev) => [{ url: imageUrl, type: "background" }, ...prev]);
+
         toast.success("배경 이미지가 생성되었습니다.");
       } catch {
         toast.error("배경 이미지 생성에 실패했습니다.");
@@ -1324,7 +1339,7 @@ export default function ResultPage() {
                       >
                         <img
                           src={img.url}
-                          alt={img.type === "bg_removed" ? `누끼 ${index + 1}` : `업로드 ${index + 1}`}
+                          alt={img.type === "bg_removed" ? `누끼 ${index + 1}` : img.type === "background" ? `배경 ${index + 1}` : `업로드 ${index + 1}`}
                           className="w-full h-full object-cover"
                         />
                         {/* Download badge - left */}
@@ -1337,7 +1352,7 @@ export default function ResultPage() {
                               const blobUrl = URL.createObjectURL(blob);
                               const a = document.createElement("a");
                               a.href = blobUrl;
-                              a.download = `${img.type === "bg_removed" ? "bg_removed" : "uploaded"}_${Date.now()}.png`;
+                              a.download = `${img.type === "bg_removed" ? "bg_removed" : img.type === "background" ? "background" : "uploaded"}_${Date.now()}.png`;
                               document.body.appendChild(a);
                               a.click();
                               document.body.removeChild(a);
@@ -1352,9 +1367,9 @@ export default function ResultPage() {
                         </button>
                         {/* 이미지 타입 badge - right */}
                         <span className={`absolute top-1.5 right-1.5 px-1.5 py-0.5 text-white text-[10px] font-medium rounded shadow-sm ${
-                          img.type === "bg_removed" ? "bg-purple-500" : "bg-emerald-500"
+                          img.type === "bg_removed" ? "bg-purple-500" : img.type === "background" ? "bg-amber-500" : "bg-emerald-500"
                         }`}>
-                          {img.type === "bg_removed" ? "누끼" : "업로드"}
+                          {img.type === "bg_removed" ? "누끼" : img.type === "background" ? "배경" : "업로드"}
                         </span>
                       </div>
                     ))}

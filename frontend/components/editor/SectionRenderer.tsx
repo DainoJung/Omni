@@ -1,6 +1,6 @@
 "use client";
 
-import { forwardRef } from "react";
+import { forwardRef, useMemo } from "react";
 import { SectionBlock } from "./SectionBlock";
 import { ChevronUp, ChevronDown, Copy, Trash2, Plus } from "lucide-react";
 import type { RenderedSection, BackgroundSettings, SectionBg } from "@/types";
@@ -26,17 +26,46 @@ export const SectionRenderer = forwardRef<HTMLDivElement, SectionRendererProps>(
   ) {
     const sorted = [...sections].sort((a, b) => a.order - b.order);
 
+    const isGlobalScope = backgroundSettings?.scope === "all";
+
     const getBgForSection = (sectionId: string): SectionBg | undefined => {
       if (!backgroundSettings) return undefined;
-      if (backgroundSettings.scope === "all") return backgroundSettings.global;
+      // 전체 모드에서는 컨테이너 레벨에서 배경을 적용하므로 개별 섹션에는 전달하지 않음
+      if (isGlobalScope) return undefined;
       return backgroundSettings.per_section[sectionId];
     };
+
+    // 전체 모드: 컨테이너 레벨에서 하나의 연속된 배경으로 적용
+    const globalBgCss = useMemo(() => {
+      if (!isGlobalScope || !backgroundSettings) return "";
+      const bg = backgroundSettings.global;
+      if (!bg || bg.type === "none") return "";
+
+      const sel = ".section-renderer-root";
+      const opacity = (bg.opacity ?? 100) / 100;
+      const brightness = (bg.brightness ?? 100) / 100;
+
+      // 개별 섹션의 기존 배경을 투명하게 (루트 + 1단계 자식까지 커버)
+      const clearSectionBg = `${sel} .section-inner > *, ${sel} .section-inner > * > * { background: none !important; background-color: transparent !important; background-image: none !important; }`;
+      const base = `${sel} { position: relative !important; } ${sel}::before { content: '' !important; position: absolute !important; inset: 0 !important; z-index: 0 !important; pointer-events: none !important; opacity: ${opacity} !important; filter: brightness(${brightness}) !important;`;
+      const childZ = `${sel} > * { position: relative !important; z-index: 1 !important; }`;
+
+      if (bg.type === "solid" && bg.hex_color) {
+        return `${base} background-color: ${bg.hex_color} !important; background-image: none !important; } ${childZ} ${clearSectionBg}`;
+      }
+      if (bg.type === "ai" && bg.ai_image_url) {
+        return `${base} background-image: url(${bg.ai_image_url}) !important; background-size: cover !important; background-position: center !important; } ${childZ} ${clearSectionBg}`;
+      }
+      return "";
+    }, [isGlobalScope, backgroundSettings]);
+
     const inverseScale = 100 / zoom;
     const btnBase =
       "w-[34px] h-[34px] flex items-center justify-center bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors shadow-sm";
 
     return (
-      <div ref={ref} className="w-full max-w-[860px] mx-auto flex flex-col">
+      <div ref={ref} className="section-renderer-root w-full max-w-[860px] mx-auto flex flex-col">
+        {globalBgCss && <style dangerouslySetInnerHTML={{ __html: globalBgCss }} />}
         {sorted.map((section, index) => (
           <div key={section.section_id} className="relative group/section">
             <SectionBlock

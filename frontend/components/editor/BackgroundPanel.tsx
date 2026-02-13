@@ -309,7 +309,8 @@ export function BackgroundPanel({
                         <button
                           onClick={() => {
                             // "전체" 선택 시 per_section에서 해당 섹션 항목 제거
-                            const { [section.section_id]: _, ...rest } = settings.per_section;
+                            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                            const { [section.section_id]: _removed, ...rest } = settings.per_section;
                             onSettingsChange({ ...settings, per_section: rest });
                           }}
                           className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${

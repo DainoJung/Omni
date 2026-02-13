@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useEffect } from "react";
 import type { RenderedSection, SectionBg } from "@/types";
+import { optimizeImageUrl } from "@/lib/imageUrl";
 
 export interface SelectedElement {
   sectionId: string;
@@ -43,6 +44,10 @@ export function SectionBlock({ section, onDataChange, onElementSelect, selectedP
   const renderedHtml = useMemo(() => {
     let html = section.html_template;
 
+    // 모든 <img> 태그에 loading="lazy" decoding="async" 주입 (이미 있는 경우 제외)
+    html = html.replace(/<img\b(?![^>]*loading=)/gi, '<img loading="lazy"');
+    html = html.replace(/<img\b(?![^>]*decoding=)/gi, '<img decoding="async"');
+
     // 이미지 태그에 data-placeholder 속성이 없으면 자동 주입
     for (const [key, value] of Object.entries(section.data)) {
       if (key.endsWith("_image") && typeof value === "string" && value.startsWith("http")) {
@@ -60,7 +65,10 @@ export function SectionBlock({ section, onDataChange, onElementSelect, selectedP
     for (const [key, value] of Object.entries(section.data)) {
       const safeValue = value ?? "";
       const skipEscape = key.endsWith("_html") || key.endsWith("_image") || key === "theme_accent";
-      const escaped = skipEscape ? safeValue : escapeHtml(safeValue);
+      let escaped = skipEscape ? safeValue : escapeHtml(safeValue);
+      if ((key.endsWith("_image") || key.includes("_image_")) && typeof escaped === "string" && escaped.startsWith("http")) {
+        escaped = optimizeImageUrl(escaped, "editor");
+      }
       html = html.replaceAll(`{{${key}}}`, escaped);
     }
     return html;
@@ -81,7 +89,11 @@ export function SectionBlock({ section, onDataChange, onElementSelect, selectedP
   const renderedCss = useMemo(() => {
     let css = section.css;
     for (const [key, value] of Object.entries(section.data)) {
-      css = css.replaceAll(`{{${key}}}`, value ?? "");
+      let val = value ?? "";
+      if ((key.endsWith("_image") || key.includes("_image_")) && typeof val === "string" && val.startsWith("http")) {
+        val = optimizeImageUrl(val, "editor");
+      }
+      css = css.replaceAll(`{{${key}}}`, val);
     }
     return css;
   }, [section.css, section.data]);
@@ -101,10 +113,31 @@ export function SectionBlock({ section, onDataChange, onElementSelect, selectedP
       return `${clearBg} ${base} background-color: ${backgroundConfig.hex_color} !important; background-image: none !important; }`;
     }
     if (backgroundConfig.type === "ai" && backgroundConfig.ai_image_url) {
-      return `${clearBg} ${base} background-image: url(${backgroundConfig.ai_image_url}) !important; background-size: cover !important; background-position: center !important; }`;
+      const bgUrl = optimizeImageUrl(backgroundConfig.ai_image_url, "editor");
+      return `${clearBg} ${base} background-image: url(${bgUrl}) !important; background-size: cover !important; background-position: center !important; }`;
     }
     return "";
   }, [backgroundConfig, section.section_id]);
+
+  // render/image 엔드포인트 실패 시 원본 /object/public/ URL로 폴백
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const imgs = containerRef.current.querySelectorAll("img");
+    const handlers: Array<{ img: HTMLImageElement; handler: () => void }> = [];
+    imgs.forEach((img) => {
+      const handler = () => {
+        const src = img.src;
+        if (src.includes("/render/image/public/")) {
+          img.src = src.replace("/render/image/public/", "/object/public/").split("?")[0];
+        }
+      };
+      img.addEventListener("error", handler, { once: true });
+      handlers.push({ img, handler });
+    });
+    return () => {
+      handlers.forEach(({ img, handler }) => img.removeEventListener("error", handler));
+    };
+  }, [renderedHtml]);
 
   useEffect(() => {
     if (!containerRef.current) return;

@@ -4,12 +4,15 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { SectionRenderer } from "@/components/editor/SectionRenderer";
+import { TextToolbar } from "@/components/editor/TextToolbar";
+import { SectionListSidebar } from "@/components/editor/SectionListSidebar";
+import { ImageGallerySidebar } from "@/components/editor/ImageGallerySidebar";
+import { ChatMessages, ChatInput } from "@/components/editor/ChatPanel";
 import { NewProjectModal } from "@/components/modals/NewProjectModal";
 import { projectsApi, sectionsApi, authApi, uploadApi, imagesApi, generateApi, backgroundApi } from "@/lib/api";
 import { BackgroundPanel } from "@/components/editor/BackgroundPanel";
-import { exportImage, inlineImages } from "@/lib/export";
-import { toPng } from "html-to-image";
-import { ZoomIn, ChevronLeft, ChevronRight, Minus, Plus, GripVertical, Image as ImageIcon, Send, ImagePlus, Download, Upload, User, LogOut, X, Eraser, Loader2, Check, Undo2, Redo2, Paintbrush } from "lucide-react";
+import { exportImage, inlineImages, clearImageCache } from "@/lib/export";
+import { ZoomIn, ChevronLeft, ChevronRight, GripVertical, Image as ImageIcon, User, LogOut, Loader2, Check, Undo2, Redo2, Paintbrush } from "lucide-react";
 import { useHistory } from "@/hooks/useHistory";
 import { toast } from "sonner";
 import type { Project, RenderedSection, BackgroundSettings } from "@/types";
@@ -55,7 +58,7 @@ export default function ResultPage() {
   const [chatPendingFile, setChatPendingFile] = useState<File | null>(null);
   const [chatLoading, setChatLoading] = useState(false);
   const [draggedSectionIndex, setDraggedSectionIndex] = useState<number | null>(null);
-  const chatFileInputRef = useRef<HTMLInputElement>(null);
+
   const [dropIndicatorIndex, setDropIndicatorIndex] = useState<number | null>(null);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
@@ -95,12 +98,6 @@ export default function ResultPage() {
       s.map((st, i) => (i === index ? { ...st, status } : st))
     );
   };
-
-  // Text toolbar states
-  const [fontSize, setFontSize] = useState(16);
-  const [fontWeight, setFontWeight] = useState(400);
-  const [fontFamily, setFontFamily] = useState("Pretendard");
-  const [textColor, setTextColor] = useState("#000000");
 
   const previewRef = useRef<HTMLDivElement>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -317,79 +314,59 @@ export default function ResultPage() {
     }
   }, [projectList.length]);
 
-  // Generate section thumbnails
+  // Generate section thumbnails (batch parallel with debounce)
+  const thumbnailTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (sections.length === 0) return;
     let cancelled = false;
 
-    const generateAll = async () => {
-      for (const section of sections) {
+    if (thumbnailTimerRef.current) clearTimeout(thumbnailTimerRef.current);
+
+    thumbnailTimerRef.current = setTimeout(async () => {
+      const BATCH_SIZE = 3;
+      const { toPng } = await import("html-to-image");
+
+      for (let i = 0; i < sections.length; i += BATCH_SIZE) {
         if (cancelled) break;
-        const element = document.querySelector(`[data-section-id="${section.section_id}"]`) as HTMLElement;
-        if (!element) continue;
-        try {
-          const restore = await inlineImages(element);
-          try {
-            const dataUrl = await toPng(element, {
-              quality: 0.5,
-              pixelRatio: 0.3,
-              cacheBust: true,
-              imagePlaceholder: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
-            });
-            if (!cancelled) {
-              setSectionThumbnails((prev) => ({ ...prev, [section.section_id]: dataUrl }));
+        const batch = sections.slice(i, i + BATCH_SIZE);
+
+        const results = await Promise.allSettled(
+          batch.map(async (section) => {
+            const element = document.querySelector(`[data-section-id="${section.section_id}"]`) as HTMLElement;
+            if (!element) return null;
+            const restore = await inlineImages(element);
+            try {
+              const dataUrl = await toPng(element, {
+                quality: 0.5,
+                pixelRatio: 0.3,
+                cacheBust: true,
+                imagePlaceholder: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+              });
+              return { sectionId: section.section_id, dataUrl };
+            } finally {
+              restore();
             }
-          } finally {
-            restore();
+          })
+        );
+
+        if (cancelled) break;
+        const newThumbs: Record<string, string> = {};
+        for (const r of results) {
+          if (r.status === "fulfilled" && r.value) {
+            newThumbs[r.value.sectionId] = r.value.dataUrl;
           }
-        } catch {
-          // skip failed thumbnail
+        }
+        if (Object.keys(newThumbs).length > 0) {
+          setSectionThumbnails((prev) => ({ ...prev, ...newThumbs }));
         }
       }
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      if (thumbnailTimerRef.current) clearTimeout(thumbnailTimerRef.current);
     };
-
-    generateAll();
-    return () => { cancelled = true; };
   }, [sections]);
-
-  // Update text toolbar when selection changes
-  useEffect(() => {
-    if (selectedElement?.type === "text" && selectedElement.currentStyles) {
-      const styles = selectedElement.currentStyles;
-      const overrides = getSelectedStyleOverrides()[selectedElement.placeholderId] || {};
-
-      // Parse fontSize
-      const size = parseInt(overrides.fontSize || styles.fontSize || "16px");
-      setFontSize(isNaN(size) ? 16 : size);
-
-      // Parse fontWeight
-      const weight = parseInt(overrides.fontWeight || styles.fontWeight || "400");
-      setFontWeight(isNaN(weight) ? 400 : weight);
-
-      // Parse fontFamily
-      const family = overrides.fontFamily || styles.fontFamily?.split(",")[0]?.trim().replace(/['"]/g, "") || "Pretendard";
-      setFontFamily(family);
-
-      // Parse color
-      const color = overrides.color || styles.color || "#000000";
-      setTextColor(color.startsWith("#") ? color : rgbToHex(color));
-    }
-  }, [selectedElement]);
-
-  const rgbToHex = (rgb: string): string => {
-    const match = rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);
-    if (!match) return rgb.startsWith("#") ? rgb : "#000000";
-    const r = parseInt(match[1]);
-    const g = parseInt(match[2]);
-    const b = parseInt(match[3]);
-    return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
-  };
-
-  const applyTextStyle = (updates: Record<string, string>) => {
-    if (!selectedElement) return;
-    const current = getSelectedStyleOverrides()[selectedElement.placeholderId] || {};
-    handleStyleChange(selectedElement.placeholderId, { ...current, ...updates });
-  };
 
   // 디바운스된 API 저장 — 최신 sectionsRef에서 읽어서 저장
   const flushSave = useCallback(
@@ -425,7 +402,7 @@ export default function ResultPage() {
     [flushSave]
   );
 
-  // 컴포넌트 언마운트 시 대기 중인 저장 즉시 실행
+  // 컴포넌트 언마운트 시 대기 중인 저장 즉시 실행 + 이미지 캐시 정리
   useEffect(() => {
     return () => {
       if (saveTimerRef.current) {
@@ -434,6 +411,7 @@ export default function ResultPage() {
           flushSave(pendingSaveRef.current.sectionId);
         }
       }
+      clearImageCache();
     };
   }, [flushSave]);
 
@@ -1258,206 +1236,35 @@ export default function ResultPage() {
           >
             <div className={`w-[328px] h-full overflow-y-auto ${showSectionList ? '' : 'pointer-events-none'}`}>
               {activeTab === "pages" && (
-                <div
-                  className="p-3 space-y-2"
+                <SectionListSidebar
+                  sections={sections}
+                  sectionThumbnails={sectionThumbnails}
+                  draggedSectionIndex={draggedSectionIndex}
+                  dropIndicatorIndex={dropIndicatorIndex}
+                  onDragStart={handleDragStart}
+                  onDragOver={handleDragOver}
+                  onDragEnd={handleDragEnd}
                   onDragLeave={(e) => {
                     if (!e.currentTarget.contains(e.relatedTarget as Node)) {
                       setDropIndicatorIndex(null);
                     }
                   }}
-                >
-                  {sections.map((section, index) => (
-                    <div key={section.section_id}>
-                      {/* Drop indicator line */}
-                      {draggedSectionIndex !== null && dropIndicatorIndex === index && (
-                        <div className="flex items-center gap-1.5 py-1">
-                          <div className="w-2 h-2 rounded-full bg-accent shrink-0" />
-                          <div className="h-[2px] bg-accent rounded-full flex-1" />
-                        </div>
-                      )}
-                      <div
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, index)}
-                        onDragOver={(e) => handleDragOver(e, index)}
-                        onDragEnd={handleDragEnd}
-                        className={`bg-bg-secondary border border-border rounded-sm p-3 hover:border-accent transition-colors cursor-move group ${draggedSectionIndex === index ? 'opacity-40 scale-[0.97]' : ''
-                          }`}
-                        onClick={() => {
-                          if (draggedSectionIndex === null) {
-                            const element = document.querySelector(`[data-section-id="${section.section_id}"]`);
-                            element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                          }
-                        }}
-                      >
-                        <div className="flex items-start gap-3">
-                          {/* Drag Handle */}
-                          <div className="flex items-center justify-center w-5 h-5 text-text-tertiary group-hover:text-accent transition-colors cursor-grab active:cursor-grabbing">
-                            <GripVertical size={16} />
-                          </div>
-
-                          {/* Thumbnail */}
-                          <div className="w-16 h-16 bg-bg-tertiary border border-border rounded-sm shrink-0 overflow-hidden">
-                            {sectionThumbnails[section.section_id] ? (
-                              <img
-                                src={sectionThumbnails[section.section_id]}
-                                alt={section.section_type}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center">
-                                <div className="w-4 h-4 border-2 border-text-tertiary border-t-transparent rounded-full animate-spin"></div>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Section Info */}
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-text-primary truncate">
-                              {section.section_type.replace(/_/g, ' ')}
-                            </p>
-                            <p className="text-xs text-text-tertiary mt-0.5">
-                              섹션 {index + 1}
-                            </p>
-                          </div>
-
-                        </div>
-                      </div>
-                      {/* Drop indicator after last item */}
-                      {draggedSectionIndex !== null && index === sections.length - 1 && dropIndicatorIndex === sections.length && (
-                        <div className="flex items-center gap-1.5 py-1">
-                          <div className="w-2 h-2 rounded-full bg-accent shrink-0" />
-                          <div className="h-[2px] bg-accent rounded-full flex-1" />
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                  onSectionClick={(sectionId) => {
+                    const element = document.querySelector(`[data-section-id="${sectionId}"]`);
+                    element?.scrollIntoView({ behavior: "smooth", block: "center" });
+                  }}
+                />
               )}
 
               {activeTab === "image" && (
-                <div className="p-3 flex flex-col h-full">
-                  <p className="text-xs text-text-secondary mb-3">이미지 추가</p>
-
-                  {/* Image Grid */}
-                  <div className="grid grid-cols-2 gap-2 auto-rows-min flex-1 overflow-y-auto">
-                    {/* AI 생성 이미지 (초기 로드 시 저장된 원본) */}
-                    {originalAiImages.map(({ sectionId, key, url }) => (
-                      <div
-                        key={`ai-${sectionId}-${key}`}
-                        className="relative rounded-lg overflow-hidden border border-border hover:border-accent/50 cursor-pointer transition-colors aspect-square"
-                        onClick={() => handleApplyImage(url)}
-                      >
-                        <img
-                          src={url}
-                          alt={key}
-                          className="w-full h-full object-cover"
-                        />
-                        {/* Download badge - left */}
-                        <button
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            try {
-                              const res = await fetch(url);
-                              const blob = await res.blob();
-                              const blobUrl = URL.createObjectURL(blob);
-                              const a = document.createElement("a");
-                              a.href = blobUrl;
-                              a.download = `${key}_${Date.now()}.png`;
-                              document.body.appendChild(a);
-                              a.click();
-                              document.body.removeChild(a);
-                              URL.revokeObjectURL(blobUrl);
-                            } catch {
-                              toast.error("이미지 다운로드에 실패했습니다.");
-                            }
-                          }}
-                          className="absolute top-1.5 left-1.5 p-1 bg-white/90 rounded shadow-sm hover:bg-white transition-colors"
-                        >
-                          <Download size={12} className="text-text-primary" />
-                        </button>
-                        {/* AI badge - right */}
-                        <span className="absolute top-1.5 right-1.5 px-1.5 py-0.5 bg-accent text-white text-[10px] font-medium rounded shadow-sm">
-                          AI
-                        </span>
-                      </div>
-                    ))}
-                    {/* 업로드 및 배경 제거 이미지 */}
-                    {uploadedImages.map((img, index) => (
-                      <div
-                        key={`uploaded-${index}`}
-                        className="relative rounded-lg overflow-hidden border border-border hover:border-accent/50 cursor-pointer transition-colors aspect-square"
-                        onClick={(e) => {
-                          if (img.type === "background") {
-                            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                            setBgApplyPopup({ url: img.url, x: rect.right + 8, y: rect.top });
-                          } else {
-                            handleApplyImage(img.url);
-                          }
-                        }}
-                      >
-                        <img
-                          src={img.url}
-                          alt={img.type === "bg_removed" ? `누끼 ${index + 1}` : img.type === "background" ? `배경 ${index + 1}` : `업로드 ${index + 1}`}
-                          className="w-full h-full object-cover"
-                        />
-                        {/* Download badge - left */}
-                        <button
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            try {
-                              const res = await fetch(img.url);
-                              const blob = await res.blob();
-                              const blobUrl = URL.createObjectURL(blob);
-                              const a = document.createElement("a");
-                              a.href = blobUrl;
-                              a.download = `${img.type === "bg_removed" ? "bg_removed" : img.type === "background" ? "background" : "uploaded"}_${Date.now()}.png`;
-                              document.body.appendChild(a);
-                              a.click();
-                              document.body.removeChild(a);
-                              URL.revokeObjectURL(blobUrl);
-                            } catch {
-                              toast.error("이미지 다운로드에 실패했습니다.");
-                            }
-                          }}
-                          className="absolute top-1.5 left-1.5 p-1 bg-white/90 rounded shadow-sm hover:bg-white transition-colors"
-                        >
-                          <Download size={12} className="text-text-primary" />
-                        </button>
-                        {/* 이미지 타입 badge - right */}
-                        <span className={`absolute top-1.5 right-1.5 px-1.5 py-0.5 text-white text-[10px] font-medium rounded shadow-sm ${img.type === "bg_removed" ? "bg-purple-500" : img.type === "background" ? "bg-amber-500" : "bg-emerald-500"
-                          }`}>
-                          {img.type === "bg_removed" ? "누끼" : img.type === "background" ? "배경" : "업로드"}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Upload Button */}
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={handleImageUpload}
-                  />
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={uploading}
-                    className="mt-3 w-full py-2.5 bg-black text-white rounded-lg text-sm font-medium flex items-center justify-center gap-2 hover:bg-gray-900 transition-colors disabled:opacity-50"
-                  >
-                    {uploading ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        업로드 중...
-                      </>
-                    ) : (
-                      <>
-                        <Upload size={16} />
-                        이미지 업로드
-                      </>
-                    )}
-                  </button>
-                </div>
+                <ImageGallerySidebar
+                  originalAiImages={originalAiImages}
+                  uploadedImages={uploadedImages}
+                  uploading={uploading}
+                  onApplyImage={handleApplyImage}
+                  onImageUpload={handleImageUpload}
+                  onBgApplyPopup={setBgApplyPopup}
+                />
               )}
 
               {activeTab === "background" && (
@@ -1517,94 +1324,11 @@ export default function ResultPage() {
         </aside>
 
         {/* Floating Text Toolbar (Canva-style) */}
-        {selectedElement?.type === "text" && (
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 bg-white rounded-lg shadow-xl border border-gray-200 px-4 py-2 flex items-center gap-3">
-            {/* Font Family */}
-            <select
-              value={fontFamily}
-              onChange={(e) => {
-                setFontFamily(e.target.value);
-                applyTextStyle({ fontFamily: e.target.value });
-              }}
-              className="h-9 px-3 border border-gray-300 rounded-md text-sm bg-white focus:border-accent focus:ring-1 focus:ring-accent/20 min-w-[140px]"
-            >
-              <option value="Pretendard">Pretendard</option>
-              <option value="SCoreDream">SCoreDream</option>
-              <option value="BmDoHyeonOtf">BmDoHyeonOtf</option>
-            </select>
-
-            <div className="w-px h-6 bg-gray-300"></div>
-
-            {/* Font Size */}
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => {
-                  const newSize = Math.max(10, fontSize - 2);
-                  setFontSize(newSize);
-                  applyTextStyle({ fontSize: `${newSize}px` });
-                }}
-                className="p-1.5 hover:bg-gray-100 rounded transition-colors"
-              >
-                <Minus size={14} />
-              </button>
-              <input
-                type="number"
-                value={fontSize}
-                onChange={(e) => {
-                  const val = Math.min(72, Math.max(10, parseInt(e.target.value) || 16));
-                  setFontSize(val);
-                  applyTextStyle({ fontSize: `${val}px` });
-                }}
-                className="w-12 h-8 px-2 border border-gray-300 rounded text-sm text-center bg-white"
-              />
-              <button
-                onClick={() => {
-                  const newSize = Math.min(72, fontSize + 2);
-                  setFontSize(newSize);
-                  applyTextStyle({ fontSize: `${newSize}px` });
-                }}
-                className="p-1.5 hover:bg-gray-100 rounded transition-colors"
-              >
-                <Plus size={14} />
-              </button>
-            </div>
-
-            <div className="w-px h-6 bg-gray-300"></div>
-
-            {/* Font Weight */}
-            <select
-              value={fontWeight}
-              onChange={(e) => {
-                const val = parseInt(e.target.value);
-                setFontWeight(val);
-                applyTextStyle({ fontWeight: String(val) });
-              }}
-              className="h-9 px-3 border border-gray-300 rounded-md text-sm bg-white focus:border-accent focus:ring-1 focus:ring-accent/20"
-            >
-              <option value={300}>Light</option>
-              <option value={400}>Regular</option>
-              <option value={500}>Medium</option>
-              <option value={600}>Semi Bold</option>
-              <option value={700}>Bold</option>
-              <option value={800}>Extra Bold</option>
-            </select>
-
-            <div className="w-px h-6 bg-gray-300"></div>
-
-            {/* Color Picker */}
-            <div className="flex items-center gap-2">
-              <input
-                type="color"
-                value={textColor}
-                onChange={(e) => {
-                  setTextColor(e.target.value);
-                  applyTextStyle({ color: e.target.value });
-                }}
-                className="w-8 h-8 rounded border border-gray-300 cursor-pointer"
-              />
-            </div>
-          </div>
-        )}
+        <TextToolbar
+          selectedElement={selectedElement}
+          getStyleOverrides={getSelectedStyleOverrides}
+          onStyleChange={handleStyleChange}
+        />
 
 
         {/* Center: Preview with Floating Zoom Controls */}
@@ -2103,203 +1827,45 @@ export default function ResultPage() {
               </div>
 
               {/* 채팅 메시지 — 하단 고정 */}
-              {chatMessages.length > 0 && (
-                <>
-                  <div className="h-px bg-border my-4" />
-                  <div className="space-y-3">
-                    {chatMessages.map((msg, i) => (
-                      <div key={i}>
-                        {msg.role === "user" ? (
-                          <div className="flex flex-col items-end gap-1.5">
-                            {msg.attachedImage && (
-                              <div className="w-16 h-16 rounded-lg border border-border overflow-hidden">
-                                <img src={msg.attachedImage.url} alt="" className="w-full h-full object-cover" />
-                              </div>
-                            )}
-                            <div className="bg-accent text-white rounded-2xl rounded-tr-sm px-3.5 py-2 max-w-[85%]">
-                              <p className="text-sm">{msg.text}</p>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="flex flex-col items-start gap-1.5">
-                            <div className="bg-bg-secondary rounded-2xl rounded-tl-sm px-3.5 py-2 max-w-[85%]">
-                              <p className="text-sm text-text-primary">{msg.text}</p>
-                            </div>
-                            {msg.imageVersions && msg.imageVersions.length > 0 && msg.sectionId && msg.placeholderId && (
-                              <div className="w-full">
-                                <p className="text-xs text-text-secondary mb-2">버전 선택 ({msg.imageVersions.length})</p>
-                                <div className="grid grid-cols-3 gap-1.5">
-                                  {msg.imageVersions.map((url, vi) => {
-                                    const isLatest = vi === msg.imageVersions!.length - 1;
-                                    const isFirst = vi === 0;
-                                    // 현재 섹션에 적용된 이미지인지 확인
-                                    const currentSec = sections.find((s) => s.section_id === msg.sectionId);
-                                    const isApplied = currentSec?.data[msg.placeholderId!] === url;
-                                    return (
-                                      <button
-                                        key={vi}
-                                        onClick={() => handleSelectVariant(msg.sectionId!, msg.placeholderId!, url)}
-                                        className={`group relative rounded-lg overflow-hidden transition-colors ${isApplied
-                                          ? "border-2 border-accent"
-                                          : "border border-border hover:border-accent"
-                                          }`}
-                                      >
-                                        <img src={url} alt={`v${vi + 1}`} className="w-full aspect-square object-cover" />
-                                        <span className={`absolute bottom-0 inset-x-0 text-white text-[10px] py-0.5 text-center ${isApplied ? "bg-accent" : isFirst ? "bg-black/60" : isLatest ? "bg-blue-500/80" : "bg-black/50"
-                                          }`}>
-                                          {isApplied ? "적용됨" : isFirst ? "원본" : `v${vi}`}
-                                        </span>
-                                      </button>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                    {chatLoading && (
-                      <div className="flex items-start gap-1.5">
-                        <div className="bg-bg-secondary rounded-2xl rounded-tl-sm px-3.5 py-2.5">
-                          <div className="flex items-center gap-2">
-                            <div className="w-4 h-4 border-2 border-text-tertiary border-t-accent rounded-full animate-spin" />
-                            <span className="text-sm text-text-secondary">이미지 생성중...</span>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    <div ref={chatEndRef} />
-                  </div>
-                </>
-              )}
-
-              {/* 빈 공간으로 채팅을 하단에 밀기 */}
-              <div className="flex-1" />
+              <ChatMessages
+                sections={sections}
+                chatMessages={chatMessages}
+                chatLoading={chatLoading}
+                chatEndRef={chatEndRef}
+                onSelectVariant={handleSelectVariant}
+              />
             </>)}
           </div>
 
           {/* Chat Input Area */}
-          {isContentReady && <div className="border-t border-border bg-white p-4">
-            <div className={`bg-bg-secondary rounded-lg border transition-colors duration-200 ${chatAttachedImage ? "border-accent" : "border-border"}`}>
-              {/* 첨부 이미지 — 필드 내부 상단, 애니메이션 확장/축소 */}
-              <div
-                className="overflow-hidden transition-all duration-300 ease-in-out"
-                style={{
-                  maxHeight: chatAttachedImage ? "80px" : "0px",
-                  opacity: chatAttachedImage ? 1 : 0,
-                  padding: chatAttachedImage ? "10px 12px 0 12px" : "0 12px",
-                }}
-              >
-                {chatAttachedImage && (
-                  <div className="flex items-start justify-between">
-                    <div className="relative group inline-block">
-                      <div className="w-14 h-14 rounded-lg border border-border overflow-hidden bg-white">
-                        <img src={chatAttachedImage.url} alt="" className="w-full h-full object-cover" />
-                      </div>
-                      <button
-                        onClick={() => {
-                          if (chatAttachedImage.url.startsWith("blob:")) {
-                            URL.revokeObjectURL(chatAttachedImage.url);
-                          }
-                          setChatAttachedImage(null);
-                          setChatPendingFile(null);
-                          setSelectedElement(null);
-                        }}
-                        className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-text-secondary text-white rounded-full flex items-center justify-center hover:bg-text-primary transition-colors"
-                      >
-                        <X size={10} />
-                      </button>
-                    </div>
-                    <button
-                      onClick={handleRemoveBg}
-                      disabled={bgRemoving || chatLoading}
-                      className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-text-tertiary hover:text-accent hover:bg-accent/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {bgRemoving ? (
-                        <>
-                          <Loader2 size={12} className="animate-spin" />
-                          <span>제거중...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Eraser size={12} />
-                          <span>배경제거</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* 텍스트 입력 */}
-              <div className="px-3 pt-3 pb-1.5">
-                <input
-                  type="text"
-                  value={chatMessage}
-                  onChange={(e) => setChatMessage(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      handleChatSend();
-                    }
-                  }}
-                  placeholder={chatAttachedImage ? "이미지를 어떻게 편집할까요?" : "이미지를 클릭하여 AI로 수정해보세요."}
-                  className="w-full bg-transparent text-sm text-text-primary placeholder:text-text-tertiary outline-none"
-                  disabled={chatLoading}
-                />
-              </div>
-
-              {/* 하단 액션 */}
-              <div className="flex items-center justify-between px-3 pb-3 pt-1.5">
-                <div>
-                  <input
-                    ref={chatFileInputRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      if (!file.type.startsWith("image/")) {
-                        toast.error("이미지 파일만 업로드할 수 있습니다.");
-                        if (chatFileInputRef.current) chatFileInputRef.current.value = "";
-                        return;
-                      }
-                      if (file.size > 10 * 1024 * 1024) {
-                        toast.error("파일 크기는 10MB 이하여야 합니다.");
-                        if (chatFileInputRef.current) chatFileInputRef.current.value = "";
-                        return;
-                      }
-                      const previewUrl = URL.createObjectURL(file);
-                      setChatPendingFile(file);
-                      setChatAttachedImage({
-                        url: previewUrl,
-                        sectionId: chatAttachedImage?.sectionId || selectedElement?.sectionId || "",
-                        placeholderId: chatAttachedImage?.placeholderId || selectedElement?.placeholderId || "",
-                      });
-                      if (chatFileInputRef.current) chatFileInputRef.current.value = "";
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => chatFileInputRef.current?.click()}
-                    className="flex items-center gap-1.5 text-xs text-text-tertiary hover:text-text-primary transition-colors"
-                  >
-                    <ImagePlus size={16} />
-                    <span>이미지 추가</span>
-                  </button>
-                </div>
-                <button
-                  onClick={handleChatSend}
-                  className="p-2 bg-accent text-white rounded-md hover:bg-accent/90 transition-colors disabled:opacity-50"
-                  disabled={!chatMessage.trim() || !chatAttachedImage || chatLoading}
-                >
-                  <Send size={16} />
-                </button>
-              </div>
-            </div>
-          </div>}
+          {isContentReady && (
+            <ChatInput
+              chatMessage={chatMessage}
+              chatAttachedImage={chatAttachedImage}
+              chatLoading={chatLoading}
+              bgRemoving={bgRemoving}
+              onChatMessageChange={setChatMessage}
+              onChatSend={handleChatSend}
+              onRemoveBg={handleRemoveBg}
+              onClearAttachment={() => {
+                if (chatAttachedImage?.url.startsWith("blob:")) {
+                  URL.revokeObjectURL(chatAttachedImage.url);
+                }
+                setChatAttachedImage(null);
+                setChatPendingFile(null);
+                setSelectedElement(null);
+              }}
+              onFileAttach={(file) => {
+                const previewUrl = URL.createObjectURL(file);
+                setChatPendingFile(file);
+                setChatAttachedImage({
+                  url: previewUrl,
+                  sectionId: chatAttachedImage?.sectionId || selectedElement?.sectionId || "",
+                  placeholderId: chatAttachedImage?.placeholderId || selectedElement?.placeholderId || "",
+                });
+              }}
+            />
+          )}
         </aside>
       </div>
 

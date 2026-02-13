@@ -5,6 +5,7 @@ import { SectionBlock } from "./SectionBlock";
 import { ChevronUp, ChevronDown, Copy, Trash2, Plus } from "lucide-react";
 import type { RenderedSection, BackgroundSettings, SectionBg } from "@/types";
 import type { SelectedElement } from "./SectionBlock";
+import { optimizeImageUrl } from "@/lib/imageUrl";
 
 interface SectionRendererProps {
   sections: RenderedSection[];
@@ -48,14 +49,15 @@ export const SectionRenderer = forwardRef<HTMLDivElement, SectionRendererProps>(
       // 개별 섹션의 CSS 배경을 투명하게 (background shorthand + linear-gradient 포함)
       // .s-gr__card 등 내부 카드 레이어는 자체 배경 유지
       const clearSectionBg = `${sel} .section-inner > *, ${sel} .section-inner > * > *:not(.s-gr__card):not(.s-point__badge) { background: transparent !important; }`;
-      const base = `${sel} { position: relative !important; } ${sel}::before { content: '' !important; position: absolute !important; inset: 0 !important; z-index: 0 !important; pointer-events: none !important; opacity: ${opacity} !important; filter: brightness(${brightness}) !important;`;
-      const childZ = `${sel} > * { position: relative !important; z-index: 1 !important; }`;
+      // isolation: isolate → 루트가 stacking context 생성, ::before z-index:-1 → 자식에 개별 z-index 불필요 → 섹션 경계 hairline gap 제거
+      const base = `${sel} { position: relative !important; isolation: isolate !important; } ${sel}::before { content: '' !important; position: absolute !important; inset: 0 !important; z-index: -1 !important; pointer-events: none !important; opacity: ${opacity} !important; filter: brightness(${brightness}) !important;`;
 
       if (bg.type === "solid" && bg.hex_color) {
-        return `${base} background-color: ${bg.hex_color} !important; background-image: none !important; } ${childZ} ${clearSectionBg}`;
+        return `${base} background-color: ${bg.hex_color} !important; background-image: none !important; } ${clearSectionBg}`;
       }
       if (bg.type === "ai" && bg.ai_image_url) {
-        return `${base} background-image: url(${bg.ai_image_url}) !important; background-size: cover !important; background-position: center !important; } ${childZ} ${clearSectionBg}`;
+        const bgUrl = optimizeImageUrl(bg.ai_image_url, "editor");
+        return `${base} background-image: url(${bgUrl}) !important; background-size: 860px auto !important; background-repeat: repeat !important; background-position: top center !important; } ${clearSectionBg}`;
       }
       return "";
     }, [isGlobalScope, backgroundSettings]);

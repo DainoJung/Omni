@@ -692,55 +692,44 @@ export function ProjectInputForm({ onSuccess, compact }: ProjectInputFormProps) 
           ...(wineSubmitData ? { wines: wineSubmitData } : {}),
         });
 
-        // 각 가게의 음식 이미지를 순서대로 업로드하고 restaurant 데이터 구성
-        const restaurantData: Array<{
-          name: string;
-          food1: { name: string; image_url: string };
-          food2: { name: string; image_url: string };
-        }> = [];
-
-        for (const r of gourmetRestaurants) {
-          let food1Url = "";
-          let food2Url = "";
-
+        // 각 가게의 음식 이미지를 병렬 업로드하고 restaurant 데이터 구성
+        const foodUploadTasks = gourmetRestaurants.flatMap((r, idx) => {
+          const tasks: Array<{ idx: number; key: "food1" | "food2"; promise: Promise<string> }> = [];
           if (r.food1.image) {
-            const res = await uploadApi.uploadImage(
-              project.id,
-              r.food1.image,
-              "input"
-            );
-            food1Url = res.public_url || "";
+            tasks.push({ idx, key: "food1", promise: uploadApi.uploadImage(project.id, r.food1.image, "input").then(res => res.public_url || "") });
           }
           if (r.food2.image) {
-            const res = await uploadApi.uploadImage(
-              project.id,
-              r.food2.image,
-              "input"
-            );
-            food2Url = res.public_url || "";
+            tasks.push({ idx, key: "food2", promise: uploadApi.uploadImage(project.id, r.food2.image, "input").then(res => res.public_url || "") });
           }
+          return tasks;
+        });
+        const foodResults = await Promise.all(foodUploadTasks.map(t => t.promise));
+        const foodUrlMap: Record<number, { food1: string; food2: string }> = {};
+        foodUploadTasks.forEach((t, i) => {
+          if (!foodUrlMap[t.idx]) foodUrlMap[t.idx] = { food1: "", food2: "" };
+          foodUrlMap[t.idx][t.key] = foodResults[i];
+        });
 
-          restaurantData.push({
-            name: r.name,
-            food1: { name: r.food1.name, image_url: food1Url },
-            food2: { name: r.food2.name, image_url: food2Url },
-          });
-        }
+        const restaurantData = gourmetRestaurants.map((r, idx) => ({
+          name: r.name,
+          food1: { name: r.food1.name, image_url: foodUrlMap[idx]?.food1 || "" },
+          food2: { name: r.food2.name, image_url: foodUrlMap[idx]?.food2 || "" },
+        }));
 
-        // 와인 이미지 업로드
+        // 와인 이미지 병렬 업로드
         if (includeWine) {
-          for (const w of wineEntries.slice(0, wineCount)) {
-            let wineUrl = "";
-            if (w.image) {
-              const res = await uploadApi.uploadImage(
-                project.id,
-                w.image,
-                "input"
-              );
-              wineUrl = res.public_url || "";
-            }
-            wineData.push({ name: w.name, image_url: wineUrl });
-          }
+          const wineSlice = wineEntries.slice(0, wineCount);
+          const wineResults = await Promise.all(
+            wineSlice.map(async (w) => {
+              let wineUrl = "";
+              if (w.image) {
+                const res = await uploadApi.uploadImage(project.id, w.image, "input");
+                wineUrl = res.public_url || "";
+              }
+              return { name: w.name, image_url: wineUrl };
+            })
+          );
+          wineData.push(...wineResults);
         }
 
         // 프로젝트 업데이트: restaurants + wines 저장
@@ -790,12 +779,12 @@ export function ProjectInputForm({ onSuccess, compact }: ProjectInputFormProps) 
           concept: concept || undefined,
         });
 
-        // 상품 이미지 업로드
-        for (const prod of products) {
-          if (prod.image) {
-            await uploadApi.uploadImage(project.id, prod.image, "input");
-          }
-        }
+        // 상품 이미지 병렬 업로드
+        await Promise.all(
+          products
+            .filter((prod) => prod.image)
+            .map((prod) => uploadApi.uploadImage(project.id, prod.image!, "input"))
+        );
 
         if (onSuccess) {
           onSuccess(project.id);

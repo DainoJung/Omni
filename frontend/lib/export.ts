@@ -1,5 +1,5 @@
-import { toPng, toJpeg } from "html-to-image";
 import { ensureFontsLoaded } from "./fonts";
+import { toOriginalUrl } from "./imageUrl";
 
 export interface ExportOptions {
   format: "png" | "jpg";
@@ -10,8 +10,13 @@ export interface ExportOptions {
 const TRANSPARENT_PIXEL =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
 
-// 이미지 data URL 캐시 (같은 URL 중복 fetch 방지)
+// 이미지 data URL 캐시 (같은 URL 중복 fetch 방지, LRU 방식 최대 50개)
+const MAX_CACHE_SIZE = 50;
 const imageDataUrlCache = new Map<string, string>();
+
+export function clearImageCache() {
+  imageDataUrlCache.clear();
+}
 
 async function fetchAsDataUrl(src: string): Promise<string> {
   const cached = imageDataUrlCache.get(src);
@@ -25,6 +30,12 @@ async function fetchAsDataUrl(src: string): Promise<string> {
     reader.onerror = reject;
     reader.readAsDataURL(blob);
   });
+
+  // LRU eviction
+  if (imageDataUrlCache.size >= MAX_CACHE_SIZE) {
+    const firstKey = imageDataUrlCache.keys().next().value;
+    if (firstKey !== undefined) imageDataUrlCache.delete(firstKey);
+  }
   imageDataUrlCache.set(src, dataUrl);
   return dataUrl;
 }
@@ -32,8 +43,15 @@ async function fetchAsDataUrl(src: string): Promise<string> {
 /**
  * 외부/크로스오리진 이미지를 data URL로 변환하여
  * html-to-image가 캔버스에 그릴 수 있도록 한다.
+ *
+ * @param forExport true이면 원본 URL(파라미터 제거)로 fetch → 다운로드 품질 보장
+ *                  false(기본)이면 현재 src를 그대로 fetch → 썸네일/프리뷰용 빠른 처리
  */
-export async function inlineImages(root: HTMLElement): Promise<() => void> {
+export async function inlineImages(
+  root: HTMLElement,
+  options?: { forExport?: boolean }
+): Promise<() => void> {
+  const forExport = options?.forExport ?? false;
   const imgs = root.querySelectorAll("img");
   const originals: { img: HTMLImageElement; src: string }[] = [];
 
@@ -45,7 +63,9 @@ export async function inlineImages(root: HTMLElement): Promise<() => void> {
       originals.push({ img, src });
 
       try {
-        img.src = await fetchAsDataUrl(src);
+        // 내보내기: 원본 풀사이즈 fetch / 썸네일: 현재 (최적화된) src 그대로
+        const fetchUrl = forExport ? toOriginalUrl(src) : src;
+        img.src = await fetchAsDataUrl(fetchUrl);
       } catch {
         // CORS 실패 시 transparent pixel로 대체
         img.src = TRANSPARENT_PIXEL;
@@ -71,10 +91,11 @@ export async function exportImage(
   // 렌더링 안정화 대기
   await new Promise((r) => setTimeout(r, 200));
 
-  // 외부 이미지를 data URL로 인라인 변환
-  const restoreImages = await inlineImages(element);
+  // 외부 이미지를 data URL로 인라인 변환 (원본 품질)
+  const restoreImages = await inlineImages(element, { forExport: true });
 
   try {
+    const { toPng, toJpeg } = await import("html-to-image");
     const exportFn = options.format === "jpg" ? toJpeg : toPng;
     const mimeParams = options.format === "jpg" ? { quality: 0.92 } : {};
 

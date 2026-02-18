@@ -366,6 +366,7 @@ class GenerateOrchestrator:
             .select("*")
             .eq("project_id", project_id)
             .eq("image_type", "input")
+            .order("sort_order")
             .order("created_at")
             .execute()
         )

@@ -61,19 +61,7 @@ function SectionListSidebarInner({
                 <GripVertical size={16} />
               </div>
 
-              {/* Thumbnail */}
-              <div className="w-16 h-16 bg-bg-tertiary border border-border rounded-sm shrink-0 overflow-hidden">
-                {sectionThumbnails[section.section_id] ? (
-                  <img
-                    src={sectionThumbnails[section.section_id]}
-                    alt={section.section_type}
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                  />
-                ) : (
-                  <div className="w-full h-full animate-pulse bg-gray-200 dark:bg-gray-700" />
-                )}
-              </div>
+              {/* Thumbnail - 임시 비활성화 (render/image CORS 이슈) */}
 
               {/* Section Info */}
               <div className="flex-1 min-w-0">

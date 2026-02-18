@@ -314,59 +314,7 @@ export default function ResultPage() {
     }
   }, [projectList.length]);
 
-  // Generate section thumbnails (batch parallel with debounce)
-  const thumbnailTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => {
-    if (sections.length === 0) return;
-    let cancelled = false;
-
-    if (thumbnailTimerRef.current) clearTimeout(thumbnailTimerRef.current);
-
-    thumbnailTimerRef.current = setTimeout(async () => {
-      const BATCH_SIZE = 3;
-      const { toPng } = await import("html-to-image");
-
-      for (let i = 0; i < sections.length; i += BATCH_SIZE) {
-        if (cancelled) break;
-        const batch = sections.slice(i, i + BATCH_SIZE);
-
-        const results = await Promise.allSettled(
-          batch.map(async (section) => {
-            const element = document.querySelector(`[data-section-id="${section.section_id}"]`) as HTMLElement;
-            if (!element) return null;
-            const restore = await inlineImages(element);
-            try {
-              const dataUrl = await toPng(element, {
-                quality: 0.5,
-                pixelRatio: 0.3,
-                cacheBust: true,
-                imagePlaceholder: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
-              });
-              return { sectionId: section.section_id, dataUrl };
-            } finally {
-              restore();
-            }
-          })
-        );
-
-        if (cancelled) break;
-        const newThumbs: Record<string, string> = {};
-        for (const r of results) {
-          if (r.status === "fulfilled" && r.value) {
-            newThumbs[r.value.sectionId] = r.value.dataUrl;
-          }
-        }
-        if (Object.keys(newThumbs).length > 0) {
-          setSectionThumbnails((prev) => ({ ...prev, ...newThumbs }));
-        }
-      }
-    }, 300);
-
-    return () => {
-      cancelled = true;
-      if (thumbnailTimerRef.current) clearTimeout(thumbnailTimerRef.current);
-    };
-  }, [sections]);
+  // TODO: 썸네일 생성 임시 비활성화 (render/image CORS 이슈 해결 후 복원)
 
   // 디바운스된 API 저장 — 최신 sectionsRef에서 읽어서 저장
   const flushSave = useCallback(

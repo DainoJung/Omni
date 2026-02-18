@@ -779,11 +779,12 @@ export function ProjectInputForm({ onSuccess, compact }: ProjectInputFormProps) 
           concept: concept || undefined,
         });
 
-        // 상품 이미지 병렬 업로드
+        // 상품 이미지 병렬 업로드 (sort_order로 입력 순서 보장)
         await Promise.all(
           products
-            .filter((prod) => prod.image)
-            .map((prod) => uploadApi.uploadImage(project.id, prod.image!, "input"))
+            .map((prod, idx) => ({ prod, idx }))
+            .filter(({ prod }) => prod.image)
+            .map(({ prod, idx }) => uploadApi.uploadImage(project.id, prod.image!, "input", idx))
         );
 
         if (onSuccess) {

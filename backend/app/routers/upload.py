@@ -35,6 +35,7 @@ router = APIRouter()
 async def upload_image(
     project_id: str = Form(...),
     image_type: str = Form(default="input"),
+    sort_order: int = Form(default=0),
     file: UploadFile = File(...),
     current_user: CurrentUser = Depends(get_current_user),
 ):
@@ -74,6 +75,7 @@ async def upload_image(
         image_type=image_type,
         storage_path=storage_path,
         original_filename=file.filename or "upload.png",
+        sort_order=sort_order,
     )
 
     public_url = storage.get_public_url(storage_path)

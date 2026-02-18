@@ -67,6 +67,7 @@ class StorageService:
         image_type: str,
         storage_path: str,
         original_filename: str,
+        sort_order: int = 0,
     ) -> dict:
         """project_images 테이블에 레코드를 저장한다."""
 
@@ -78,6 +79,7 @@ class StorageService:
                     "image_type": image_type,
                     "storage_path": storage_path,
                     "original_filename": original_filename,
+                    "sort_order": sort_order,
                 }
             )
             .execute()

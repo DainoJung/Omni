@@ -245,11 +245,13 @@ export const uploadApi = {
   uploadImage: async (
     projectId: string,
     file: File,
-    imageType: string = "input"
+    imageType: string = "input",
+    sortOrder: number = 0
   ) => {
     const formData = new FormData();
     formData.append("project_id", projectId);
     formData.append("image_type", imageType);
+    formData.append("sort_order", String(sortOrder));
     formData.append("file", file);
 
     const response = await fetch(`${API_URL}/api/upload`, {

@@ -11,7 +11,7 @@ import { ChatMessages, ChatInput } from "@/components/editor/ChatPanel";
 import { NewProjectModal } from "@/components/modals/NewProjectModal";
 import { projectsApi, sectionsApi, authApi, uploadApi, imagesApi, generateApi, backgroundApi } from "@/lib/api";
 import { BackgroundPanel } from "@/components/editor/BackgroundPanel";
-import { exportImage, inlineImages, clearImageCache } from "@/lib/export";
+import { exportImage, clearImageCache } from "@/lib/export";
 import { ZoomIn, ChevronLeft, ChevronRight, GripVertical, Image as ImageIcon, User, LogOut, Loader2, Check, Undo2, Redo2, Paintbrush } from "lucide-react";
 import { useHistory } from "@/hooks/useHistory";
 import { toast } from "sonner";
@@ -47,7 +47,7 @@ export default function ResultPage() {
   const [zoom, setZoom] = useState(50);
   const [showZoomMenu, setShowZoomMenu] = useState(false);
   const [showSectionList, setShowSectionList] = useState(true);
-  const [sectionThumbnails, setSectionThumbnails] = useState<Record<string, string>>({});
+  const [sectionThumbnails] = useState<Record<string, string>>({});
   const [activeTab, setActiveTab] = useState<"pages" | "image" | "background">("pages");
   const [projectList, setProjectList] = useState<Project[]>([]);
   const [expandedSteps, setExpandedSteps] = useState<Record<number, boolean>>({});

@@ -6,7 +6,7 @@ import type { RenderedSection } from "@/types";
 
 interface SectionListSidebarProps {
   sections: RenderedSection[];
-  sectionThumbnails: Record<string, string>;
+  sectionThumbnails?: Record<string, string>;
   draggedSectionIndex: number | null;
   dropIndicatorIndex: number | null;
   onDragStart: (e: React.DragEvent, index: number) => void;
@@ -18,7 +18,6 @@ interface SectionListSidebarProps {
 
 function SectionListSidebarInner({
   sections,
-  sectionThumbnails,
   draggedSectionIndex,
   dropIndicatorIndex,
   onDragStart,

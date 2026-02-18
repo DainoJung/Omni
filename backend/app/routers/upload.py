@@ -20,7 +20,7 @@ def sanitize_filename(filename: str) -> str:
     else:
         stem, ext = name, ""
     # 영문·숫자·하이픈·언더스코어만 남기고 나머지는 _ 로 치환
-    stem = re.sub(r"[^a-zA-Z0-9가-힣_-]", "_", stem)
+    stem = re.sub(r"[^a-zA-Z0-9_-]", "_", stem)
     # 연속 언더스코어 정리
     stem = re.sub(r"_+", "_", stem).strip("_")
     # 빈 이름이면 uuid

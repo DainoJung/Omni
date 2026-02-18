@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     # App
     BACKEND_HOST: str = "0.0.0.0"
     BACKEND_PORT: int = 8000
-    CORS_ORIGINS: List[str] = ["http://localhost:3000"]
+    CORS_ORIGINS: List[str] = ["http://localhost:3000", "https://ssgpopmaker.squarelight.ai"]
     LOG_LEVEL: str = "INFO"
 
     # Auth (JWT)

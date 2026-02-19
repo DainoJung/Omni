@@ -73,10 +73,36 @@ export async function inlineImages(
     })
   );
 
+  // CSS background-image URL도 data URL로 인라인 (배경 레이어 요소)
+  const bgLayers = root.querySelectorAll<HTMLElement>("[data-bg-layer]");
+  const bgOriginals: { el: HTMLElement; bgImage: string }[] = [];
+
+  await Promise.all(
+    Array.from(bgLayers).map(async (el) => {
+      const bgImage = el.style.backgroundImage;
+      if (!bgImage || !bgImage.startsWith("url(")) return;
+      const match = bgImage.match(/url\(["']?(.+?)["']?\)/);
+      if (!match || match[1].startsWith("data:")) return;
+
+      bgOriginals.push({ el, bgImage });
+
+      try {
+        const fetchUrl = forExport ? toOriginalUrl(match[1]) : match[1];
+        const dataUrl = await fetchAsDataUrl(fetchUrl);
+        el.style.backgroundImage = `url(${dataUrl})`;
+      } catch {
+        // CORS 실패 시 원본 유지
+      }
+    })
+  );
+
   // 복원 함수 반환
   return () => {
     for (const { img, src } of originals) {
       img.src = src;
+    }
+    for (const { el, bgImage } of bgOriginals) {
+      el.style.backgroundImage = bgImage;
     }
   };
 }

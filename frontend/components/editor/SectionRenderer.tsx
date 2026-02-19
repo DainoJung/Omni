@@ -1,11 +1,10 @@
 "use client";
 
-import { forwardRef, useMemo } from "react";
+import React, { forwardRef, useMemo } from "react";
 import { SectionBlock } from "./SectionBlock";
 import { ChevronUp, ChevronDown, Copy, Trash2, Plus } from "lucide-react";
 import type { RenderedSection, BackgroundSettings, SectionBg } from "@/types";
 import type { SelectedElement } from "./SectionBlock";
-import { optimizeImageUrl } from "@/lib/imageUrl";
 
 interface SectionRendererProps {
   sections: RenderedSection[];
@@ -37,39 +36,58 @@ export const SectionRenderer = forwardRef<HTMLDivElement, SectionRendererProps>(
       return sectionBg;
     };
 
-    // 전체 모드: 컨테이너 레벨에서 하나의 연속된 배경으로 적용
-    const globalBgCss = useMemo(() => {
+    // 전체 모드: 개별 섹션 배경 투명 처리 CSS
+    const globalBgClearCss = useMemo(() => {
       if (!backgroundSettings) return "";
       const bg = backgroundSettings.global;
       if (!bg || bg.type === "none") return "";
-
       const sel = ".section-renderer-root";
-      const opacity = (bg.opacity ?? 100) / 100;
-      const brightness = (bg.brightness ?? 100) / 100;
-
-      // 개별 섹션의 CSS 배경을 투명하게 (background shorthand + linear-gradient 포함)
-      // .s-gr__card 등 내부 카드 레이어는 자체 배경 유지
-      const clearSectionBg = `${sel} .section-inner > *, ${sel} .section-inner > * > *:not(.s-gr__card):not(.s-point__badge) { background: transparent !important; }`;
-      // isolation: isolate → 루트가 stacking context 생성, ::before z-index:-1 → 자식에 개별 z-index 불필요 → 섹션 경계 hairline gap 제거
-      const base = `${sel} { position: relative !important; isolation: isolate !important; } ${sel}::before { content: '' !important; position: absolute !important; inset: 0 !important; z-index: -1 !important; pointer-events: none !important; opacity: ${opacity} !important; filter: brightness(${brightness}) !important;`;
-
-      if (bg.type === "solid" && bg.hex_color) {
-        return `${base} background-color: ${bg.hex_color} !important; background-image: none !important; } ${clearSectionBg}`;
-      }
-      if (bg.type === "ai" && bg.ai_image_url) {
-        const bgUrl = optimizeImageUrl(bg.ai_image_url, "editor");
-        return `${base} background-image: url(${bgUrl}) !important; background-size: 860px auto !important; background-repeat: repeat !important; background-position: top center !important; } ${clearSectionBg}`;
-      }
-      return "";
+      return `${sel} .section-inner > *, ${sel} .section-inner > * > *:not(.s-gr__card):not(.s-point__badge) { background: transparent !important; }`;
     }, [backgroundSettings]);
 
+    // 전체 모드: 실제 DOM 요소로 배경 레이어 생성 (html-to-image 호환)
+    const globalBgLayerStyle = useMemo((): React.CSSProperties | null => {
+      if (!backgroundSettings) return null;
+      const bg = backgroundSettings.global;
+      if (!bg || bg.type === "none") return null;
+      const opacity = (bg.opacity ?? 100) / 100;
+      const brightness = (bg.brightness ?? 100) / 100;
+      const base: React.CSSProperties = {
+        position: "absolute",
+        top: 0, left: 0, right: 0, bottom: 0,
+        zIndex: -1,
+        pointerEvents: "none",
+        opacity,
+        filter: `brightness(${brightness})`,
+      };
+      if (bg.type === "solid" && bg.hex_color) {
+        return { ...base, backgroundColor: bg.hex_color };
+      }
+      if (bg.type === "ai" && bg.ai_image_url) {
+        return {
+          ...base,
+          backgroundImage: `url(${bg.ai_image_url})`,
+          backgroundSize: "860px auto",
+          backgroundRepeat: "repeat",
+          backgroundPosition: "top center",
+        };
+      }
+      return null;
+    }, [backgroundSettings]);
+
+    const hasGlobalBg = !!globalBgLayerStyle;
     const inverseScale = 100 / zoom;
     const btnBase =
       "w-[34px] h-[34px] flex items-center justify-center bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors shadow-sm";
 
     return (
-      <div ref={ref} className="section-renderer-root w-full max-w-[860px] mx-auto flex flex-col">
-        {globalBgCss && <style dangerouslySetInnerHTML={{ __html: globalBgCss }} />}
+      <div
+        ref={ref}
+        className="section-renderer-root w-full max-w-[860px] mx-auto flex flex-col"
+        style={hasGlobalBg ? { position: "relative", isolation: "isolate" } : undefined}
+      >
+        {globalBgClearCss && <style dangerouslySetInnerHTML={{ __html: globalBgClearCss }} />}
+        {globalBgLayerStyle && <div data-bg-layer style={globalBgLayerStyle} />}
         {sorted.map((section, index) => (
           <div key={section.section_id} className="relative group/section">
             <SectionBlock

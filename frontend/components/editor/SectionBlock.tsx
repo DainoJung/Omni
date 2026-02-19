@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useEffect } from "react";
+import React, { useMemo, useRef, useEffect } from "react";
 import type { RenderedSection, SectionBg } from "@/types";
 import { optimizeImageUrl } from "@/lib/imageUrl";
 
@@ -98,25 +98,38 @@ export function SectionBlock({ section, onDataChange, onElementSelect, selectedP
     return css;
   }, [section.css, section.data]);
 
-  const bgOverrideCss = useMemo(() => {
+  // 섹션별 배경: 기존 배경 투명 처리 CSS
+  const bgClearCss = useMemo(() => {
     if (!backgroundConfig || backgroundConfig.type === "none") return "";
     const sel = `[data-section-id="${section.section_id}"] .section-inner > *:first-child`;
+    return `${sel} { background: transparent !important; }`;
+  }, [backgroundConfig, section.section_id]);
+
+  // 섹션별 배경: 실제 DOM 요소로 배경 레이어 생성 (html-to-image 호환)
+  const bgLayerStyle = useMemo((): React.CSSProperties | null => {
+    if (!backgroundConfig || backgroundConfig.type === "none") return null;
     const opacity = (backgroundConfig.opacity ?? 100) / 100;
     const brightness = (backgroundConfig.brightness ?? 100) / 100;
-
-    // ::before 오버레이로 배경을 깔아 opacity가 콘텐츠에 영향 없이 적용
-    // 기존 섹션 배경(gradient 포함)을 투명하게 + ::before로 새 배경 적용
-    const clearBg = `${sel} { position: relative !important; background: transparent !important; } ${sel} > * { position: relative !important; z-index: 1 !important; }`;
-    const base = `${sel}::before { content: '' !important; position: absolute !important; inset: 0 !important; z-index: 0 !important; pointer-events: none !important; opacity: ${opacity} !important; filter: brightness(${brightness}) !important;`;
-
+    const base: React.CSSProperties = {
+      position: "absolute",
+      top: 0, left: 0, right: 0, bottom: 0,
+      zIndex: 0,
+      pointerEvents: "none",
+      opacity,
+      filter: `brightness(${brightness})`,
+    };
     if (backgroundConfig.type === "solid" && backgroundConfig.hex_color) {
-      return `${clearBg} ${base} background-color: ${backgroundConfig.hex_color} !important; background-image: none !important; }`;
+      return { ...base, backgroundColor: backgroundConfig.hex_color };
     }
     if (backgroundConfig.type === "ai" && backgroundConfig.ai_image_url) {
-      const bgUrl = optimizeImageUrl(backgroundConfig.ai_image_url, "editor");
-      return `${clearBg} ${base} background-image: url(${bgUrl}) !important; background-size: cover !important; background-position: center !important; }`;
+      return {
+        ...base,
+        backgroundImage: `url(${backgroundConfig.ai_image_url})`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+      };
     }
-    return "";
+    return null;
   }, [backgroundConfig, section.section_id]);
 
   // render/image 엔드포인트 실패 시 원본 /object/public/ URL로 폴백
@@ -252,12 +265,24 @@ export function SectionBlock({ section, onDataChange, onElementSelect, selectedP
     return () => { container.removeEventListener("click", handleClick); };
   }, []);
 
+  const hasBgLayer = !!bgLayerStyle;
+
   return (
-    <div ref={containerRef} className="section-block" data-section-id={section.section_id}>
+    <div
+      ref={containerRef}
+      className="section-block"
+      data-section-id={section.section_id}
+      style={hasBgLayer ? { position: "relative" } : undefined}
+    >
       <style dangerouslySetInnerHTML={{ __html: renderedCss }} />
       {overrideCss && <style dangerouslySetInnerHTML={{ __html: overrideCss }} />}
-      {bgOverrideCss && <style dangerouslySetInnerHTML={{ __html: bgOverrideCss }} />}
-      <div className="section-inner" dangerouslySetInnerHTML={{ __html: renderedHtml }} />
+      {bgClearCss && <style dangerouslySetInnerHTML={{ __html: bgClearCss }} />}
+      {bgLayerStyle && <div data-bg-layer style={bgLayerStyle} />}
+      <div
+        className="section-inner"
+        style={hasBgLayer ? { position: "relative", zIndex: 1 } : undefined}
+        dangerouslySetInnerHTML={{ __html: renderedHtml }}
+      />
     </div>
   );
 }

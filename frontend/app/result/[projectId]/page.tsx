@@ -75,7 +75,7 @@ export default function ResultPage() {
   // Background settings state
   const [backgroundSettings, setBackgroundSettings] = useState<BackgroundSettings>({
     scope: "all",
-    global: { type: "solid" },
+    global: { type: "solid", hex_color: "#ffffff" },
     per_section: {},
   });
   const [bgGenerating, setBgGenerating] = useState(false);

@@ -17,6 +17,26 @@ MIN_DIMENSION = 320
 MAX_DIMENSION = 4096
 
 
+def _pad_for_bg_removal(image_bytes: bytes, pad_ratio: float = 0.15) -> bytes:
+    """이미지 주변에 패딩을 추가하여 가장자리 피사체가 잘리지 않도록 한다."""
+    img = Image.open(io.BytesIO(image_bytes))
+    w, h = img.size
+
+    pad_x = int(w * pad_ratio)
+    pad_y = int(h * pad_ratio)
+    new_w = w + pad_x * 2
+    new_h = h + pad_y * 2
+
+    # 흰색 배경 캔버스에 원본을 중앙에 배치
+    canvas = Image.new("RGB", (new_w, new_h), (255, 255, 255))
+    canvas.paste(img, (pad_x, pad_y))
+
+    output = io.BytesIO()
+    canvas.save(output, format="PNG")
+    logger.info(f"패딩 추가: {w}x{h} → {new_w}x{new_h} (ratio={pad_ratio})")
+    return output.getvalue()
+
+
 def _center_subject(image_bytes: bytes) -> bytes:
     """투명 배경을 트림하고 피사체를 원본 크기 캔버스 정중앙에 배치한다."""
     img = Image.open(io.BytesIO(image_bytes))
@@ -98,8 +118,9 @@ async def remove_background(image_bytes: bytes, *, raise_on_error: bool = False)
         배경 제거된 이미지 바이트. 실패 시 원본 반환(raise_on_error=False).
     """
     try:
-        # 이미지 크기 검증 및 리사이징
-        processed_bytes = _ensure_valid_dimensions(image_bytes)
+        # 가장자리 피사체 잘림 방지를 위해 패딩 추가 후 크기 검증
+        processed_bytes = _pad_for_bg_removal(image_bytes)
+        processed_bytes = _ensure_valid_dimensions(processed_bytes)
         input_b64 = base64.b64encode(processed_bytes).decode("utf-8")
 
         body = {

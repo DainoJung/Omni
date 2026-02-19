@@ -201,15 +201,18 @@ async def regenerate_section_image(project_id: UUID, section_id: str, body: Imag
             logger.warning(f"기존 이미지 다운로드 실패, 새로 생성합니다: {e}")
 
     # 이미지 재생성 (reference_image가 있으면 편집 모드, 없으면 새로 생성)
-    image_bytes, prompt_used = await generate_section_image(
-        product_names=product_names,
-        section_type=sec_type,
-        width=w,
-        height=h,
-        custom_prompt=body.prompt,
-        reference_image=reference_image,
-        reference_mime_type=reference_mime_type,
-    )
+    try:
+        image_bytes, prompt_used = await generate_section_image(
+            product_names=product_names,
+            section_type=sec_type,
+            width=w,
+            height=h,
+            custom_prompt=body.prompt,
+            reference_image=reference_image,
+            reference_mime_type=reference_mime_type,
+        )
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=f"이미지 생성에 실패했습니다: {e}")
 
     # 업로드
     filename = f"{sec_type}_regen_{section_id[:8]}.png"
@@ -299,13 +302,16 @@ async def generate_background_image(project_id: UUID, body: BackgroundGenerateRe
     if body.section_type and body.section_type in image_size_map:
         w, h = image_size_map[body.section_type]
 
-    image_bytes, prompt_used = await generate_section_image(
-        product_names=product_names,
-        section_type="background",
-        width=w,
-        height=h,
-        concept=body.prompt,
-    )
+    try:
+        image_bytes, prompt_used = await generate_section_image(
+            product_names=product_names,
+            section_type="background",
+            width=w,
+            height=h,
+            concept=body.prompt,
+        )
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=f"이미지 생성에 실패했습니다: {e}")
 
     filename = f"bg_{_uuid.uuid4().hex[:8]}.png"
     path = await storage.upload_image(

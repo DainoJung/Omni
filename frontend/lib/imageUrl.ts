@@ -18,6 +18,8 @@ const PRESETS: Record<Exclude<ImagePreset, "original">, { width: number; quality
 export function optimizeImageUrl(url: string, preset: ImagePreset): string {
   if (!url || preset === "original") return url;
   if (!url.startsWith(OBJECT_PREFIX)) return url;
+  // 누끼 제거된 투명 PNG는 render 엔드포인트에서 잘림 → 원본 사용
+  if (url.includes("bg_removed")) return url;
   const base = url.split("?")[0];
   const path = base.slice(OBJECT_PREFIX.length);
   const p = PRESETS[preset];

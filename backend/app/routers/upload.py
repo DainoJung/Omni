@@ -57,8 +57,8 @@ async def upload_image(
 
     storage = StorageService()
 
-    # 파일명 sanitize (공백·특수문자 제거)
-    safe_filename = sanitize_filename(file.filename or "upload.png")
+    # 파일명 sanitize (공백·특수문자 제거) + UUID prefix로 충돌 방지
+    safe_filename = f"{uuid4().hex[:8]}_{sanitize_filename(file.filename or 'upload.png')}"
 
     # Storage에 업로드
     storage_path = await storage.upload_image(

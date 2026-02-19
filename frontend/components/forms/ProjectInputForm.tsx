@@ -693,13 +693,14 @@ export function ProjectInputForm({ onSuccess, compact }: ProjectInputFormProps) 
         });
 
         // 각 가게의 음식 이미지를 병렬 업로드하고 restaurant 데이터 구성
+        // sort_order: idx * 2 + food_offset 으로 음식 이미지 순서 보장
         const foodUploadTasks = gourmetRestaurants.flatMap((r, idx) => {
           const tasks: Array<{ idx: number; key: "food1" | "food2"; promise: Promise<string> }> = [];
           if (r.food1.image) {
-            tasks.push({ idx, key: "food1", promise: uploadApi.uploadImage(project.id, r.food1.image, "input").then(res => res.public_url || "") });
+            tasks.push({ idx, key: "food1", promise: uploadApi.uploadImage(project.id, r.food1.image, "input", idx * 2).then(res => res.public_url || "") });
           }
           if (r.food2.image) {
-            tasks.push({ idx, key: "food2", promise: uploadApi.uploadImage(project.id, r.food2.image, "input").then(res => res.public_url || "") });
+            tasks.push({ idx, key: "food2", promise: uploadApi.uploadImage(project.id, r.food2.image, "input", idx * 2 + 1).then(res => res.public_url || "") });
           }
           return tasks;
         });
@@ -719,11 +720,12 @@ export function ProjectInputForm({ onSuccess, compact }: ProjectInputFormProps) 
         // 와인 이미지 병렬 업로드
         if (includeWine) {
           const wineSlice = wineEntries.slice(0, wineCount);
+          const wineSortOffset = gourmetRestaurants.length * 2;
           const wineResults = await Promise.all(
-            wineSlice.map(async (w) => {
+            wineSlice.map(async (w, wIdx) => {
               let wineUrl = "";
               if (w.image) {
-                const res = await uploadApi.uploadImage(project.id, w.image, "input");
+                const res = await uploadApi.uploadImage(project.id, w.image, "input", wineSortOffset + wIdx);
                 wineUrl = res.public_url || "";
               }
               return { name: w.name, image_url: wineUrl };

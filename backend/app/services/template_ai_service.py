@@ -109,7 +109,15 @@ async def generate_section_image(
     section_template_key = section_type if section_type in templates else None
 
     if custom_prompt:
-        text_prompt = f"{custom_prompt} {no_text_rule}"
+        if reference_image:
+            # 참조 이미지가 있으면 편집 모드: 원본을 유지하면서 사용자 요청만 반영
+            text_prompt = (
+                f"첨부한 이미지를 다음 요청에 따라 수정해줘: {custom_prompt}. "
+                f"반드시 원본 이미지의 구도, 상품, 전체적인 분위기를 최대한 유지하면서 "
+                f"요청한 부분만 변경해줘. {no_text_rule}"
+            )
+        else:
+            text_prompt = f"{custom_prompt} {no_text_rule}"
         prompt_vars["custom_prompt"] = custom_prompt
     elif section_template_key:
         # 섹션 전용 템플릿 사용

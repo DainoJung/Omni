@@ -153,11 +153,11 @@ async def regenerate_section_image(project_id: UUID, section_id: str, body: Imag
 
     sec_type = target_section["section_type"]
 
-    # 이미지 크기 매핑
+    # 이미지 크기 매핑 (generate_orchestrator.py의 image_size_map과 동기화)
     image_size_map = {
         "hero_banner": (860, 1400),
         "description": (860, 860),
-        "feature_point": (860, 957),
+        "promo_hero": (860, 645),
         "fit_hero": (860, 625),
         "fit_event_info": (860, 1220),
         "fit_product_trio": (860, 1133),

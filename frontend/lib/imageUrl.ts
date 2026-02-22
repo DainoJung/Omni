@@ -11,6 +11,18 @@ const PRESETS: Record<Exclude<ImagePreset, "original">, { width: number; quality
 };
 
 /**
+ * /render/image/ 엔드포인트 사용 가능 여부.
+ * 한 번이라도 실패하면 false로 전환되어 이후 모든 이미지에서 최적화를 건너뜀.
+ * 이를 통해 Free 플랜에서 반복적인 이미지 로드 실패 → 폴백 → 깜빡임을 방지함.
+ */
+let renderEndpointAvailable = true;
+
+/** render/image 엔드포인트 실패 시 호출하여 이후 최적화를 비활성화 */
+export function markRenderEndpointUnavailable(): void {
+  renderEndpointAvailable = false;
+}
+
+/**
  * Supabase /render/image/ 엔드포인트로 변환하여 서버사이드 리사이징 적용.
  * Pro 플랜에서 동작하며, Free 플랜에서는 SectionBlock의 onerror 핸들러가 원본으로 폴백.
  * 브라우저가 WebP 지원 시 자동 변환됨.
@@ -18,6 +30,8 @@ const PRESETS: Record<Exclude<ImagePreset, "original">, { width: number; quality
 export function optimizeImageUrl(url: string, preset: ImagePreset): string {
   if (!url || preset === "original") return url;
   if (!url.startsWith(OBJECT_PREFIX)) return url;
+  // render 엔드포인트가 사용 불가능하면 원본 사용 (깜빡임 방지)
+  if (!renderEndpointAvailable) return url;
   // 누끼 제거된 투명 PNG는 render 엔드포인트에서 잘림 → 원본 사용
   if (url.includes("bg_removed")) return url;
   const base = url.split("?")[0];

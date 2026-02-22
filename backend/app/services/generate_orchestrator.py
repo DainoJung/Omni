@@ -144,9 +144,14 @@ class GenerateOrchestrator:
 
             # AI가 생성한 bg_color 추출 및 테마 반영
             ai_bg_color = section_texts.pop("bg_color", None)
-            validated_bg_color = validate_bg_color(ai_bg_color, theme["catalog_bg_color"])
+            # 단색 배경 설정 시 사용자 선택 색상을 bg_color로 사용
+            # (프론트엔드에서 섹션 배경을 transparent로 덮어쓰므로 실제 보이는 색 기준)
+            if background_config and background_config.get("mode") == "solid":
+                validated_bg_color = background_config.get("hex_color", "#FFFFFF")
+            else:
+                validated_bg_color = validate_bg_color(ai_bg_color, theme["catalog_bg_color"])
             theme["catalog_bg_color"] = validated_bg_color
-            logger.info(f"AI bg_color: {ai_bg_color} → validated: {validated_bg_color}")
+            logger.info(f"AI bg_color: {ai_bg_color} → validated: {validated_bg_color} (solid_override={bool(background_config and background_config.get('mode') == 'solid')})")
 
             # 5. 섹션 이미지 병렬 생성 (세마포어로 동시 실행 제한)
             # AI 이미지 생성은 배경/분위기 섹션만 (상품 이미지는 사용자 업로드 직접 사용)

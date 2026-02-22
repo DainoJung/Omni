@@ -2,7 +2,7 @@
 
 import React, { useMemo, useRef, useEffect } from "react";
 import type { RenderedSection, SectionBg } from "@/types";
-import { optimizeImageUrl } from "@/lib/imageUrl";
+import { optimizeImageUrl, markRenderEndpointUnavailable } from "@/lib/imageUrl";
 
 export interface SelectedElement {
   sectionId: string;
@@ -105,6 +105,26 @@ export function SectionBlock({ section, onDataChange, onElementSelect, selectedP
     return `${sel} { background: transparent !important; }`;
   }, [backgroundConfig, section.section_id]);
 
+  // 배경색 밝기 기반 텍스트 색상 동적 오버라이드
+  const textColorOverrideCss = useMemo(() => {
+    if (!backgroundConfig || backgroundConfig.type !== "solid" || !backgroundConfig.hex_color) return "";
+    const hex = backgroundConfig.hex_color.replace("#", "");
+    if (hex.length !== 6) return "";
+    const r = parseInt(hex.slice(0, 2), 16);
+    const g = parseInt(hex.slice(2, 4), 16);
+    const b = parseInt(hex.slice(4, 6), 16);
+    const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+    const textColor = luminance > 150 ? "#111111" : "#FFFFFF";
+    const textColorSub = luminance > 150 ? "rgba(0,0,0,0.6)" : "rgba(255,255,255,0.75)";
+
+    // 현재 data의 text_color와 다를 때만 오버라이드
+    if (section.data.text_color === textColor) return "";
+
+    const scope = `[data-section-id="${section.section_id}"]`;
+    return `${scope} [data-editable] { color: ${textColor} !important; }
+${scope} [data-placeholder]:not([data-editable]) { color: ${textColorSub} !important; }`;
+  }, [backgroundConfig, section.section_id, section.data.text_color]);
+
   // 섹션별 배경: 실제 DOM 요소로 배경 레이어 생성 (html-to-image 호환)
   const bgLayerStyle = useMemo((): React.CSSProperties | null => {
     if (!backgroundConfig || backgroundConfig.type === "none") return null;
@@ -138,10 +158,15 @@ export function SectionBlock({ section, onDataChange, onElementSelect, selectedP
     const imgs = containerRef.current.querySelectorAll("img");
     const handlers: Array<{ img: HTMLImageElement; handler: () => void }> = [];
     imgs.forEach((img) => {
+      // 이미 폴백 완료된 이미지는 건너뛰기 (반복 교체 방지)
+      if (img.dataset.fallbackApplied) return;
       const handler = () => {
         const src = img.src;
         if (src.includes("/render/image/public/")) {
+          img.dataset.fallbackApplied = "true";
           img.src = src.replace("/render/image/public/", "/object/public/").split("?")[0];
+          // render 엔드포인트 사용 불가 → 이후 모든 이미지 최적화 비활성화
+          markRenderEndpointUnavailable();
         }
       };
       img.addEventListener("error", handler, { once: true });
@@ -277,6 +302,7 @@ export function SectionBlock({ section, onDataChange, onElementSelect, selectedP
       <style dangerouslySetInnerHTML={{ __html: renderedCss }} />
       {overrideCss && <style dangerouslySetInnerHTML={{ __html: overrideCss }} />}
       {bgClearCss && <style dangerouslySetInnerHTML={{ __html: bgClearCss }} />}
+      {textColorOverrideCss && <style dangerouslySetInnerHTML={{ __html: textColorOverrideCss }} />}
       {bgLayerStyle && <div data-bg-layer style={bgLayerStyle} />}
       <div
         className="section-inner"

@@ -9,6 +9,30 @@ logger = logging.getLogger(__name__)
 
 # product_name_0, product_image_2 등 → (base_id, index) 추출
 _INDEXED_PH_RE = re.compile(r"^(.+)_(\d+)$")
+_HEX_RE = re.compile(r"^#([0-9a-fA-F]{6})$")
+
+
+def _compute_text_colors(bg_hex: str) -> tuple[str, str]:
+    """배경색 밝기 기반으로 (text_color, text_color_sub) 반환.
+
+    W3C 상대 휘도 공식으로 밝기를 계산하여
+    어두운 배경이면 밝은 텍스트, 밝은 배경이면 어두운 텍스트를 반환한다.
+    """
+    m = _HEX_RE.match(bg_hex.strip() if bg_hex else "")
+    if not m:
+        return "#FFFFFF", "rgba(255,255,255,0.75)"
+
+    hex_str = m.group(1)
+    r, g, b = int(hex_str[0:2], 16), int(hex_str[2:4], 16), int(hex_str[4:6], 16)
+    # ITU-R BT.601 밝기 공식
+    luminance = 0.299 * r + 0.587 * g + 0.114 * b
+
+    if luminance > 150:
+        # 밝은 배경 → 어두운 텍스트
+        return "#111111", "rgba(0,0,0,0.6)"
+    else:
+        # 어두운 배경 → 밝은 텍스트
+        return "#FFFFFF", "rgba(255,255,255,0.75)"
 
 
 def _format_price(raw: str) -> str:
@@ -102,6 +126,8 @@ def bind_section_data(
         if source == "theme":
             if ph_id == "bg_color":
                 data[ph_id] = theme.get("catalog_bg_color", "#6B1520")
+            elif ph_id in ("text_color", "text_color_sub"):
+                pass  # bg_color 기반으로 루프 이후 자동 산출
             else:
                 data[ph_id] = accent_color
 
@@ -251,5 +277,11 @@ def bind_section_data(
 
         else:
             data[ph_id] = _get_text(ph_id)
+
+    # bg_color가 있으면 밝기 기반으로 text_color / text_color_sub 자동 산출
+    if "bg_color" in data:
+        text_color, text_color_sub = _compute_text_colors(data["bg_color"])
+        data.setdefault("text_color", text_color)
+        data.setdefault("text_color_sub", text_color_sub)
 
     return data

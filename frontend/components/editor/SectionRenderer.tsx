@@ -45,6 +45,31 @@ export const SectionRenderer = forwardRef<HTMLDivElement, SectionRendererProps>(
       return `${sel} .section-inner > *, ${sel} .section-inner > * > *:not(.s-gr__card):not(.s-point__badge) { background: transparent !important; }`;
     }, [backgroundSettings]);
 
+    // 전체 모드: 배경색 밝기 기반 텍스트 색상 오버라이드
+    const globalTextColorCss = useMemo(() => {
+      if (!backgroundSettings) return "";
+      const bg = backgroundSettings.global;
+      if (!bg || bg.type !== "solid" || !bg.hex_color) return "";
+      const hex = bg.hex_color.replace("#", "");
+      if (hex.length !== 6) return "";
+      const r = parseInt(hex.slice(0, 2), 16);
+      const g = parseInt(hex.slice(2, 4), 16);
+      const b = parseInt(hex.slice(4, 6), 16);
+      const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+      // 배경과 text_color가 동일 계열이면 오버라이드
+      const firstTextColor = sections[0]?.data?.text_color;
+      const bgIsBright = luminance > 150;
+      const textIsBright = firstTextColor === "#FFFFFF" || firstTextColor?.startsWith("rgba(255");
+      if (bgIsBright === textIsBright || (!bgIsBright && !textIsBright)) {
+        const textColor = bgIsBright ? "#111111" : "#FFFFFF";
+        const textColorSub = bgIsBright ? "rgba(0,0,0,0.6)" : "rgba(255,255,255,0.75)";
+        const sel = ".section-renderer-root";
+        return `${sel} [data-editable] { color: ${textColor} !important; }
+${sel} [data-placeholder]:not([data-editable]) { color: ${textColorSub} !important; }`;
+      }
+      return "";
+    }, [backgroundSettings, sections]);
+
     // 전체 모드: 실제 DOM 요소로 배경 레이어 생성 (html-to-image 호환)
     const globalBgLayerStyle = useMemo((): React.CSSProperties | null => {
       if (!backgroundSettings) return null;
@@ -87,6 +112,7 @@ export const SectionRenderer = forwardRef<HTMLDivElement, SectionRendererProps>(
         style={hasGlobalBg ? { position: "relative", isolation: "isolate" } : undefined}
       >
         {globalBgClearCss && <style dangerouslySetInnerHTML={{ __html: globalBgClearCss }} />}
+        {globalTextColorCss && <style dangerouslySetInnerHTML={{ __html: globalTextColorCss }} />}
         {globalBgLayerStyle && <div data-bg-layer style={globalBgLayerStyle} />}
         {sorted.map((section, index) => (
           <div key={section.section_id} className="relative group/section">

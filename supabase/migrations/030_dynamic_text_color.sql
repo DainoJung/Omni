@@ -134,8 +134,8 @@ SET
   flex-shrink: 0;
 }
 .s-pcard__image {
-  width: 350px;
-  height: 350px;
+  width: 420px;
+  height: 420px;
   object-fit: contain;
 }
 .s-pcard__info {
@@ -180,7 +180,7 @@ SET
 }',
 
   placeholders = '[
-  {"id": "product_image", "type": "image", "label": "상품 이미지", "source": "product", "editable": true},
+  {"id": "product_image", "type": "image", "label": "상품 이미지", "source": "product", "editable": true, "bg_remove": true},
   {"id": "brand_name", "type": "text", "label": "브랜드명", "source": "product", "editable": true},
   {"id": "product_name", "type": "text", "label": "상품명", "source": "product", "editable": true},
   {"id": "product_price", "type": "text", "label": "가격", "source": "product", "editable": true},

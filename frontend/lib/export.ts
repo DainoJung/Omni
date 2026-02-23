@@ -107,6 +107,92 @@ export async function inlineImages(
   };
 }
 
+/**
+ * html-to-image가 CSS opacity/filter를 제대로 캡처하지 못하는 문제 해결.
+ * 배경 레이어의 opacity와 brightness를 실제 색상값으로 베이킹한다.
+ * - 단색 배경: rgba 알파 + brightness 곱연산으로 최종 색상 계산
+ * - 이미지 배경: 반투명 오버레이로 brightness/opacity 시뮬레이션
+ */
+function bakeBgLayerEffects(root: HTMLElement): () => void {
+  const layers = root.querySelectorAll<HTMLElement>("[data-bg-layer]");
+  const originals: { el: HTMLElement; styles: Record<string, string> }[] = [];
+
+  layers.forEach((el) => {
+    const opacity = parseFloat(el.style.opacity || "1");
+    const filterMatch = el.style.filter?.match(/brightness\(([\d.]+)\)/);
+    const brightness = filterMatch ? parseFloat(filterMatch[1]) : 1;
+
+    // opacity와 brightness 모두 기본값이면 처리 불필요
+    if (opacity === 1 && brightness === 1) return;
+
+    originals.push({
+      el,
+      styles: {
+        opacity: el.style.opacity,
+        filter: el.style.filter,
+        backgroundColor: el.style.backgroundColor,
+      },
+    });
+
+    const bgColor = el.style.backgroundColor;
+    const hasImage = el.style.backgroundImage && el.style.backgroundImage !== "none";
+
+    if (!hasImage && bgColor) {
+      // 단색 배경: opacity + brightness를 rgba로 베이킹
+      const m = bgColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+      const hexM = bgColor.match(/^#([0-9a-fA-F]{6})$/);
+      let r = 0, g = 0, b = 0;
+      if (m) {
+        r = parseInt(m[1]); g = parseInt(m[2]); b = parseInt(m[3]);
+      } else if (hexM) {
+        r = parseInt(hexM[1].slice(0, 2), 16);
+        g = parseInt(hexM[1].slice(2, 4), 16);
+        b = parseInt(hexM[1].slice(4, 6), 16);
+      }
+      // brightness 적용 후 opacity를 alpha로
+      r = Math.min(255, Math.round(r * brightness));
+      g = Math.min(255, Math.round(g * brightness));
+      b = Math.min(255, Math.round(b * brightness));
+      el.style.backgroundColor = `rgba(${r}, ${g}, ${b}, ${opacity})`;
+      el.style.opacity = "1";
+      el.style.filter = "none";
+    } else if (hasImage) {
+      // 이미지 배경: opacity는 유지하되 brightness를 오버레이로 시뮬레이션
+      // html-to-image는 opacity는 처리 가능하지만 filter는 불안정
+      if (brightness < 1) {
+        // 어둡게: 검정 오버레이 추가
+        const darkAlpha = 1 - brightness;
+        el.style.filter = "none";
+        el.dataset.exportOverlay = "true";
+        const overlay = document.createElement("div");
+        overlay.dataset.bgOverlayExport = "true";
+        overlay.style.cssText = `position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,${darkAlpha});pointer-events:none;`;
+        el.appendChild(overlay);
+      } else if (brightness > 1) {
+        // 밝게: 흰색 오버레이 추가
+        const lightAlpha = brightness - 1;
+        el.style.filter = "none";
+        el.dataset.exportOverlay = "true";
+        const overlay = document.createElement("div");
+        overlay.dataset.bgOverlayExport = "true";
+        overlay.style.cssText = `position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,${Math.min(1, lightAlpha)});pointer-events:none;`;
+        el.appendChild(overlay);
+      }
+    }
+  });
+
+  return () => {
+    for (const { el, styles } of originals) {
+      el.style.opacity = styles.opacity;
+      el.style.filter = styles.filter;
+      el.style.backgroundColor = styles.backgroundColor;
+      delete el.dataset.exportOverlay;
+      // 임시 오버레이 제거
+      el.querySelectorAll("[data-bg-overlay-export]").forEach((o) => o.remove());
+    }
+  };
+}
+
 export async function exportImage(
   element: HTMLElement,
   options: ExportOptions
@@ -119,6 +205,9 @@ export async function exportImage(
 
   // 외부 이미지를 data URL로 인라인 변환 (원본 품질)
   const restoreImages = await inlineImages(element, { forExport: true });
+
+  // 배경 레이어의 opacity/brightness를 실제 색상으로 베이킹
+  const restoreBgEffects = bakeBgLayerEffects(element);
 
   try {
     const { toPng, toJpeg } = await import("html-to-image");
@@ -140,7 +229,8 @@ export async function exportImage(
     link.click();
     document.body.removeChild(link);
   } finally {
-    // 원본 src 복원
+    // 원본 스타일 복원
+    restoreBgEffects();
     restoreImages();
   }
 }

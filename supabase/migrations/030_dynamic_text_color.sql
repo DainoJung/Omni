@@ -66,7 +66,7 @@ SET
 .s-phero__image-area {
   position: relative;
   width: 100%;
-  aspect-ratio: 2 / 1;
+  height: 430px;
   overflow: hidden;
 }
 .s-phero__bg {

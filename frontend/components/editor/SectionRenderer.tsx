@@ -64,8 +64,8 @@ export const SectionRenderer = forwardRef<HTMLDivElement, SectionRendererProps>(
         const textColor = bgIsBright ? "#111111" : "#FFFFFF";
         const textColorSub = bgIsBright ? "rgba(0,0,0,0.6)" : "rgba(255,255,255,0.75)";
         const sel = ".section-renderer-root";
-        return `${sel} [data-editable] { color: ${textColor} !important; }
-${sel} [data-placeholder]:not([data-editable]) { color: ${textColorSub} !important; }`;
+        return `${sel} [data-editable] { color: ${textColor}; }
+${sel} [data-placeholder]:not([data-editable]) { color: ${textColorSub}; }`;
       }
       return "";
     }, [backgroundSettings, sections]);

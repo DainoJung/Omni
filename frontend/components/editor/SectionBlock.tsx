@@ -2,7 +2,6 @@
 
 import React, { useMemo, useRef, useEffect } from "react";
 import type { RenderedSection, SectionBg } from "@/types";
-import { optimizeImageUrl, markRenderEndpointUnavailable } from "@/lib/imageUrl";
 
 export interface SelectedElement {
   sectionId: string;
@@ -65,10 +64,7 @@ export function SectionBlock({ section, onDataChange, onElementSelect, selectedP
     for (const [key, value] of Object.entries(section.data)) {
       const safeValue = value ?? "";
       const skipEscape = key.endsWith("_html") || key.endsWith("_image") || key === "theme_accent";
-      let escaped = skipEscape ? safeValue : escapeHtml(safeValue);
-      if ((key.endsWith("_image") || key.includes("_image_")) && typeof escaped === "string" && escaped.startsWith("http")) {
-        escaped = optimizeImageUrl(escaped, "editor");
-      }
+      const escaped = skipEscape ? safeValue : escapeHtml(safeValue);
       html = html.replaceAll(`{{${key}}}`, escaped);
     }
     return html;
@@ -89,10 +85,7 @@ export function SectionBlock({ section, onDataChange, onElementSelect, selectedP
   const renderedCss = useMemo(() => {
     let css = section.css;
     for (const [key, value] of Object.entries(section.data)) {
-      let val = value ?? "";
-      if ((key.endsWith("_image") || key.includes("_image_")) && typeof val === "string" && val.startsWith("http")) {
-        val = optimizeImageUrl(val, "editor");
-      }
+      const val = value ?? "";
       css = css.replaceAll(`{{${key}}}`, val);
     }
     return css;
@@ -121,8 +114,8 @@ export function SectionBlock({ section, onDataChange, onElementSelect, selectedP
     if (section.data.text_color === textColor) return "";
 
     const scope = `[data-section-id="${section.section_id}"]`;
-    return `${scope} [data-editable] { color: ${textColor} !important; }
-${scope} [data-placeholder]:not([data-editable]) { color: ${textColorSub} !important; }`;
+    return `${scope} [data-editable] { color: ${textColor}; }
+${scope} [data-placeholder]:not([data-editable]) { color: ${textColorSub}; }`;
   }, [backgroundConfig, section.section_id, section.data.text_color]);
 
   // 섹션별 배경: 실제 DOM 요소로 배경 레이어 생성 (html-to-image 호환)
@@ -152,23 +145,13 @@ ${scope} [data-placeholder]:not([data-editable]) { color: ${textColorSub} !impor
     return null;
   }, [backgroundConfig, section.section_id]);
 
-  // render/image 엔드포인트 실패 시 원본 /object/public/ URL로 폴백
+  // 이미지 로드 실패 시 에러 숨김 (깨진 이미지 아이콘 방지)
   useEffect(() => {
     if (!containerRef.current) return;
     const imgs = containerRef.current.querySelectorAll("img");
     const handlers: Array<{ img: HTMLImageElement; handler: () => void }> = [];
     imgs.forEach((img) => {
-      // 이미 폴백 완료된 이미지는 건너뛰기 (반복 교체 방지)
-      if (img.dataset.fallbackApplied) return;
-      const handler = () => {
-        const src = img.src;
-        if (src.includes("/render/image/public/")) {
-          img.dataset.fallbackApplied = "true";
-          img.src = src.replace("/render/image/public/", "/object/public/").split("?")[0];
-          // render 엔드포인트 사용 불가 → 이후 모든 이미지 최적화 비활성화
-          markRenderEndpointUnavailable();
-        }
-      };
+      const handler = () => { img.style.visibility = "hidden"; };
       img.addEventListener("error", handler, { once: true });
       handlers.push({ img, handler });
     });

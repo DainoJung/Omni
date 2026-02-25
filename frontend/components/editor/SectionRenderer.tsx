@@ -109,7 +109,7 @@ ${sel} [data-placeholder]:not([data-editable]) { color: ${textColorSub}; }`;
       <div
         ref={ref}
         className="section-renderer-root w-full max-w-[860px] mx-auto flex flex-col"
-        style={hasGlobalBg ? { position: "relative", isolation: "isolate" } : undefined}
+        style={{ backgroundColor: "#ffffff", ...(hasGlobalBg ? { position: "relative", isolation: "isolate" } : {}) }}
       >
         {globalBgClearCss && <style dangerouslySetInnerHTML={{ __html: globalBgClearCss }} />}
         {globalTextColorCss && <style dangerouslySetInnerHTML={{ __html: globalTextColorCss }} />}

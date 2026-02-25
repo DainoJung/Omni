@@ -267,8 +267,8 @@ export function BackgroundPanel({
                         : "border-border hover:border-accent/50"
                     }`}
                   >
-                    {/* Thumbnail */}
-                    <div className="w-10 h-10 bg-bg-tertiary border border-border rounded shrink-0 overflow-hidden">
+                    {/* 섹션 썸네일 미리보기 — 로딩 성능 이슈로 임시 비활성화 */}
+                    {/* <div className="w-10 h-10 bg-bg-tertiary border border-border rounded shrink-0 overflow-hidden">
                       {sectionThumbnails[section.section_id] ? (
                         <img
                           src={sectionThumbnails[section.section_id]}
@@ -280,7 +280,7 @@ export function BackgroundPanel({
                           <div className="w-3 h-3 border-2 border-text-tertiary border-t-transparent rounded-full animate-spin" />
                         </div>
                       )}
-                    </div>
+                    </div> */}
                     <div className="flex-1 min-w-0 text-left">
                       <p className="text-xs font-medium text-text-primary truncate">
                         {section.section_type.replace(/_/g, " ")}
@@ -292,7 +292,6 @@ export function BackgroundPanel({
                         </span>
                       </p>
                     </div>
-                    {/* Color indicator */}
                     {sectionBg.type === "solid" && sectionBg.hex_color && (
                       <div
                         className="w-5 h-5 rounded-full border-2 border-white shadow-sm shrink-0"
@@ -301,15 +300,11 @@ export function BackgroundPanel({
                     )}
                   </button>
 
-                  {/* Expanded section controls */}
                   {isSelected && (
                     <div className="mt-1.5 ml-2 pl-3 border-l-2 border-accent/20 space-y-3 pb-2">
-                      {/* Type selector */}
                       <div className="flex gap-1 p-1 bg-bg-secondary rounded-lg">
                         <button
                           onClick={() => {
-                            // "전체" 선택 시 per_section에서 해당 섹션 항목 제거
-                            // eslint-disable-next-line @typescript-eslint/no-unused-vars
                             const { [section.section_id]: _removed, ...rest } = settings.per_section;
                             onSettingsChange({ ...settings, per_section: rest });
                           }}
@@ -343,7 +338,6 @@ export function BackgroundPanel({
                         </button>
                       </div>
 
-                      {/* Section solid color */}
                       {sectionBg.type === "solid" && (
                         <div className="flex items-center gap-2">
                           <input
@@ -376,7 +370,6 @@ export function BackgroundPanel({
                         </div>
                       )}
 
-                      {/* Section AI */}
                       {sectionBg.type === "ai" && (
                         <div className="space-y-2">
                           <textarea
@@ -424,7 +417,6 @@ export function BackgroundPanel({
                         </div>
                       )}
 
-                      {/* Section Opacity & Brightness Sliders */}
                       {(sectionBg.type === "solid" || sectionBg.type === "ai") && (
                         <div className="space-y-2.5">
                           <div className="space-y-1.5">

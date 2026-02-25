@@ -1318,7 +1318,7 @@ export default function ResultPage() {
               <div
                 className="origin-top overflow-hidden shrink-0"
                 style={{
-                  width: `${860 * (zoom / 100)}px`,
+                  width: `${860 * (zoom / 100) + 50}px`,
                   height: 'fit-content',
                 }}
               >

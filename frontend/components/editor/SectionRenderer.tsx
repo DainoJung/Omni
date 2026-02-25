@@ -2,7 +2,7 @@
 
 import React, { forwardRef, useMemo } from "react";
 import { SectionBlock } from "./SectionBlock";
-import { ChevronUp, ChevronDown, Copy, Trash2, Plus } from "lucide-react";
+import { ChevronUp, ChevronDown, Copy, Trash2 } from "lucide-react";
 import type { RenderedSection, BackgroundSettings, SectionBg } from "@/types";
 import type { SelectedElement } from "./SectionBlock";
 
@@ -163,13 +163,7 @@ ${sel} [data-placeholder]:not([data-editable]) { color: ${textColorSub}; }`;
                 >
                   <Trash2 size={16} className="text-gray-500" />
                 </button>
-                <button
-                  onClick={(e) => { e.stopPropagation(); onDuplicate?.(index); }}
-                  className={btnBase}
-                  title="섹션 추가"
-                >
-                  <Plus size={18} className="text-gray-500" />
-                </button>
+
               </div>
             </div>
           </div>

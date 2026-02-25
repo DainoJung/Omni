@@ -107,7 +107,7 @@ export function Header({
         <Link href="/" className="flex items-center gap-2">
           <Image src="/logo.png" alt="SSG" width={28} height={28} />
           <span className="text-lg font-semibold tracking-widest">
-            SSG POP MAKER
+            POP MAKER
           </span>
         </Link>
 
@@ -160,8 +160,8 @@ export function Header({
                         <div
                           key={project.id}
                           className={`group flex items-center gap-2 px-3 py-2 text-sm transition-colors ${isSelected
-                              ? "bg-accent/10 text-accent"
-                              : "text-text-primary hover:bg-bg-secondary"
+                            ? "bg-accent/10 text-accent"
+                            : "text-text-primary hover:bg-bg-secondary"
                             }`}
                         >
                           <button

@@ -56,7 +56,7 @@ export default function HomePage() {
           <div className="flex items-center gap-2">
             <Image src="/logo.png" alt="SSG" width={28} height={28} />
             <h1 className="text-lg font-semibold tracking-widest">
-              SSG POP MAKER
+              POP MAKER
             </h1>
           </div>
         </header>

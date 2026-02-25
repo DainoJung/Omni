@@ -54,7 +54,7 @@ export default function HomePage() {
         {/* Header */}
         <header className="h-14 border-b border-border flex items-center px-10">
           <div className="flex items-center gap-2">
-            <Image src="/logo.png" alt="SSG" width={28} height={28} />
+            <Image src="/logo.png" alt="SSG" width={120} height={40} />
           </div>
         </header>
 

@@ -19,6 +19,7 @@ export function BackgroundPanel({
   onSettingsChange,
   onGenerateAI,
   generating,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   sectionThumbnails,
 }: BackgroundPanelProps) {
   const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
@@ -305,6 +306,7 @@ export function BackgroundPanel({
                       <div className="flex gap-1 p-1 bg-bg-secondary rounded-lg">
                         <button
                           onClick={() => {
+                            // eslint-disable-next-line @typescript-eslint/no-unused-vars
                             const { [section.section_id]: _removed, ...rest } = settings.per_section;
                             onSettingsChange({ ...settings, per_section: rest });
                           }}

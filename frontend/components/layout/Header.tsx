@@ -106,6 +106,7 @@ export function Header({
       <div className="flex items-center gap-4">
         <Link href="/" className="flex items-center gap-2">
           <Image src="/logo.png" alt="SSG" width={120} height={40} />
+          <h1 className="text-lg font-semibold text-center text-gray-700">CONTENTS MAKER</h1>
         </Link>
 
         {/* Project Selector */}

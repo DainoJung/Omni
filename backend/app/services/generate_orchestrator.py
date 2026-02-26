@@ -49,7 +49,7 @@ def _get_section_text_keys(section_type: str) -> list[str]:
 
 
 class GenerateOrchestrator:
-    """v5.2 HTML 템플릿 기반 POP 생성 파이프라인 오케스트레이터."""
+    """v5.2 HTML 템플릿 기반 광고 콘텐츠 생성 파이프라인 오케스트레이터."""
 
     def __init__(self):
         self.storage = StorageService()
@@ -66,7 +66,7 @@ class GenerateOrchestrator:
         wines: list[dict] | None = None,
         concept: str | None = None,
     ) -> GenerateResponse:
-        """HTML 템플릿 기반 POP 생성 파이프라인을 실행한다."""
+        """HTML 템플릿 기반 광고 콘텐츠 생성 파이프라인을 실행한다."""
 
         try:
             # 1. 페이지 타입 정보 조회 → 테마 호환 dict 생성
@@ -361,7 +361,7 @@ class GenerateOrchestrator:
             )
 
         except Exception as e:
-            logger.exception(f"POP 생성 실패 (project={project_id}): {e}")
+            logger.exception(f"광고 콘텐츠 생성 실패 (project={project_id}): {e}")
             raise
 
     async def _get_product_image_urls(self, project_id: str) -> list[str]:

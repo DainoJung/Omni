@@ -1437,7 +1437,7 @@ export default function ResultPage() {
             {!isContentReady && (
               <div className="space-y-6">
                 <div>
-                  <h3 className="text-lg font-bold mb-1">AI 광고페이지 생성 중</h3>
+                  <h3 className="text-lg font-bold mb-1">AI 광고 콘텐츠 생성 중</h3>
                   <p className="text-xs text-text-secondary">
                     입력하신 정보로 상세페이지를 생성하고 있습니다.
                   </p>

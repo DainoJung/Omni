@@ -87,7 +87,11 @@
       "Bash(git diff:*)",
       "mcp__supabase__get_project",
       "Bash(dig:*)",
-      "Bash(nslookup:*)"
+      "Bash(nslookup:*)",
+      "Bash(gh run watch:*)",
+      "Bash(sips -g pixelWidth -g pixelHeight /Users/jungdain/Desktop/POP_maker/frontend/public/product_point_preview.png /Users/jungdain/Desktop/POP_maker/frontend/public/product_promotion_preview.png /Users/jungdain/Desktop/POP_maker/frontend/public/restaurant_preview.png)",
+      "Bash(git reflog expire --expire=now --all && git gc --prune=now --aggressive 2>&1 | tail -5)",
+      "Bash(git config http.postBuffer 524288000 && git push origin main 2>&1)"
     ]
   }
 }

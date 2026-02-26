@@ -210,11 +210,10 @@ function GourmetForm({
             onChange={(e) =>
               onUpdate(rIdx, { ...restaurant, name: e.target.value })
             }
-            className={`w-full h-9 px-3 border rounded-sm text-sm focus:border-border-focus ${
-              errors[`restaurant_${rIdx}_name`]
+            className={`w-full h-9 px-3 border rounded-sm text-sm focus:border-border-focus ${errors[`restaurant_${rIdx}_name`]
                 ? "border-error"
                 : "border-border"
-            }`}
+              }`}
           />
           {errors[`restaurant_${rIdx}_name`] && (
             <p className="text-xs text-error">
@@ -245,11 +244,10 @@ function GourmetForm({
                 onChange={(e) =>
                   updateFood(rIdx, "food1", "name", e.target.value)
                 }
-                className={`w-full h-8 px-2 border rounded-sm text-sm focus:border-border-focus ${
-                  errors[`restaurant_${rIdx}_food1_name`]
+                className={`w-full h-8 px-2 border rounded-sm text-sm focus:border-border-focus ${errors[`restaurant_${rIdx}_food1_name`]
                     ? "border-error"
                     : "border-border"
-                }`}
+                  }`}
               />
             </div>
           </div>
@@ -277,11 +275,10 @@ function GourmetForm({
                 onChange={(e) =>
                   updateFood(rIdx, "food2", "name", e.target.value)
                 }
-                className={`w-full h-8 px-2 border rounded-sm text-sm focus:border-border-focus ${
-                  errors[`restaurant_${rIdx}_food2_name`]
+                className={`w-full h-8 px-2 border rounded-sm text-sm focus:border-border-focus ${errors[`restaurant_${rIdx}_food2_name`]
                     ? "border-error"
                     : "border-border"
-                }`}
+                  }`}
               />
             </div>
           </div>
@@ -323,11 +320,10 @@ function GourmetForm({
                     key={n}
                     type="button"
                     onClick={() => onWineCountChange(n)}
-                    className={`px-3 py-1 text-xs rounded-sm border transition-colors ${
-                      wineCount === n
+                    className={`px-3 py-1 text-xs rounded-sm border transition-colors ${wineCount === n
                         ? "border-accent bg-accent/10 text-accent font-medium"
                         : "border-border text-text-tertiary hover:border-text-secondary"
-                    }`}
+                      }`}
                   >
                     {n}개
                   </button>
@@ -354,9 +350,8 @@ function GourmetForm({
                     placeholder={`와인 ${i + 1} 이름`}
                     value={wine.name}
                     onChange={(e) => onWineEntryChange(i, "name", e.target.value)}
-                    className={`w-full h-9 px-3 border rounded-sm text-sm focus:border-border-focus ${
-                      errors[`wine_${i}`] ? "border-error" : "border-border"
-                    }`}
+                    className={`w-full h-9 px-3 border rounded-sm text-sm focus:border-border-focus ${errors[`wine_${i}`] ? "border-error" : "border-border"
+                      }`}
                   />
                   {errors[`wine_${i}`] && (
                     <p className="text-xs text-error mt-1">
@@ -475,9 +470,8 @@ function CustomSectionForm({
               placeholder={`상품 ${i + 1} 이름`}
               value={name}
               onChange={(e) => onProductChange(i, e.target.value)}
-              className={`flex-1 h-9 px-3 border rounded-sm text-sm focus:border-border-focus ${
-                errors[`custom_product_${i}`] ? "border-error" : "border-border"
-              }`}
+              className={`flex-1 h-9 px-3 border rounded-sm text-sm focus:border-border-focus ${errors[`custom_product_${i}`] ? "border-error" : "border-border"
+                }`}
             />
             {products.length > 1 && (
               <button
@@ -838,9 +832,8 @@ export function ProjectInputForm({ onSuccess, compact }: ProjectInputFormProps) 
             onChange={(e) => setConcept(e.target.value)}
             placeholder="예: 크리스마스 선물 기획전, 여름 쿨링 특가"
             rows={2}
-            className={`w-full px-3 py-2 border rounded-sm text-sm resize-none focus:border-border-focus ${
-              errors.concept ? "border-error" : "border-border"
-            }`}
+            className={`w-full px-3 py-2 border rounded-sm text-sm resize-none focus:border-border-focus ${errors.concept ? "border-error" : "border-border"
+              }`}
             maxLength={500}
           />
           {errors.concept && (
@@ -920,9 +913,8 @@ export function ProjectInputForm({ onSuccess, compact }: ProjectInputFormProps) 
             placeholder="브랜드명을 입력하세요 (예: GUCCI)"
             value={brandName}
             onChange={(e) => setBrandName(e.target.value)}
-            className={`w-full h-10 px-3 border rounded-sm text-sm font-medium focus:border-border-focus ${
-              errors.brand_name ? "border-error" : "border-border"
-            }`}
+            className={`w-full h-10 px-3 border rounded-sm text-sm font-medium focus:border-border-focus ${errors.brand_name ? "border-error" : "border-border"
+              }`}
           />
           {errors.brand_name && (
             <p className="text-xs text-error">{errors.brand_name}</p>
@@ -1036,7 +1028,7 @@ export function ProjectInputForm({ onSuccess, compact }: ProjectInputFormProps) 
 
       <div className="pt-4">
         <Button type="submit" size="lg" loading={loading} className="w-full">
-          AI 상세페이지 생성하기
+          AI 광고 콘텐츠 생성하기
         </Button>
       </div>
     </form>

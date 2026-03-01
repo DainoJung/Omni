@@ -29,7 +29,7 @@ async def create_project(data: ProjectCreate, current_user: CurrentUser = Depend
     db = get_supabase()
     insert_data = {
         "products": [p.model_dump() for p in data.products],
-        "theme_id": data.page_type,
+        "page_type": data.page_type,
         "user_id": current_user.user_id,
     }
     if data.selected_sections:

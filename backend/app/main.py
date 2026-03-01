@@ -9,7 +9,7 @@ from app.routers import projects, generate, upload, templates, themes, auth, ima
 logger = logging.getLogger(__name__)
 
 app = FastAPI(
-    title="POP Maker API",
+    title="Omni API",
     version="5.3.0",
     docs_url="/docs",
     redoc_url="/redoc",

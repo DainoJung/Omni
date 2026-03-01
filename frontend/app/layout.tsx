@@ -70,7 +70,7 @@ const bebasNeue = Bebas_Neue({
 });
 
 export const metadata: Metadata = {
-  title: "POP Maker - 신세계백화점 POP 자동 생성",
+  title: "Omni - 신세계백화점 POP 자동 생성",
   description: "AI 기반 POP 자동 생성 시스템",
 };
 

@@ -9,13 +9,12 @@ import {
   Search,
   Loader2,
   CheckCircle,
-  Sparkles,
   X,
   Plus,
   Pencil,
   ImageIcon,
 } from "lucide-react";
-import type { AnalysisResponse, TemplateStyle } from "@/types";
+import type { AnalysisResponse } from "@/types";
 
 type InputTab = "name" | "url";
 

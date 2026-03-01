@@ -62,6 +62,20 @@ class GenerateResponse(BaseModel):
     generated_at: datetime
 
 
+class GenerateV2Request(BaseModel):
+    project_id: UUID
+    template_style: Optional[str] = Field(None, max_length=50)
+    language: str = Field(default="ko", pattern=r"^(ko|en)$")
+
+
+class GenerateV2Response(BaseModel):
+    project_id: UUID
+    template_style: str
+    language: str
+    rendered_sections: List[RenderedSectionResponse]
+    generated_at: datetime
+
+
 class UploadResult(BaseModel):
     file_id: UUID
     storage_path: str

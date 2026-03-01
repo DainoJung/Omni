@@ -15,7 +15,7 @@ import { exportImage, clearImageCache } from "@/lib/export";
 import { ZoomIn, ChevronLeft, ChevronRight, GripVertical, Image as ImageIcon, User, LogOut, Loader2, Check, Undo2, Redo2, Paintbrush } from "lucide-react";
 import { useHistory } from "@/hooks/useHistory";
 import { toast } from "sonner";
-import type { Project, RenderedSection, BackgroundSettings } from "@/types";
+import type { Project, RenderedSection, BackgroundSettings, TemplateStyle } from "@/types";
 import type { SelectedElement } from "@/components/editor/SectionBlock";
 
 type GenerationStepStatus = "pending" | "running" | "done";
@@ -71,6 +71,11 @@ export default function ResultPage() {
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
   const [colorPickerSection, setColorPickerSection] = useState<string | null>(null);
   const colorPickerRef = useRef<HTMLDivElement>(null);
+
+  // Language & template style
+  const [currentLanguage, setCurrentLanguage] = useState("ko");
+  const [currentTemplateStyle, setCurrentTemplateStyle] = useState<TemplateStyle | null>(null);
+  const [regenerating, setRegenerating] = useState(false);
 
   // Background settings state
   const [backgroundSettings, setBackgroundSettings] = useState<BackgroundSettings>({
@@ -175,6 +180,9 @@ export default function ResultPage() {
       }
       setOriginalAiImages(aiImages);
     }
+    // Load language and template style from project
+    if (proj.language) setCurrentLanguage(proj.language);
+    if (proj.template_style) setCurrentTemplateStyle(proj.template_style as TemplateStyle);
   }, [pushSnapshot, triggerRender]);
 
   useEffect(() => {
@@ -825,17 +833,45 @@ export default function ResultPage() {
     setTimeout(() => flushSave(sectionId), 0);
   }, [selectedElement, flushSave, pushSnapshot, triggerRender]);
 
-  const handleExport = async () => {
+  const handleExport = async (options?: { format?: "png" | "jpg"; quality?: 1 | 2 | 3; filename?: string }) => {
     if (!previewRef.current) return;
     try {
       await exportImage(previewRef.current, {
-        format: "png",
-        quality: 2,
-        filename: `POP_${Date.now()}`,
+        format: options?.format || "png",
+        quality: options?.quality || 2,
+        filename: options?.filename || `Omni_${Date.now()}`,
       });
       toast.success("이미지가 다운로드되었습니다.");
     } catch {
       toast.error("이미지 출력에 실패했습니다.");
+    }
+  };
+
+  const handleRegenerate = async (newLanguage?: string, newTemplate?: TemplateStyle) => {
+    if (regenerating) return;
+    setRegenerating(true);
+    try {
+      const lang = newLanguage || currentLanguage;
+      const tmpl = newTemplate || currentTemplateStyle || undefined;
+
+      await generateApi.generateV2({
+        project_id: projectId,
+        template_style: tmpl,
+        language: lang,
+      });
+
+      const updatedProj = await projectsApi.get(projectId);
+      setProject(updatedProj);
+      loadProjectData(updatedProj);
+
+      if (newLanguage) setCurrentLanguage(newLanguage);
+      if (newTemplate) setCurrentTemplateStyle(newTemplate);
+
+      toast.success("콘텐츠가 재생성되었습니다.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "재생성에 실패했습니다.");
+    } finally {
+      setRegenerating(false);
     }
   };
 
@@ -1562,6 +1598,69 @@ export default function ResultPage() {
 
             {/* 생성 완료 후 기존 UI */}
             {isContentReady && (<>
+              {/* Language & Template Controls */}
+              <div className="space-y-3 mb-4 pb-4 border-b border-border">
+                <div className="space-y-2">
+                  <span className="text-xs font-medium text-text-secondary">생성 언어</span>
+                  <div className="flex gap-1.5">
+                    {[
+                      { code: "ko", label: "한국어" },
+                      { code: "en", label: "EN" },
+                      { code: "ja", label: "日本語" },
+                      { code: "zh", label: "中文" },
+                    ].map((lang) => (
+                      <button
+                        key={lang.code}
+                        onClick={() => {
+                          if (lang.code !== currentLanguage) {
+                            handleRegenerate(lang.code, undefined);
+                          }
+                        }}
+                        disabled={regenerating}
+                        className={`px-2.5 py-1 text-xs rounded-sm border transition-colors ${
+                          currentLanguage === lang.code
+                            ? "border-accent bg-accent/10 text-accent font-medium"
+                            : "border-border text-text-tertiary hover:border-text-secondary"
+                        } disabled:opacity-50`}
+                      >
+                        {lang.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {currentTemplateStyle && (
+                  <div className="space-y-2">
+                    <span className="text-xs font-medium text-text-secondary">템플릿 스타일</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {(["clean_minimal", "premium_luxury", "bold_casual", "tech_modern", "organic_natural"] as TemplateStyle[]).map((style) => (
+                        <button
+                          key={style}
+                          onClick={() => {
+                            if (style !== currentTemplateStyle) {
+                              handleRegenerate(undefined, style);
+                            }
+                          }}
+                          disabled={regenerating}
+                          className={`px-2 py-1 text-[10px] rounded-sm border transition-colors ${
+                            currentTemplateStyle === style
+                              ? "border-accent bg-accent/10 text-accent font-medium"
+                              : "border-border text-text-tertiary hover:border-text-secondary"
+                          } disabled:opacity-50`}
+                        >
+                          {style.replace(/_/g, " ")}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {regenerating && (
+                  <div className="flex items-center gap-2 text-xs text-accent">
+                    <Loader2 size={12} className="animate-spin" />
+                    <span>콘텐츠 재생성 중...</span>
+                  </div>
+                )}
+              </div>
+
               <div className="space-y-4">
                 {/* 입력한 정보 */}
                 <div className="bg-white rounded-lg border border-border">

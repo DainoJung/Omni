@@ -286,6 +286,36 @@ _SECTION_TEXT_KEYS: dict[str, list[tuple[str, str]]] = {
         ("benefit_3", "20자 이내 혜택3, 예: 무료 주차 3시간"),
         ("event_period", "20자 이내 행사 기간"),
     ],
+    # --- Global templates ---
+    "global_hero": [
+        ("category", "10자 이내 카테고리명, 예: Premium Collection"),
+        ("title", "20자 이내 임팩트 있는 메인 타이틀"),
+        ("subtitle", "30자 이내 보조 설명 문구"),
+    ],
+    "global_feature_grid": [
+        ("badge_1_icon", "이모지 1개, 상품 특징을 나타내는 이모지"),
+        ("badge_1", "8자 이내 특징 라벨, 줄바꿈 가능"),
+        ("badge_2_icon", "이모지 1개, 상품 특징을 나타내는 이모지"),
+        ("badge_2", "8자 이내 특징 라벨, 줄바꿈 가능"),
+        ("badge_3_icon", "이모지 1개, 상품 특징을 나타내는 이모지"),
+        ("badge_3", "8자 이내 특징 라벨, 줄바꿈 가능"),
+    ],
+    "global_description": [
+        ("desc_title_main", "15자 이내 설명 제목 첫째줄"),
+        ("desc_title_accent", "15자 이내 설명 제목 강조 부분"),
+        ("desc_body", "100자 이내 상세 설명, 줄바꿈 가능"),
+    ],
+    "global_product_showcase": [
+        ("point_body", "80자 이내 상품의 매력 포인트 설명"),
+    ],
+    "global_gallery": [
+        ("gallery_heading", "15자 이내 갤러리 섹션 제목, 예: More Products"),
+    ],
+    "global_cta": [
+        ("cta_title", "15자 이내 행동 유도 타이틀, 예: 지금 바로 만나보세요"),
+        ("cta_desc", "30자 이내 행동 유도 설명"),
+        ("cta_button", "8자 이내 버튼 텍스트, 예: 자세히 보기"),
+    ],
 }
 
 
@@ -354,6 +384,7 @@ async def generate_section_texts(
     copy_keywords: list[str],
     section_counts: dict[str, int] | None = None,
     concept: str | None = None,
+    language: str = "ko",
 ) -> dict:
     """Gemini 1회 호출로 전 섹션 텍스트를 JSON으로 생성한다.
 
@@ -363,6 +394,12 @@ async def generate_section_texts(
     products_str = ", ".join(product_names)
     keywords_str = ", ".join(copy_keywords)
     schema = _build_text_prompt_schema(section_counts)
+
+    lang_instruction = (
+        "모든 텍스트를 한국어로 작성하세요."
+        if language == "ko"
+        else "Write ALL text in English."
+    )
 
     concept_line = f"- 콘셉트: {concept}\n" if concept else ""
 
@@ -380,8 +417,9 @@ async def generate_section_texts(
         )
 
     prompt = (
-        f"당신은 한국 이커머스 POP(상품 상세 페이지) 카피라이터입니다.\n"
-        f"다음 조건으로 POP의 각 섹션에 들어갈 한국어 텍스트를 JSON으로 생성해주세요.\n\n"
+        f"당신은 이커머스 상품 상세 페이지(PDP) 전문 카피라이터입니다.\n"
+        f"{lang_instruction}\n"
+        f"다음 조건으로 PDP의 각 섹션에 들어갈 텍스트를 JSON으로 생성해주세요.\n\n"
         f"조건:\n"
         f"- 상품: {products_str}\n"
         f"- 테마: {theme_name}\n"

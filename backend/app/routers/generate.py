@@ -1,9 +1,10 @@
 from fastapi import APIRouter, HTTPException, Depends
 
 from app.database import get_supabase
-from app.schemas.generate import GenerateRequest, GenerateResponse
+from app.schemas.generate import GenerateRequest, GenerateResponse, GenerateV2Request, GenerateV2Response
 from app.services.generate_orchestrator import GenerateOrchestrator
 from app.dependencies.auth import get_current_user, CurrentUser
+from app.routers.billing import deduct_credit
 
 router = APIRouter()
 
@@ -12,6 +13,11 @@ router = APIRouter()
 async def generate(data: GenerateRequest, current_user: CurrentUser = Depends(get_current_user)):
     orchestrator = GenerateOrchestrator()
     try:
+        # 크레딧 차감
+        has_credit = await deduct_credit(current_user.user_id)
+        if not has_credit:
+            raise HTTPException(status_code=402, detail="크레딧이 부족합니다. 플랜을 업그레이드해주세요.")
+
         # background_config는 요청에서 또는 DB에서 로드
         background_config = data.background.model_dump() if data.background else None
         include_wine = data.include_wine or False
@@ -52,5 +58,37 @@ async def generate(data: GenerateRequest, current_user: CurrentUser = Depends(ge
         raise HTTPException(status_code=400, detail=str(e))
     except RuntimeError as e:
         raise HTTPException(status_code=502, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"INTERNAL_ERROR: {e}")
+
+
+@router.post("/v2", response_model=GenerateV2Response)
+async def generate_v2(data: GenerateV2Request, current_user: CurrentUser = Depends(get_current_user)):
+    """v2 글로벌 생성 파이프라인: 분석 기반 템플릿 매칭 → 다국어 콘텐츠 생성"""
+    orchestrator = GenerateOrchestrator()
+    try:
+        # 프로젝트 소유권 확인
+        db = get_supabase()
+        proj = db.table("projects").select("id").eq("id", str(data.project_id)).eq("user_id", current_user.user_id).maybe_single().execute()
+        if not proj.data:
+            raise HTTPException(status_code=404, detail="프로젝트를 찾을 수 없습니다.")
+
+        # 크레딧 차감
+        has_credit = await deduct_credit(current_user.user_id)
+        if not has_credit:
+            raise HTTPException(status_code=402, detail="크레딧이 부족합니다. 플랜을 업그레이드해주세요.")
+
+        result = await orchestrator.generate_v2(
+            project_id=str(data.project_id),
+            template_style=data.template_style,
+            language=data.language,
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"INTERNAL_ERROR: {e}")

@@ -30,6 +30,14 @@ class Settings(BaseSettings):
     JWT_EXPIRY_HOURS: int = 72
     ADMIN_DEFAULT_PASSWORD: str = "ssg2026!"
 
+    # Google Custom Search (이미지 검색)
+    GOOGLE_CSE_API_KEY: str = ""  # 비어있으면 GEMINI_API_KEY 사용
+    GOOGLE_CSE_ID: str = ""  # Programmable Search Engine ID
+
+    # Scraping & Generation
+    SCRAPER_TIMEOUT: int = 15
+    DEFAULT_LANGUAGE: str = "ko"
+
     # Storage
     STORAGE_BUCKET_PROJECTS: str = "project-images"
     STORAGE_BUCKET_TEMPLATES: str = "templates"

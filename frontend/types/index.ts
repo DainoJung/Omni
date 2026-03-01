@@ -45,7 +45,14 @@ export type SectionType =
   | "gourmet_restaurant"
   | "gourmet_wine_intro"
   | "gourmet_wine"
-  | "shinsegae_hero";
+  | "shinsegae_hero"
+  // Global v2 section types
+  | "global_hero"
+  | "global_feature_grid"
+  | "global_description"
+  | "global_product_showcase"
+  | "global_gallery"
+  | "global_cta";
 
 export interface RenderedSection {
   section_id: string;
@@ -75,6 +82,11 @@ export interface Project {
   background_config?: BackgroundConfig;
   background_settings?: BackgroundSettings;
   restaurants?: RestaurantInput[];
+  // v2 fields
+  product_url?: string;
+  analysis_result?: ProductAnalysis;
+  template_style?: TemplateStyle;
+  language?: string;
   created_at: string;
   updated_at: string;
 }
@@ -212,4 +224,61 @@ export interface ErrorResponse {
   error: string;
   message: string;
   detail?: string;
+}
+
+// === v2: Global Template System ===
+export type TemplateStyle =
+  | "clean_minimal"
+  | "premium_luxury"
+  | "bold_casual"
+  | "tech_modern"
+  | "organic_natural";
+
+export interface TemplateStyleInfo {
+  id: TemplateStyle;
+  name: string;
+  name_ko: string;
+  description: string;
+  description_ko: string;
+  preview_colors: string[];
+  css_variables: Record<string, string>;
+}
+
+export interface ProductAnalysis {
+  category: string;
+  subcategory: string;
+  usp_points: string[];
+  target_customer: string;
+  tone: string;
+  recommended_template_style: TemplateStyle;
+  color_palette: string[];
+  summary: string;
+}
+
+export interface AnalysisResponse extends ProductAnalysis {
+  scraped_data?: {
+    name: string;
+    description: string;
+    price: string;
+    currency: string;
+    brand: string;
+    images: string[];
+    category: string;
+    url: string;
+    platform: string;
+  };
+}
+
+export interface GenerateV2Request {
+  project_id: string;
+  template_style?: TemplateStyle;
+  language?: string;
+}
+
+export interface GenerateV2Response {
+  project_id: string;
+  template_style: string;
+  language: string;
+  rendered_sections: RenderedSection[];
+  generated_at: string;
 }

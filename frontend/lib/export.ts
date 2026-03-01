@@ -7,6 +7,11 @@ export interface ExportOptions {
   filename: string;
 }
 
+export interface PresetExportOptions extends ExportOptions {
+  preset?: string;
+  targetWidth?: number;
+}
+
 const TRANSPARENT_PIXEL =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
 
@@ -232,5 +237,50 @@ export async function exportImage(
     // 원본 스타일 복원
     restoreBgEffects();
     restoreImages();
+  }
+}
+
+/**
+ * Export with marketplace preset width scaling.
+ * Temporarily adjusts the element width before capturing.
+ */
+export async function exportWithPreset(
+  element: HTMLElement,
+  options: PresetExportOptions
+): Promise<void> {
+  const PRESET_WIDTHS: Record<string, number> = {
+    amazon: 970,
+    shopify: 2048,
+    coupang: 780,
+    general: 860,
+  };
+
+  const targetWidth = options.targetWidth || PRESET_WIDTHS[options.preset || "general"] || 860;
+  const currentWidth = element.offsetWidth;
+
+  // If target width differs, scale the element temporarily
+  if (targetWidth !== currentWidth) {
+    const scale = targetWidth / currentWidth;
+    const originalTransform = element.style.transform;
+    const originalTransformOrigin = element.style.transformOrigin;
+    const originalWidth = element.style.width;
+
+    element.style.transformOrigin = "top left";
+    element.style.transform = `scale(${scale})`;
+    element.style.width = `${currentWidth}px`;
+
+    try {
+      await exportImage(element, {
+        format: options.format,
+        quality: options.quality,
+        filename: options.filename,
+      });
+    } finally {
+      element.style.transform = originalTransform;
+      element.style.transformOrigin = originalTransformOrigin;
+      element.style.width = originalWidth;
+    }
+  } else {
+    await exportImage(element, options);
   }
 }

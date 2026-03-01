@@ -13,6 +13,8 @@ class CurrentUser:
     user_id: str
     username: str
     is_admin: bool
+    email: Optional[str] = None
+    plan: str = "free"
 
 
 async def get_current_user(authorization: Optional[str] = Header(None)) -> CurrentUser:

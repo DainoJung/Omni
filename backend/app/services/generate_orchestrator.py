@@ -16,10 +16,11 @@ from app.services.template_ai_service import (
     generate_section_image,
     validate_bg_color,
 )
-from app.services.section_compose_service import compose_sections
+from app.services.section_compose_service import compose_sections, compose_sections_for_style
 from app.services.template_render_service import render_section, bind_section_data
 from app.services.storage_service import StorageService
-from app.schemas.generate import GenerateResponse, RenderedSectionResponse
+from app.schemas.generate import GenerateResponse, GenerateV2Response, RenderedSectionResponse
+from app.constants.global_templates import get_template_style
 
 logger = logging.getLogger(__name__)
 
@@ -107,6 +108,13 @@ class GenerateOrchestrator:
             )
             logger.info(f"페이지 타입 '{page_type['name']}' → 섹션: {selected_sections}")
             section_templates = compose_sections(selected_sections)
+
+            # 2.5. 스크래핑된 상품 이미지 저장 (분석 결과에서 이미지 추출)
+            proj = self.db.table("projects").select("input_data, analysis_result").eq("id", project_id).single().execute()
+            project_data = proj.data or {}
+            input_data = project_data.get("input_data") or {}
+            analysis_result = project_data.get("analysis_result") or input_data.get("analysis_result") or {}
+            await self._ensure_scraped_images_stored(project_id, project_data, analysis_result)
 
             # 3. 상품 이미지 URL 수집 + 참조 이미지 다운로드
             product_image_urls = await self._get_product_image_urls(project_id)
@@ -337,7 +345,7 @@ class GenerateOrchestrator:
             }
 
             update_payload = {
-                "theme_id": page_type_id,
+                "page_type": page_type_id,
                 "template_used": template_used,
                 "generated_data": generated_data,
                 "rendered_sections": rendered_sections,
@@ -363,6 +371,330 @@ class GenerateOrchestrator:
         except Exception as e:
             logger.exception(f"광고 콘텐츠 생성 실패 (project={project_id}): {e}")
             raise
+
+    async def generate_v2(
+        self,
+        project_id: str,
+        template_style: str | None = None,
+        language: str = "ko",
+    ) -> GenerateV2Response:
+        """v2 글로벌 생성 파이프라인: 분석 결과 기반 템플릿 매칭 → 섹션 구성 → AI 텍스트/이미지 생성.
+
+        기존 generate()와 독립적으로 작동. 기존 파이프라인은 하위 호환을 위해 유지.
+        """
+        try:
+            # 1. 프로젝트 데이터 로드
+            proj = self.db.table("projects").select("*").eq("id", project_id).single().execute()
+            if not proj.data:
+                raise ValueError(f"프로젝트를 찾을 수 없습니다: {project_id}")
+
+            project = proj.data
+            input_data = project.get("input_data") or {}
+
+            # analysis_result: 직접 컬럼 → input_data 내부 → 재분석 순서로 탐색
+            analysis_result = project.get("analysis_result") or input_data.get("analysis_result") or {}
+
+            # 2. 분석이 없으면 기본값 사용
+            if not analysis_result:
+                from app.services.product_analyzer import analyze_product
+                products = project.get("products") or []
+                product_data = {
+                    "name": products[0]["name"] if products else "Product",
+                    "description": "",
+                    "brand": products[0].get("brand_name", "") if products else "",
+                }
+                analysis = await analyze_product(product_data, language=language)
+                analysis_result = analysis.to_dict()
+
+            # analysis_result를 top-level 컬럼에도 저장 (다음 조회 시 빠르게 접근)
+            self.db.table("projects").update({"analysis_result": analysis_result}).eq("id", project_id).execute()
+
+            # 3. 템플릿 스타일 결정
+            if not template_style:
+                template_style = (
+                    project.get("template_style")
+                    or input_data.get("template_style")
+                    or analysis_result.get("recommended_template_style", "clean_minimal")
+                )
+
+            style_config = get_template_style(template_style)
+            css_variables = style_config["css_variables"]
+
+            # 4. 글로벌 섹션 구성
+            products = project.get("products") or []
+            product_count = max(len(products), 1)
+            section_templates = compose_sections_for_style(template_style, product_count)
+
+            if not section_templates:
+                raise ValueError(f"템플릿 섹션을 구성할 수 없습니다: {template_style}")
+
+            # 5. 스크래핑된 상품 이미지 → project_images에 저장 (없으면)
+            await self._ensure_scraped_images_stored(project_id, project, analysis_result)
+
+            # 5.1. 상품 이미지 URL 수집
+            product_image_urls = await self._get_product_image_urls(project_id)
+
+            # 6. 참조 이미지 다운로드
+            default_ref = await self._download_reference_image(product_image_urls, 0)
+
+            # 7. 텍스트 생성 (글로벌 키 기반)
+            product_names = [p.get("name", "") for p in products] if products else ["Product"]
+            section_counts = dict(Counter(
+                st["section_type"] for st in section_templates
+            ))
+
+            copy_keywords = style_config["copy_keywords"].get(language, style_config["copy_keywords"].get("ko", []))
+            concept = analysis_result.get("summary", "")
+
+            section_texts = await generate_section_texts(
+                product_names=product_names,
+                theme_name=style_config["name"],
+                copy_keywords=copy_keywords,
+                section_counts=section_counts,
+                concept=concept,
+                language=language,
+            )
+
+            # bg_color 처리
+            ai_bg_color = section_texts.pop("bg_color", None)
+            validated_bg_color = validate_bg_color(ai_bg_color, css_variables.get("--bg-color", "#FFFFFF"))
+
+            # 테마 호환 dict 생성 (기존 bind_section_data와 호환)
+            theme = {
+                "id": template_style,
+                "name": style_config["name"],
+                "accent_color": css_variables.get("--accent-color", "#111111"),
+                "catalog_bg_color": validated_bg_color,
+                "background_prompt": style_config["image_prompts"].get("hero", ""),
+                "copy_keywords": copy_keywords,
+            }
+
+            # 8. 이미지 생성 (글로벌 섹션용)
+            image_size_map = {
+                "global_hero": (860, 1000),
+                "global_description": (860, 860),
+                "global_product_showcase": (860, 600),
+            }
+
+            image_tasks: list[dict] = []
+            image_instance_counter: dict[str, int] = {}
+            for st in section_templates:
+                sec_type = st["section_type"]
+                if sec_type not in image_size_map:
+                    continue
+                inst_idx = image_instance_counter.get(sec_type, 0)
+                image_instance_counter[sec_type] = inst_idx + 1
+
+                is_duplicate = section_counts.get(sec_type, 1) > 1
+                w, h = image_size_map[sec_type]
+                filename = f"{sec_type}_{inst_idx}.png" if is_duplicate else f"{sec_type}.png"
+
+                ref_img, ref_mime = default_ref if default_ref else (None, None)
+
+                key = f"{sec_type}__{inst_idx}" if is_duplicate else sec_type
+                image_tasks.append({
+                    "key": key,
+                    "sec_type": sec_type,
+                    "inst_idx": inst_idx,
+                    "w": w, "h": h,
+                    "filename": filename,
+                    "relevant_texts": {},
+                    "ref_img": ref_img,
+                    "ref_mime": ref_mime,
+                    "product_names": product_names,
+                })
+
+            img_sem = asyncio.Semaphore(2)
+            section_image_urls: dict[str, str] = {}
+            image_prompts: dict[str, str] = {}
+
+            async def _gen_image(task_info: dict) -> None:
+                async with img_sem:
+                    try:
+                        image_bytes, prompt_used = await generate_section_image(
+                            product_names=task_info["product_names"],
+                            section_type=task_info["sec_type"],
+                            width=task_info["w"],
+                            height=task_info["h"],
+                            reference_image=task_info["ref_img"],
+                            reference_mime_type=task_info["ref_mime"],
+                            section_texts=task_info["relevant_texts"],
+                            theme=theme,
+                            concept=concept,
+                        )
+                        path = await self.storage.upload_image(
+                            file_bytes=image_bytes,
+                            project_id=project_id,
+                            image_type="generated",
+                            filename=task_info["filename"],
+                        )
+                        url = self.storage.get_public_url(path)
+                        section_image_urls[task_info["key"]] = url
+                        image_prompts[task_info["key"]] = prompt_used
+                    except Exception as e:
+                        logger.warning(f"v2 이미지 생성 실패 ({task_info['sec_type']}), 플레이스홀더 사용: {e}")
+                        section_image_urls[task_info["key"]] = ""
+                        image_prompts[task_info["key"]] = f"failed: {e}"
+
+            # 배경 제거 + 이미지 생성 병렬
+            parallel_jobs = [
+                asyncio.gather(*[_gen_image(t) for t in image_tasks]),
+                self._preprocess_bg_removal(
+                    section_templates=section_templates,
+                    product_image_urls=product_image_urls,
+                    project_id=project_id,
+                ),
+            ]
+            parallel_results = await asyncio.gather(*parallel_jobs)
+            product_bg_removed_urls = parallel_results[1]
+
+            # 9. 섹션 바인딩 + 렌더링
+            rendered_sections = []
+            instance_counter: dict[str, int] = {}
+            for i, st in enumerate(section_templates):
+                sec_type = st["section_type"]
+                inst_idx = instance_counter.get(sec_type, 0)
+                instance_counter[sec_type] = inst_idx + 1
+
+                passed_instance_index = inst_idx if section_counts.get(sec_type, 1) > 1 else None
+
+                data = bind_section_data(
+                    section_template=st,
+                    section_texts=section_texts,
+                    theme=theme,
+                    product_image_urls=product_image_urls,
+                    products=products,
+                    section_image_urls=section_image_urls,
+                    instance_index=passed_instance_index,
+                    product_bg_removed_urls=product_bg_removed_urls,
+                )
+
+                # Inject CSS variables into data for template use
+                for var_name, var_value in css_variables.items():
+                    safe_key = var_name.replace("--", "css_").replace("-", "_")
+                    data[safe_key] = var_value
+
+                section = render_section(
+                    section_template=st,
+                    order=i,
+                    data=data,
+                )
+                rendered_sections.append(section)
+
+            # 10. DB 저장
+            template_used = f"global_{template_style}"
+            generated_data = {
+                "section_texts": section_texts,
+                "section_image_urls": section_image_urls,
+                "image_prompts": image_prompts,
+                "theme": theme,
+                "template_used": template_used,
+                "template_style": template_style,
+                "css_variables": css_variables,
+                "language": language,
+                "generated_at": datetime.now().isoformat(),
+            }
+
+            update_payload = {
+                "template_used": template_used,
+                "template_style": template_style,
+                "language": language,
+                "generated_data": generated_data,
+                "rendered_sections": rendered_sections,
+            }
+            self.db.table("projects").update(update_payload).eq("id", project_id).execute()
+
+            return GenerateV2Response(
+                project_id=project_id,
+                template_style=template_style,
+                language=language,
+                rendered_sections=[
+                    RenderedSectionResponse(**s) for s in rendered_sections
+                ],
+                generated_at=datetime.now(),
+            )
+
+        except Exception as e:
+            logger.exception(f"v2 생성 실패 (project={project_id}): {e}")
+            raise
+
+    async def _ensure_scraped_images_stored(
+        self,
+        project_id: str,
+        project: dict,
+        analysis_result: dict,
+    ) -> None:
+        """스크래핑된 상품 이미지가 project_images에 없으면 다운로드하여 저장한다.
+
+        분석 결과의 scraped_data.images 또는 products[].image_url에서 이미지 URL을 추출하고,
+        project_images 테이블에 input 타입으로 저장한다.
+        """
+        # 이미 project_images에 input 이미지가 있으면 스킵
+        existing = (
+            self.db.table("project_images")
+            .select("id")
+            .eq("project_id", project_id)
+            .eq("image_type", "input")
+            .limit(1)
+            .execute()
+        )
+        if existing.data:
+            logger.info(f"프로젝트 {project_id}: 이미 업로드된 상품 이미지 있음, 스크래핑 이미지 저장 스킵")
+            return
+
+        # 이미지 URL 수집: analysis_result.scraped_data.images 우선, products[].image_url 폴백
+        image_urls: list[str] = []
+
+        # 소스 1: 분석 결과의 scraped_data
+        scraped_data = analysis_result.get("scraped_data") or {}
+        if isinstance(scraped_data, dict):
+            scraped_images = scraped_data.get("images") or []
+            image_urls.extend([u for u in scraped_images if isinstance(u, str) and u.startswith("http")])
+
+        # 소스 2: input_data 내 분석 결과
+        input_data = project.get("input_data") or {}
+        if not image_urls:
+            nested_analysis = input_data.get("analysis_result") or {}
+            nested_scraped = nested_analysis.get("scraped_data") or {}
+            if isinstance(nested_scraped, dict):
+                nested_images = nested_scraped.get("images") or []
+                image_urls.extend([u for u in nested_images if isinstance(u, str) and u.startswith("http")])
+
+        # 소스 3: products[].image_url
+        if not image_urls:
+            products = project.get("products") or []
+            for p in products:
+                img_url = p.get("image_url", "")
+                if isinstance(img_url, str) and img_url.startswith("http"):
+                    image_urls.append(img_url)
+
+        if not image_urls:
+            logger.info(f"프로젝트 {project_id}: 스크래핑된 이미지 URL 없음")
+            return
+
+        # 최대 5장까지만 처리
+        image_urls = image_urls[:5]
+        logger.info(f"프로젝트 {project_id}: 스크래핑 이미지 {len(image_urls)}장 저장 시작")
+
+        for idx, url in enumerate(image_urls):
+            try:
+                filename = f"scraped_{idx}.jpg"
+                storage_path = await self.storage.download_and_store(
+                    image_url=url,
+                    project_id=project_id,
+                    image_type="input",
+                    filename=filename,
+                )
+                self.storage.save_image_record(
+                    project_id=project_id,
+                    image_type="input",
+                    storage_path=storage_path,
+                    original_filename=filename,
+                    sort_order=idx,
+                )
+                logger.info(f"스크래핑 이미지 저장 완료: [{idx}] {url[:80]}...")
+            except Exception as e:
+                logger.warning(f"스크래핑 이미지 저장 실패 [{idx}] {url[:80]}: {e}")
 
     async def _get_product_image_urls(self, project_id: str) -> list[str]:
         """프로젝트에 업로드된 상품 이미지 public URL 목록을 반환한다."""

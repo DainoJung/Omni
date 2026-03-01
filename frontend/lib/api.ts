@@ -4,8 +4,10 @@ import type {
   ProjectUpdate,
   GenerateRequest,
   GenerateResponse,
-  Theme,
-  PageType,
+  GenerateV2Request,
+  GenerateV2Response,
+  AnalysisResponse,
+  TemplateStyleInfo,
   ListResponse,
   ErrorResponse,
 } from "@/types";
@@ -91,17 +93,55 @@ export const generateApi = {
       method: "POST",
       body: JSON.stringify(data),
     }),
+
+  generateV2: (data: GenerateV2Request) =>
+    request<GenerateV2Response>("/api/generate/v2", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
 };
 
-// === Themes ===
-export const themesApi = {
-  list: () => request<Theme[]>("/api/themes"),
+// === Product Analysis ===
+export const productAnalysisApi = {
+  searchByName: (name: string, language: string = "ko") =>
+    request<AnalysisResponse>("/api/analyze/search", {
+      method: "POST",
+      body: JSON.stringify({ name, language }),
+    }),
+
+  analyzeUrl: (url: string, language: string = "ko") =>
+    request<AnalysisResponse>("/api/analyze/url", {
+      method: "POST",
+      body: JSON.stringify({ url, language }),
+    }),
+
+  analyzeManual: (data: {
+    name: string;
+    description?: string;
+    brand?: string;
+    price?: string;
+    images?: string[];
+    language?: string;
+  }) =>
+    request<AnalysisResponse>("/api/analyze/manual", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
 };
 
-// === Page Types ===
-export const pageTypesApi = {
-  list: () => request<PageType[]>("/api/page-types"),
+// === Template Catalog ===
+export const templateCatalogApi = {
+  list: () => request<TemplateStyleInfo[]>("/api/templates/catalog"),
+
+  get: (styleId: string) =>
+    request<TemplateStyleInfo>(`/api/templates/catalog/${styleId}`),
 };
+
+// === Themes (deprecated — SSG-only, kept for backward compat) ===
+// export const themesApi = { list: () => request<Theme[]>("/api/themes") };
+
+// === Page Types (deprecated — SSG-only, kept for backward compat) ===
+// export const pageTypesApi = { list: () => request<PageType[]>("/api/page-types") };
 
 // === Sections ===
 export const sectionsApi = {
@@ -187,6 +227,27 @@ export const authApi = {
     }
   },
 
+  register: async (email: string, username: string, password: string, display_name?: string) => {
+    const response = await fetch(`${API_URL}/api/auth/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, username, password, display_name }),
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({
+        error: "REGISTER_ERROR",
+        message: "회원가입에 실패했습니다.",
+      }));
+      throw new ApiError(response.status, errorData);
+    }
+    return response.json() as Promise<{
+      success: boolean;
+      token?: string;
+      message?: string;
+      user?: { id: string; username: string; display_name?: string; is_admin: boolean; email?: string; plan?: string };
+    }>;
+  },
+
   // Admin: user management
   createUser: (data: { username: string; password: string; display_name?: string; is_admin?: boolean }) =>
     request<{ id: string; username: string; display_name?: string; is_admin: boolean; created_at: string }>(
@@ -201,6 +262,44 @@ export const authApi = {
 
   deleteUser: (userId: string) =>
     request<void>(`/api/auth/users/${userId}`, { method: "DELETE" }),
+};
+
+// === Users ===
+export const usersApi = {
+  getProfile: () =>
+    request<{
+      id: string;
+      username: string;
+      email?: string;
+      display_name?: string;
+      is_admin: boolean;
+      plan: string;
+      credits_remaining: number;
+      created_at: string;
+    }>("/api/users/me"),
+
+  updateProfile: (data: { display_name?: string; email?: string }) =>
+    request<{
+      id: string;
+      username: string;
+      email?: string;
+      display_name?: string;
+      is_admin: boolean;
+      plan: string;
+      credits_remaining: number;
+      created_at: string;
+    }>("/api/users/me", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+
+  getUsage: () =>
+    request<{
+      plan: string;
+      credits_remaining: number;
+      credits_used: number;
+      total_projects: number;
+    }>("/api/users/me/usage"),
 };
 
 // === Images ===

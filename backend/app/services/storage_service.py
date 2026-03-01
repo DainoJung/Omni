@@ -41,16 +41,21 @@ class StorageService:
     ) -> str:
         """외부 URL의 이미지를 다운로드하여 Storage에 저장한다."""
 
-        async with httpx.AsyncClient(timeout=15.0) as client:
+        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
             response = await client.get(image_url)
             response.raise_for_status()
             image_bytes = response.content
+
+        # 응답 Content-Type에서 실제 이미지 형식 감지
+        raw_ct = response.headers.get("content-type", "image/jpeg").split(";")[0].strip()
+        content_type = raw_ct if raw_ct in ("image/png", "image/jpeg", "image/webp") else "image/jpeg"
 
         return await self.upload_image(
             file_bytes=image_bytes,
             project_id=project_id,
             image_type=image_type,
             filename=filename,
+            content_type=content_type,
         )
 
     def get_public_url(self, storage_path: str) -> str:

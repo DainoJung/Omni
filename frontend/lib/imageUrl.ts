@@ -1,5 +1,5 @@
 const SUPABASE_STORAGE_HOST =
-  "https://vphfowdnhjvefahkzkmg.supabase.co/storage/v1/";
+  `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/`;
 const OBJECT_PREFIX = `${SUPABASE_STORAGE_HOST}object/public/`;
 const RENDER_PREFIX = `${SUPABASE_STORAGE_HOST}render/image/public/`;
 

@@ -105,8 +105,8 @@ export function Header({
     <header className="h-14 border-b border-border flex items-center justify-between px-6">
       <div className="flex items-center gap-4">
         <Link href="/" className="flex items-center gap-2">
-          <Image src="/logo.png" alt="SSG" width={120} height={40} />
-          <h1 className="text-lg font-semibold text-center text-gray-700">CONTENTS MAKER</h1>
+          <Image src="/logo.png" alt="Omni" width={35} height={35} />
+          <h1 className="text-lg font-semibold text-center text-gray-700">Omni</h1>
         </Link>
 
         {/* Project Selector */}

@@ -19,6 +19,9 @@ out/
 dist/
 build/
 
+# Claude Code
+.claude/
+
 # IDE
 .vscode/
 .idea/

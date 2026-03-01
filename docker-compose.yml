@@ -23,10 +23,11 @@ services:
     environment:
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
-      - CLAUDE_API_KEY=${CLAUDE_API_KEY}
-      - CLAUDE_MODEL=${CLAUDE_MODEL:-claude-sonnet-4-20250514}
-      - IMAGE_GEN_API_KEY=${IMAGE_GEN_API_KEY}
-      - IMAGE_GEN_BASE_URL=${IMAGE_GEN_BASE_URL}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-3-flash-preview}
+      - IMAGE_GEN_MODEL=${IMAGE_GEN_MODEL:-gemini-2.5-flash-image}
+      - AWS_BEARER_TOKEN_BEDROCK=${AWS_BEARER_TOKEN_BEDROCK}
+      - AUTH_SECRET=${AUTH_SECRET}
       - CORS_ORIGINS=["http://localhost:3000"]
     volumes:
       - ./backend:/app

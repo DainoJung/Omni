@@ -2,11 +2,13 @@
 
 import json
 import logging
+import re
 
 from google import genai
 from google.genai import types
 
 from app.config import settings
+from app.services.product_search_service import _strip_markdown_fences
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +49,16 @@ class AnalysisResult:
             "color_palette": self.color_palette,
             "summary": self.summary,
         }
+
+
+def _extract_json_from_text(text: str) -> str:
+    """Extract json cleanly from AI response, ignoring conversational prefixes."""
+    text = _strip_markdown_fences(text)
+    # try to find the start of a JSON block
+    match = re.search(r'(\{.*\})', text, re.DOTALL)
+    if match:
+        return match.group(1)
+    return text
 
 
 async def analyze_product(
@@ -108,13 +120,14 @@ Return ONLY valid JSON, no explanation."""
                 model=settings.GEMINI_MODEL,
                 contents=prompt,
                 config=types.GenerateContentConfig(
-                    max_output_tokens=1024,
+                    max_output_tokens=2048,
                     temperature=0.5,
                     response_mime_type="application/json",
                 ),
             )
 
             raw = response.text.strip()
+            raw = _extract_json_from_text(raw)
             data = json.loads(raw)
 
             # Validate recommended_template_style
@@ -138,7 +151,7 @@ Return ONLY valid JSON, no explanation."""
             return result
 
         except (json.JSONDecodeError, KeyError) as e:
-            logger.warning(f"Analysis JSON parse error (attempt {attempt + 1}): {e}")
+            logger.warning(f"Analysis JSON parse error (attempt {attempt + 1}): {e}\nRaw output: {raw}")
             if attempt == max_retries:
                 # Return safe defaults
                 return AnalysisResult(

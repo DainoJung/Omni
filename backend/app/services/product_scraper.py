@@ -11,6 +11,23 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
+# 봇 차단 우회를 위한 브라우저 헤더
+_BROWSER_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+    "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
+    "Accept-Encoding": "gzip, deflate, br, zstd",
+    "Cache-Control": "max-age=0",
+    "Sec-Ch-Ua": '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+    "Sec-Ch-Ua-Mobile": "?0",
+    "Sec-Ch-Ua-Platform": '"macOS"',
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "none",
+    "Sec-Fetch-User": "?1",
+    "Upgrade-Insecure-Requests": "1",
+}
+
 
 class ScrapedProduct:
     """Scraped product data container"""
@@ -129,6 +146,67 @@ def _normalize_image_url(src: str, base_url: str) -> str:
     return ""
 
 
+def clean_image_url(raw_url: str) -> str:
+    """CDN별 썸네일 → 고해상도 URL 변환.
+
+    Amazon, Shopify, Cloudinary(Nike 등), imgix, WordPress, 일반 CDN 패턴 지원.
+    """
+    if not raw_url:
+        return ""
+
+    url = raw_url
+
+    # ── Amazon media CDN ──
+    # 710RpePupiL._SY88_.jpg → 710RpePupiL.jpg
+    # 710RpePupiL._SX300_SY300_.jpg → 710RpePupiL.jpg
+    if "media-amazon.com" in url or "ssl-images-amazon.com" in url:
+        url = re.sub(r'\._[A-Z]{2}\d+[^./]*_*\.(jpg|jpeg|png|webp|gif)', r'.\1', url, flags=re.IGNORECASE)
+        # Multiple modifiers: ._AA200_QL40_.jpg → .jpg
+        url = re.sub(r'\._[^./]+\.(jpg|jpeg|png|webp|gif)$', r'.\1', url, flags=re.IGNORECASE)
+        return url
+
+    # ── Shopify CDN ──
+    # product_300x300.jpg → product.jpg
+    # product_300x300_crop_center.jpg → product.jpg
+    if "shopify.com" in url or "cdn.shopify" in url:
+        url = re.sub(r'_\d+x\d*(?:_crop_center)?\.(jpg|jpeg|png|webp|gif)', r'.\1', url, flags=re.IGNORECASE)
+        return url
+
+    # ── Cloudinary / Nike CDN ──
+    # /t_PDP_144_v1/ → /t_PDP_1728_v1/  (Nike)
+    # /c_thumb,w_300/ → /c_fill,w_1200/
+    # /f_auto,q_auto:eco/ 유지, 크기 변환만
+    if "cloudinary.com" in url or "static.nike.com" in url:
+        # Nike PDP transforms: 144, 535, 936 → 1728
+        url = re.sub(r'/t_PDP_\d+_v\d+/', '/t_PDP_1728_v1/', url)
+        url = re.sub(r'/t_web_pdp_\d+_v\d+/', '/t_PDP_1728_v1/', url)
+        # Generic Cloudinary thumb → large
+        url = re.sub(r'/c_thumb,w_\d+/', '/c_fill,w_1200/', url)
+        url = re.sub(r'/c_scale,w_\d+/', '/c_scale,w_1200/', url)
+        url = re.sub(r',w_\d+,h_\d+/', ',w_1200,h_1200/', url)
+        return url
+
+    # ── imgix CDN ──
+    if "imgix.net" in url:
+        url = re.sub(r'[?&]w=\d+', '?w=1200', url)
+        url = re.sub(r'[?&]h=\d+', '', url)
+        return url
+
+    # ── WordPress / WooCommerce ──
+    # image-300x300.jpg → image.jpg
+    if "wp-content" in url:
+        url = re.sub(r'-\d+x\d+\.(jpg|jpeg|png|webp|gif)', r'.\1', url, flags=re.IGNORECASE)
+        return url
+
+    # ── 알 수 없는 CDN: 최소한의 안전한 변환만 ──
+    # 쿼리 파라미터는 건드리지 않음 (CDN마다 필수 파라미터가 다름)
+    # 파일명 suffix만 안전하게 처리
+    url = re.sub(r'[_-](thumb|small|thumbnail|sq)\.(jpg|jpeg|png|webp|gif)$', r'.\2', url, flags=re.IGNORECASE)
+
+    return url
+
+
+
 def _extract_opengraph(soup: BeautifulSoup) -> dict:
     """Extract product data from OpenGraph meta tags"""
     og = {}
@@ -192,7 +270,7 @@ def _extract_generic(soup: BeautifulSoup, base_url: str = "") -> dict:
     seen = set()
 
     def _add_img(src: str):
-        normalized = _normalize_image_url(src, base_url)
+        normalized = clean_image_url(_normalize_image_url(src, base_url))
         if normalized and normalized not in seen:
             # 아이콘/로고/트래커 필터링
             lower = normalized.lower()
@@ -244,25 +322,282 @@ def _extract_generic(soup: BeautifulSoup, base_url: str = "") -> dict:
     return data
 
 
+def _extract_js_image_urls(html: str) -> list[str]:
+    """HTML 내 JavaScript/JSON에 포함된 이미지 URL을 추출한다.
+
+    많은 사이트가 img 태그 대신 JS 변수로 이미지 URL을 전달한다 (Nike, Amazon 등).
+    """
+    urls: list[str] = []
+    seen: set[str] = set()
+
+    # 패턴 1: JSON 내 고해상도 이미지 키 ("hiRes", "large", "zoom", "original" 등)
+    hi_res_patterns = [
+        r'"hiRes"\s*:\s*"(https?://[^"]+)"',
+        r'"large"\s*:\s*"(https?://[^"]+)"',
+        r'"zoom"\s*:\s*"(https?://[^"]+)"',
+        r'"original"\s*:\s*"(https?://[^"]+)"',
+        r'"full"\s*:\s*"(https?://[^"]+)"',
+        r'"hero"\s*:\s*"(https?://[^"]+)"',
+        r'"mainImageUrl"\s*:\s*"(https?://[^"]+)"',
+        r'"imageUrl"\s*:\s*"(https?://[^"]+)"',
+    ]
+    for pattern in hi_res_patterns:
+        for match in re.finditer(pattern, html):
+            u = match.group(1)
+            if u not in seen:
+                seen.add(u)
+                urls.append(u)
+
+    # 패턴 2: 이미지 확장자를 가진 URL (jpg, png, webp)
+    # - 최소 길이 40자 (의미 있는 이미지 URL)
+    # - 크기 힌트가 600px 이상이거나 크기 힌트 없는 것 우선
+    img_pattern = re.compile(
+        r'"(https?://[^"]{40,}\.(?:jpg|jpeg|png|webp)(?:\?[^"]*)?)"',
+        re.IGNORECASE,
+    )
+    for match in img_pattern.finditer(html):
+        u = match.group(1)
+        if u in seen:
+            continue
+        lower = u.lower()
+        # 추적/아이콘 URL 제외
+        if any(skip in lower for skip in ("pixel", "tracking", "logo", "icon", "favicon",
+                                           "sprite", "badge", "1x1", ".svg")):
+            continue
+        seen.add(u)
+        urls.append(u)
+
+    return urls
+
+
+def _extract_all_images(soup: BeautifulSoup, base_url: str, html: str = "") -> list[str]:
+    """URL 페이지에서 가능한 모든 상품 이미지를 추출한다.
+
+    우선순위: JSON-LD → JS 임베디드(고화질) → 상품 셀렉터 → srcset → OG → 큰 이미지
+    아이콘/로고/트래커는 필터링.
+    """
+    images: list[str] = []
+    seen: set[str] = set()
+
+    skip_patterns = (
+        "logo", "icon", "favicon", "pixel", "tracking", "badge",
+        "button", "banner-ad", "1x1", "sprite", "spacer", "blank",
+        "arrow", "checkbox", "radio", "star-rating", "rating",
+        "payment", "visa", "mastercard", "paypal",
+    )
+
+    def _add(src: str) -> None:
+        normalized = clean_image_url(_normalize_image_url(src, base_url))
+        if not normalized or normalized in seen:
+            return
+        lower = normalized.lower()
+        if any(p in lower for p in skip_patterns):
+            return
+        if normalized.startswith("data:"):
+            return
+        seen.add(normalized)
+        images.append(normalized)
+
+    # 1) JSON-LD 이미지 (가장 신뢰도 높음, 보통 고화질)
+    json_ld = _extract_json_ld(soup)
+    if json_ld:
+        ld_images = json_ld.get("image", [])
+        if isinstance(ld_images, str):
+            ld_images = [ld_images]
+        elif isinstance(ld_images, dict):
+            ld_images = [ld_images.get("url", "")]
+        elif isinstance(ld_images, list):
+            flat = []
+            for img in ld_images:
+                if isinstance(img, str):
+                    flat.append(img)
+                elif isinstance(img, dict):
+                    flat.append(img.get("url", ""))
+            ld_images = flat
+        for src in ld_images:
+            _add(src)
+
+    # 2) 상품 이미지 전용 셀렉터
+    product_selectors = [
+        ".product-image img", "#product-images img", ".gallery img",
+        "[data-testid='product-image'] img", "img[data-zoom-image]",
+        ".product-gallery img", ".product-photos img",
+        ".swiper-slide img", ".slick-slide img", ".carousel-item img",
+        "[class*='product'] img", "[class*='gallery'] img",
+        "[id*='product'] img", "[id*='gallery'] img",
+        # Amazon 전용
+        "#altImages img", "#imageBlock img", ".imageThumbnail img",
+        "#main-image-container img",
+        # Coupang 전용
+        ".prod-image img", ".prod-image__item img",
+        # 일반 이커머스
+        ".product-detail img", ".product-main img",
+        ".detail-image img", ".item-image img",
+        ".product-slider img", ".product-carousel img",
+    ]
+    for sel in product_selectors:
+        for img in soup.select(sel)[:20]:
+            src = (
+                img.get("data-zoom-image")
+                or img.get("data-large")
+                or img.get("data-large_size_url")
+                or img.get("data-old-hires")
+                or img.get("data-a-dynamic-image", "")
+                or img.get("data-src")
+                or img.get("data-original")
+                or img.get("src")
+                or ""
+            )
+            # Amazon data-a-dynamic-image (JSON 형태)
+            if src.startswith("{"):
+                import json as _json
+                try:
+                    dynamic = _json.loads(src)
+                    if isinstance(dynamic, dict) and dynamic:
+                        def _get_res(v):
+                            return v[0] * v[1] if isinstance(v, list) and len(v) >= 2 else 0
+                        best = max(dynamic.keys(), key=lambda k: _get_res(dynamic[k]))
+                        _add(best)
+                    continue
+                except (ValueError, AttributeError):
+                    pass
+            _add(src)
+
+    # 4) srcset에서 최고 해상도 이미지
+    for img in soup.find_all("img", srcset=True):
+        srcset = img.get("srcset", "")
+        best_url = ""
+        max_w = 0
+        for part in srcset.split(","):
+            part = part.strip()
+            if not part:
+                continue
+            tokens = part.split()
+            url_part = tokens[0]
+            if len(tokens) > 1 and tokens[1].endswith("w"):
+                try:
+                    w = int(tokens[1][:-1])
+                    if w > max_w:
+                        max_w = w
+                        best_url = url_part
+                except ValueError:
+                    if not best_url:
+                        best_url = url_part
+            elif not best_url:
+                best_url = url_part
+        if best_url:
+            _add(best_url)
+
+    # 5) OpenGraph 이미지
+    for meta in soup.find_all("meta", property="og:image"):
+        _add(meta.get("content", ""))
+
+    # 6) 큰 이미지 (width/height ≥ 200 또는 크기 힌트 없음)
+    for img in soup.find_all("img", src=True)[:50]:
+        src = img.get("data-src") or img.get("data-original") or img.get("src") or ""
+        width = img.get("width", "")
+        height = img.get("height", "")
+        try:
+            w = int(str(width).replace("px", "")) if width else 0
+            h = int(str(height).replace("px", "")) if height else 0
+        except ValueError:
+            w, h = 0, 0
+        if w >= 200 or h >= 200 or (not width and not height):
+            _add(src)
+
+    # 7) DOM에서 충분하지 않으면 JS 임베디드 이미지로 보충
+    if len(images) < 5 and html:
+        js_images = _extract_js_image_urls(html)
+        for src in js_images:
+            _add(src)
+            if len(images) >= 30:
+                break
+
+    return images[:30]
+
+
+async def scrape_images_from_url(url: str) -> list[str]:
+    """URL에서 상품 이미지만 추출한다.
+
+    1차: httpx로 빠르게 시도
+    2차: httpx 실패 시 Playwright headless browser로 JS 렌더링 후 추출
+    """
+    # 1차: httpx (빠름)
+    images = await _scrape_images_httpx(url)
+    if images:
+        return images
+
+    # 2차: Playwright 폴백 (JS 렌더링, 봇 차단 우회)
+    logger.info(f"httpx 실패, Playwright 폴백: {url}")
+    return await _scrape_images_playwright(url)
+
+
+async def _scrape_images_httpx(url: str) -> list[str]:
+    """httpx로 이미지 스크래핑 (빠르지만 JS 렌더링 불가)."""
+    headers = {**_BROWSER_HEADERS, "Referer": url}
+    try:
+        async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
+            resp = await client.get(url, headers=headers)
+            resp.raise_for_status()
+
+        html = resp.text
+        soup = BeautifulSoup(html, "lxml")
+        images = _extract_all_images(soup, base_url=url, html=html)
+        logger.info(f"httpx 이미지 스크래핑: {len(images)}장")
+        return images
+
+    except httpx.HTTPStatusError as e:
+        logger.warning(f"httpx HTTP error ({e.response.status_code}): {url}")
+        return []
+    except Exception as e:
+        logger.warning(f"httpx 스크래핑 실패: {e}")
+        return []
+
+
+async def _scrape_images_playwright(url: str) -> list[str]:
+    """Playwright headless browser로 이미지 스크래핑."""
+    try:
+        from app.services.playwright_browser import scrape_rendered_html
+        html = await scrape_rendered_html(url)
+        soup = BeautifulSoup(html, "lxml")
+        images = _extract_all_images(soup, base_url=url, html=html)
+        logger.info(f"Playwright 이미지 스크래핑: {len(images)}장")
+        return images
+    except Exception as e:
+        logger.warning(f"Playwright 스크래핑 실패: {e}")
+        return []
+
+
 async def scrape_product(url: str) -> ScrapedProduct:
     """Scrape product data from a URL.
 
-    Strategy: JSON-LD first, then OpenGraph fallback, then generic selectors.
+    Strategy: httpx → Playwright 폴백 → JSON-LD/OpenGraph/generic 파싱.
     """
     platform = _detect_platform(url)
     timeout = settings.SCRAPER_TIMEOUT
 
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
-    }
+    html = None
+    # 1차: httpx
+    headers = {**_BROWSER_HEADERS, "Referer": url}
+    try:
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
+            resp = await client.get(url, headers=headers)
+            resp.raise_for_status()
+        html = resp.text
+    except Exception as e:
+        logger.warning(f"scrape_product httpx 실패: {e}")
 
-    async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
-        resp = await client.get(url, headers=headers)
-        resp.raise_for_status()
+    # 2차: Playwright 폴백
+    if not html:
+        try:
+            from app.services.playwright_browser import scrape_rendered_html
+            html = await scrape_rendered_html(url)
+            logger.info("scrape_product: Playwright 폴백 성공")
+        except Exception as e:
+            logger.warning(f"scrape_product Playwright도 실패: {e}")
+            raise
 
-    soup = BeautifulSoup(resp.text, "lxml")
+    soup = BeautifulSoup(html, "lxml")
     product = ScrapedProduct(url=url, platform=platform)
 
     # Strategy 1: JSON-LD structured data (most reliable)
@@ -300,7 +635,7 @@ async def scrape_product(url: str) -> ScrapedProduct:
                 elif isinstance(img, dict):
                     normalized.append(img.get("url", ""))
             images = normalized
-        product.images = [_normalize_image_url(img, url) for img in images if img][:5]
+        product.images = [clean_image_url(_normalize_image_url(img, url)) for img in images if img][:5]
         product.images = [img for img in product.images if img]
 
         logger.info(f"Scraped via JSON-LD: {product.name}")
@@ -313,7 +648,7 @@ async def scrape_product(url: str) -> ScrapedProduct:
         product.description = og.get("description", "")[:500]
         og_images = og.get("images", [])
         if og_images:
-            product.images = [_normalize_image_url(img, url) for img in og_images if img][:5]
+            product.images = [clean_image_url(_normalize_image_url(img, url)) for img in og_images if img][:5]
             product.images = [img for img in product.images if img]
         if og.get("product:price:amount"):
             product.price = og["product:price:amount"]

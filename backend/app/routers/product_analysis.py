@@ -60,11 +60,30 @@ async def analyze_url(
     data: AnalyzeUrlRequest,
     current_user: CurrentUser = Depends(get_current_user),
 ):
-    """URL의 상품 정보를 Gemini + Google Search로 검색하고 AI 분석을 수행한다."""
+    """URL의 상품 정보를 검색하고 AI 분석을 수행한다.
+
+    상품명을 추출하지 못해도 이미지 등 부분 결과가 있으면 반환한다.
+    프론트엔드에서 사용자가 부족한 정보를 직접 입력할 수 있도록.
+    """
     try:
         scraped = await search_product_by_url(data.url, language=data.language)
 
         if not scraped or not scraped.name:
+            # 이미지라도 있으면 부분 결과 반환 (사용자가 상품명 직접 입력)
+            if scraped and scraped.images:
+                logger.info(f"상품명 추출 실패, 이미지 {len(scraped.images)}장으로 부분 결과 반환")
+                scraped.name = ""
+                return AnalysisResponse(
+                    category="",
+                    subcategory="",
+                    usp_points=[],
+                    target_customer="",
+                    tone="",
+                    recommended_template_style="clean_minimal",
+                    color_palette=[],
+                    summary="상품 정보를 자동으로 추출하지 못했습니다. 상품명을 직접 입력해 주세요.",
+                    scraped_data=ScrapedProductResponse(**scraped.to_dict()),
+                )
             raise HTTPException(
                 status_code=422,
                 detail="상품 정보를 추출할 수 없습니다. 상품명을 직접 입력해 주세요.",

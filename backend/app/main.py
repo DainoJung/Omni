@@ -1,4 +1,5 @@
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,11 +12,32 @@ from app.routers import (
 
 logger = logging.getLogger(__name__)
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # ── Startup ──
+    from app.routers.auth import seed_admin_user
+    await seed_admin_user()
+    try:
+        from app.services.playwright_browser import start_browser
+        await start_browser()
+    except Exception as e:
+        logger.warning(f"Playwright 초기화 실패 (httpx 폴백 사용): {e}")
+    yield
+    # ── Shutdown ──
+    try:
+        from app.services.playwright_browser import stop_browser
+        await stop_browser()
+    except Exception:
+        pass
+
+
 app = FastAPI(
     title="Omni API",
     version="5.3.0",
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -36,12 +58,6 @@ app.include_router(images.router, prefix="/api/images", tags=["Images"])
 app.include_router(users.router, prefix="/api/users", tags=["Users"])
 app.include_router(product_analysis.router, prefix="/api/analyze", tags=["Analysis"])
 app.include_router(billing.router, prefix="/api/billing", tags=["Billing"])
-
-
-@app.on_event("startup")
-async def startup_event():
-    from app.routers.auth import seed_admin_user
-    await seed_admin_user()
 
 
 @app.get("/health")

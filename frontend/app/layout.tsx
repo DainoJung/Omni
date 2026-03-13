@@ -80,9 +80,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ko">
+    <html lang="ko" suppressHydrationWarning>
       <body
         className={`${notoSansKR.variable} ${notoSerifKR.variable} ${playfairDisplay.variable} ${cormorantGaramond.variable} ${montserrat.variable} ${raleway.variable} ${libreBaskerville.variable} ${bebasNeue.variable} font-sans antialiased bg-white text-text-primary`}
+        suppressHydrationWarning
       >
         <ClientLayout>{children}</ClientLayout>
         <Toaster position="bottom-right" richColors />

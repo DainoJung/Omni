@@ -73,10 +73,10 @@ async def generate_v2(data: GenerateV2Request, current_user: CurrentUser = Depen
         if not proj.data:
             raise HTTPException(status_code=404, detail="프로젝트를 찾을 수 없습니다.")
 
-        # 크레딧 차감
-        has_credit = await deduct_credit(current_user.user_id)
-        if not has_credit:
-            raise HTTPException(status_code=402, detail="크레딧이 부족합니다. 플랜을 업그레이드해주세요.")
+        # TODO: 과금 시스템 연동 후 크레딧 차감 활성화
+        # has_credit = await deduct_credit(current_user.user_id)
+        # if not has_credit:
+        #     raise HTTPException(status_code=402, detail="크레딧이 부족합니다. 플랜을 업그레이드해주세요.")
 
         result = await orchestrator.generate_v2(
             project_id=str(data.project_id),

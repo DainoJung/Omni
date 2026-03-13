@@ -2,24 +2,16 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/Button";
 import { ProductInput } from "./ProductInput";
-import { projectsApi, generateApi } from "@/lib/api";
+import { projectsApi } from "@/lib/api";
 import { toast } from "sonner";
-import { ArrowLeft, Globe } from "lucide-react";
 import type { AnalysisResponse } from "@/types";
 
-type Step = "input" | "review" | "generate";
+type Step = "input" | "review";
 
 const STEPS: { id: Step; label: string; number: number }[] = [
   { id: "input", label: "상품 입력", number: 1 },
-  { id: "review", label: "결과 확인", number: 2 },
-  { id: "generate", label: "생성", number: 3 },
-];
-
-const LANGUAGES = [
-  { code: "ko", label: "한국어" },
-  { code: "en", label: "English" },
+  { id: "review", label: "확인 & 생성", number: 2 },
 ];
 
 interface ProjectInputFormProps {
@@ -30,72 +22,48 @@ interface ProjectInputFormProps {
 export function ProjectInputForm({ onSuccess, compact }: ProjectInputFormProps) {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState<Step>("input");
-  const [loading, setLoading] = useState(false);
-
-  // Analysis result (confirmed by user in step 2)
-  const [analysisResult, setAnalysisResult] = useState<AnalysisResponse | null>(null);
-
-  // Settings
+  const [generating, setGenerating] = useState(false);
   const [language, setLanguage] = useState("ko");
 
   const currentStepIndex = STEPS.findIndex((s) => s.id === currentStep);
 
-  // Step 1 → Step 2: 분석 완료 시 스텝 인디케이터 업데이트
+  // Step 1 → Step 2: 분석 완료 시
   const handleAnalysisFetched = (analysis: AnalysisResponse | null) => {
-    if (analysis) {
-      setCurrentStep("review");
-    } else {
-      // 사용자가 "다시 검색" 클릭
-      setCurrentStep("input");
-    }
+    setCurrentStep(analysis ? "review" : "input");
   };
 
-  // Step 2 → Step 3: 사용자가 "다음 단계" 클릭하여 결과 확정
-  const handleAnalysisConfirmed = (analysis: AnalysisResponse) => {
-    setAnalysisResult(analysis);
-    setCurrentStep("generate");
-  };
-
-  const handleGenerate = async () => {
-    if (!analysisResult) return;
-
-    setLoading(true);
+  // "생성하기" 클릭 → 프로젝트 생성 후 바로 결과 페이지로 이동 (생성은 결과 페이지에서)
+  const handleGenerate = async (analysis: AnalysisResponse) => {
+    setGenerating(true);
     try {
-      // Build products array from analysis result
-      const scrapedImages = analysisResult.scraped_data?.images || [];
-      const products = analysisResult.scraped_data
+      const scrapedImages = analysis.scraped_data?.images || [];
+      const products = analysis.scraped_data
         ? [
             {
-              name: analysisResult.scraped_data.name,
-              price: analysisResult.scraped_data.price || undefined,
-              brand_name: analysisResult.scraped_data.brand || undefined,
+              name: analysis.scraped_data.name || analysis.summary || "Product",
+              price: analysis.scraped_data.price || undefined,
+              brand_name: analysis.scraped_data.brand || undefined,
               image_url: scrapedImages[0] || undefined,
             },
           ]
-        : [{ name: analysisResult.summary || "Product" }];
+        : [{ name: analysis.summary || "Product" }];
 
-      // 1. Create project with product_detail page type
       const project = await projectsApi.create({
         products,
         page_type: "product_detail",
       });
 
-      // 2. Save analysis result for scraped image pipeline
       await projectsApi.update(project.id, {
+        analysis_result: analysis,
         input_data: {
-          analysis_result: analysisResult,
+          analysis_result: analysis,
           language,
-          product_url: analysisResult.scraped_data?.url || undefined,
+          product_url: analysis.scraped_data?.url || undefined,
+          template_style: analysis.recommended_template_style,
         },
       });
 
-      // 3. Generate using v1 pipeline with product_detail template
-      await generateApi.generate({
-        project_id: project.id,
-        products,
-        page_type: "product_detail",
-      });
-
+      // 바로 결과 페이지로 이동 (생성은 결과 페이지에서 자동 시작)
       if (onSuccess) {
         onSuccess(project.id);
       } else {
@@ -103,10 +71,9 @@ export function ProjectInputForm({ onSuccess, compact }: ProjectInputFormProps) 
       }
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : "생성에 실패했습니다. 다시 시도해주세요."
+        err instanceof Error ? err.message : "프로젝트 생성에 실패했습니다. 다시 시도해주세요."
       );
-    } finally {
-      setLoading(false);
+      setGenerating(false);
     }
   };
 
@@ -172,124 +139,14 @@ export function ProjectInputForm({ onSuccess, compact }: ProjectInputFormProps) 
         })}
       </div>
 
-      {/* Step Content */}
-      {/* Steps 1 & 2 are both handled by ProductInput (input view + result view) */}
-      {(currentStep === "input" || currentStep === "review") && (
-        <ProductInput
-          onAnalysisComplete={handleAnalysisConfirmed}
-          onAnalysisFetched={handleAnalysisFetched}
-        />
-      )}
-
-      {/* Step 3: Generate */}
-      {currentStep === "generate" && (
-        <div className="space-y-6">
-          {/* Analysis Summary */}
-          {analysisResult && (
-            <div className="border border-border rounded-sm p-4 space-y-3">
-              <h4 className="text-sm font-medium text-text-primary">생성 정보</h4>
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div>
-                  <span className="text-text-tertiary">상품명</span>
-                  <p className="text-text-primary font-medium mt-0.5">
-                    {analysisResult.scraped_data?.name || analysisResult.summary}
-                  </p>
-                </div>
-                <div>
-                  <span className="text-text-tertiary">카테고리</span>
-                  <p className="text-text-primary font-medium mt-0.5">
-                    {analysisResult.category} / {analysisResult.subcategory}
-                  </p>
-                </div>
-                <div>
-                  <span className="text-text-tertiary">타겟</span>
-                  <p className="text-text-primary font-medium mt-0.5">{analysisResult.target_customer}</p>
-                </div>
-                <div>
-                  <span className="text-text-tertiary">톤앤매너</span>
-                  <p className="text-text-primary font-medium mt-0.5">{analysisResult.tone}</p>
-                </div>
-              </div>
-              {analysisResult.usp_points.length > 0 && (
-                <div>
-                  <span className="text-xs text-text-tertiary">USP</span>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {analysisResult.usp_points.slice(0, 3).map((usp, i) => (
-                      <span key={i} className="text-xs bg-accent/10 text-accent px-2 py-0.5 rounded-sm">
-                        {usp}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {/* 이미지 미리보기 */}
-              {analysisResult.scraped_data?.images && analysisResult.scraped_data.images.length > 0 && (
-                <div>
-                  <span className="text-xs text-text-tertiary">참조 이미지</span>
-                  <div className="flex gap-1.5 mt-1">
-                    {analysisResult.scraped_data.images.slice(0, 3).map((img, i) => (
-                      <img
-                        key={i}
-                        src={img}
-                        alt={`참조 ${i + 1}`}
-                        className="w-12 h-12 rounded-sm object-cover border border-border"
-                        onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Settings */}
-          <div className="border border-border rounded-sm p-4 space-y-3">
-            <h4 className="text-sm font-medium text-text-primary">생성 설정</h4>
-
-            {/* Language selection */}
-            <div className="space-y-2">
-              <span className="text-xs text-text-tertiary flex items-center gap-1">
-                <Globe size={12} />
-                생성 언어
-              </span>
-              <div className="flex gap-2">
-                {LANGUAGES.map((lang) => (
-                  <button
-                    key={lang.code}
-                    type="button"
-                    onClick={() => setLanguage(lang.code)}
-                    className={`px-3 py-1.5 text-xs rounded-sm border transition-colors ${
-                      language === lang.code
-                        ? "border-accent bg-accent/10 text-accent font-medium"
-                        : "border-border text-text-tertiary hover:border-text-secondary"
-                    }`}
-                  >
-                    {lang.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="flex gap-3">
-            <Button
-              variant="ghost"
-              onClick={() => setCurrentStep("review")}
-              className="flex items-center gap-1"
-            >
-              <ArrowLeft size={16} />
-              이전
-            </Button>
-            <Button
-              onClick={handleGenerate}
-              loading={loading}
-              className="flex-1"
-            >
-              {loading ? "생성 중..." : "AI 상세페이지 생성하기"}
-            </Button>
-          </div>
-        </div>
-      )}
+      {/* ProductInput handles both input view and result view */}
+      <ProductInput
+        onAnalysisComplete={handleGenerate}
+        onAnalysisFetched={handleAnalysisFetched}
+        language={language}
+        onLanguageChange={setLanguage}
+        generating={generating}
+      />
     </div>
   );
 }

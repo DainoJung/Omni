@@ -20,7 +20,6 @@ from app.services.section_compose_service import compose_sections, compose_secti
 from app.services.template_render_service import render_section, bind_section_data
 from app.services.storage_service import StorageService
 from app.schemas.generate import GenerateResponse, GenerateV2Response, RenderedSectionResponse
-from app.constants.global_templates import get_template_style
 
 logger = logging.getLogger(__name__)
 
@@ -409,7 +408,7 @@ class GenerateOrchestrator:
             # analysis_result를 top-level 컬럼에도 저장 (다음 조회 시 빠르게 접근)
             self.db.table("projects").update({"analysis_result": analysis_result}).eq("id", project_id).execute()
 
-            # 3. 템플릿 스타일 결정
+            # 3. 템플릿 스타일 결정 (현재 단일 템플릿 사용, 향후 확장용)
             if not template_style:
                 template_style = (
                     project.get("template_style")
@@ -417,10 +416,7 @@ class GenerateOrchestrator:
                     or analysis_result.get("recommended_template_style", "clean_minimal")
                 )
 
-            style_config = get_template_style(template_style)
-            css_variables = style_config["css_variables"]
-
-            # 4. 글로벌 섹션 구성
+            # 4. feature_point 섹션 구성
             products = project.get("products") or []
             product_count = max(len(products), 1)
             section_templates = compose_sections_for_style(template_style, product_count)
@@ -437,18 +433,19 @@ class GenerateOrchestrator:
             # 6. 참조 이미지 다운로드
             default_ref = await self._download_reference_image(product_image_urls, 0)
 
-            # 7. 텍스트 생성 (글로벌 키 기반)
+            # 7. 텍스트 생성 (feature_point 키 기반)
             product_names = [p.get("name", "") for p in products] if products else ["Product"]
             section_counts = dict(Counter(
                 st["section_type"] for st in section_templates
             ))
 
-            copy_keywords = style_config["copy_keywords"].get(language, style_config["copy_keywords"].get("ko", []))
+            # 분석 결과에서 키워드 추출, 없으면 빈 리스트
+            copy_keywords = analysis_result.get("usp_points", [])
             concept = analysis_result.get("summary", "")
 
             section_texts = await generate_section_texts(
                 product_names=product_names,
-                theme_name=style_config["name"],
+                theme_name=analysis_result.get("category", "Product"),
                 copy_keywords=copy_keywords,
                 section_counts=section_counts,
                 concept=concept,
@@ -457,23 +454,27 @@ class GenerateOrchestrator:
 
             # bg_color 처리
             ai_bg_color = section_texts.pop("bg_color", None)
-            validated_bg_color = validate_bg_color(ai_bg_color, css_variables.get("--bg-color", "#FFFFFF"))
+            validated_bg_color = validate_bg_color(ai_bg_color, "#FFFFFF")
+
+            # 분석 결과에서 accent_color 추출
+            color_palette = analysis_result.get("color_palette", [])
+            accent_color = color_palette[0] if color_palette else "#111111"
 
             # 테마 호환 dict 생성 (기존 bind_section_data와 호환)
             theme = {
                 "id": template_style,
-                "name": style_config["name"],
-                "accent_color": css_variables.get("--accent-color", "#111111"),
+                "name": analysis_result.get("category", "Product"),
+                "accent_color": accent_color,
                 "catalog_bg_color": validated_bg_color,
-                "background_prompt": style_config["image_prompts"].get("hero", ""),
+                "background_prompt": "",
                 "copy_keywords": copy_keywords,
             }
 
-            # 8. 이미지 생성 (글로벌 섹션용)
+            # 8. 이미지 생성 (AI 이미지가 필요한 섹션)
             image_size_map = {
-                "global_hero": (860, 1000),
-                "global_description": (860, 860),
-                "global_product_showcase": (860, 600),
+                "hero_banner": (860, 1400),
+                "description": (860, 860),
+                "feature_point": (860, 957),
             }
 
             image_tasks: list[dict] = []
@@ -489,7 +490,24 @@ class GenerateOrchestrator:
                 w, h = image_size_map[sec_type]
                 filename = f"{sec_type}_{inst_idx}.png" if is_duplicate else f"{sec_type}.png"
 
-                ref_img, ref_mime = default_ref if default_ref else (None, None)
+                # 참조 이미지: 인스턴스별로 다른 상품 이미지 사용
+                ref_pair = await self._download_reference_image(product_image_urls, inst_idx)
+                if not ref_pair or ref_pair == (None, None):
+                    ref_pair = default_ref if default_ref else (None, None)
+                ref_img, ref_mime = ref_pair if ref_pair else (None, None)
+
+                # 해당 인스턴스의 텍스트 추출
+                relevant_texts: dict[str, str] = {}
+                text_keys = _get_section_text_keys(sec_type)
+                for tk in text_keys:
+                    suffixed = f"{tk}__{inst_idx}" if is_duplicate else tk
+                    if suffixed in section_texts:
+                        relevant_texts[tk] = section_texts[suffixed]
+                    elif tk in section_texts:
+                        relevant_texts[tk] = section_texts[tk]
+
+                # 해당 인스턴스의 상품명
+                task_product_names = [product_names[inst_idx]] if inst_idx < len(product_names) else product_names
 
                 key = f"{sec_type}__{inst_idx}" if is_duplicate else sec_type
                 image_tasks.append({
@@ -498,10 +516,10 @@ class GenerateOrchestrator:
                     "inst_idx": inst_idx,
                     "w": w, "h": h,
                     "filename": filename,
-                    "relevant_texts": {},
+                    "relevant_texts": relevant_texts,
                     "ref_img": ref_img,
                     "ref_mime": ref_mime,
-                    "product_names": product_names,
+                    "product_names": task_product_names,
                 })
 
             img_sem = asyncio.Semaphore(2)
@@ -569,11 +587,6 @@ class GenerateOrchestrator:
                     product_bg_removed_urls=product_bg_removed_urls,
                 )
 
-                # Inject CSS variables into data for template use
-                for var_name, var_value in css_variables.items():
-                    safe_key = var_name.replace("--", "css_").replace("-", "_")
-                    data[safe_key] = var_value
-
                 section = render_section(
                     section_template=st,
                     order=i,
@@ -582,7 +595,7 @@ class GenerateOrchestrator:
                 rendered_sections.append(section)
 
             # 10. DB 저장
-            template_used = f"global_{template_style}"
+            template_used = f"v2_feature_point"
             generated_data = {
                 "section_texts": section_texts,
                 "section_image_urls": section_image_urls,
@@ -590,7 +603,6 @@ class GenerateOrchestrator:
                 "theme": theme,
                 "template_used": template_used,
                 "template_style": template_style,
-                "css_variables": css_variables,
                 "language": language,
                 "generated_at": datetime.now().isoformat(),
             }

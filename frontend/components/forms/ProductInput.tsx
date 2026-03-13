@@ -13,21 +13,39 @@ import {
   Plus,
   Pencil,
   ImageIcon,
+  Check,
+  Globe,
 } from "lucide-react";
 import type { AnalysisResponse } from "@/types";
 
 type InputTab = "name" | "url";
 
 interface ProductInputProps {
-  /** 사용자가 "다음 단계"를 눌러 결과를 확정했을 때 */
+  /** "생성하기" 클릭 시 분석 결과를 확정하고 생성 시작 */
   onAnalysisComplete: (analysis: AnalysisResponse) => void;
   /** 분석 완료/리셋 시 부모에게 알림 (스텝 트래킹용) */
   onAnalysisFetched?: (analysis: AnalysisResponse | null) => void;
+  /** 생성 언어 */
+  language: string;
+  /** 생성 언어 변경 */
+  onLanguageChange: (lang: string) => void;
+  /** 생성 진행 중 여부 */
+  generating?: boolean;
 }
 
 const TONE_OPTIONS = ["premium", "playful", "professional", "warm", "modern"];
+const LANGUAGES = [
+  { code: "ko", label: "한국어" },
+  { code: "en", label: "English" },
+];
 
-export function ProductInput({ onAnalysisComplete, onAnalysisFetched }: ProductInputProps) {
+export function ProductInput({
+  onAnalysisComplete,
+  onAnalysisFetched,
+  language,
+  onLanguageChange,
+  generating,
+}: ProductInputProps) {
   const [activeTab, setActiveTab] = useState<InputTab>("name");
   const [loading, setLoading] = useState(false);
 
@@ -47,6 +65,8 @@ export function ProductInput({ onAnalysisComplete, onAnalysisFetched }: ProductI
   const [editPrice, setEditPrice] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [editImages, setEditImages] = useState<string[]>([]);
+  // 전체 스크래핑된 이미지 (URL 입력 시) — 선택 UI용
+  const [allScrapedImages, setAllScrapedImages] = useState<string[]>([]);
 
   // Editable fields — analysis
   const [editCategory, setEditCategory] = useState("");
@@ -68,7 +88,10 @@ export function ProductInput({ onAnalysisComplete, onAnalysisFetched }: ProductI
         : ""
     );
     setEditDescription(r.scraped_data?.description || "");
-    setEditImages(r.scraped_data?.images || []);
+    const imgs = r.scraped_data?.images || [];
+    setAllScrapedImages(imgs);
+    // URL 입력이고 이미지가 많으면 처음 5개만 선택, 아니면 전체 선택
+    setEditImages(imgs.length > 5 ? imgs.slice(0, 5) : [...imgs]);
     setEditCategory(r.category);
     setEditSubcategory(r.subcategory);
     setEditTarget(r.target_customer);
@@ -161,6 +184,7 @@ export function ProductInput({ onAnalysisComplete, onAnalysisFetched }: ProductI
     setResult(null);
     setEditMode(false);
     setInputError("");
+    setAllScrapedImages([]);
     onAnalysisFetched?.(null);
   };
 
@@ -179,6 +203,18 @@ export function ProductInput({ onAnalysisComplete, onAnalysisFetched }: ProductI
   const removeImage = (idx: number) => {
     setEditImages((prev) => prev.filter((_, i) => i !== idx));
   };
+
+  const toggleImageSelection = (imgUrl: string) => {
+    setEditImages((prev) =>
+      prev.includes(imgUrl) ? prev.filter((u) => u !== imgUrl) : [...prev, imgUrl]
+    );
+  };
+
+  const selectAllImages = () => setEditImages([...allScrapedImages]);
+  const deselectAllImages = () => setEditImages([]);
+
+  // 이미지 선택 모드: URL 입력이고 전체 이미지가 5개 초과일 때 활성화
+  const showImageSelector = allScrapedImages.length > 5;
 
   // ──────────────── Result View (Step 2: 분석 결과 확인 & 수정) ────────────────
   if (result) {
@@ -241,56 +277,127 @@ export function ProductInput({ onAnalysisComplete, onAnalysisFetched }: ProductI
             </div>
           )}
 
-          {/* Images */}
-          {(editImages.length > 0 || editMode) && (
+          {/* Images — 이미지 선택 그리드 */}
+          {(allScrapedImages.length > 0 || editImages.length > 0 || editMode) && (
             <div className="space-y-2 pt-1">
               <div className="flex items-center justify-between">
                 <span className="text-xs text-text-tertiary flex items-center gap-1">
                   <ImageIcon size={12} />
                   상품 이미지
                 </span>
-                {editImages.length > 0 && (
-                  <span className="text-[10px] text-text-tertiary bg-bg-secondary px-1.5 py-0.5 rounded">
-                    {editImages.length}장
-                  </span>
-                )}
-              </div>
-              <div className="flex gap-2 overflow-x-auto pb-1">
-                {editImages.map((imgUrl, i) => (
-                  <div key={i} className="relative shrink-0 group">
-                    <img
-                      src={imgUrl}
-                      alt={`상품 이미지 ${i + 1}`}
-                      className="w-24 h-24 rounded-sm object-cover border border-border"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = "none";
-                      }}
-                    />
-                    {i === 0 && (
-                      <span className="absolute top-0.5 left-0.5 text-[9px] bg-accent text-white px-1 py-0.5 rounded leading-none">
-                        대표
-                      </span>
-                    )}
-                    {editMode && (
+                <div className="flex items-center gap-2">
+                  {showImageSelector && (
+                    <div className="flex gap-1.5">
                       <button
                         type="button"
-                        onClick={() => removeImage(i)}
-                        className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-error text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={selectAllImages}
+                        className="text-[10px] text-accent hover:underline"
                       >
-                        <X size={10} />
+                        전체 선택
                       </button>
-                    )}
-                  </div>
-                ))}
+                      <span className="text-[10px] text-text-tertiary">|</span>
+                      <button
+                        type="button"
+                        onClick={deselectAllImages}
+                        className="text-[10px] text-text-tertiary hover:underline"
+                      >
+                        전체 해제
+                      </button>
+                    </div>
+                  )}
+                  <span className="text-[10px] text-text-tertiary bg-bg-secondary px-1.5 py-0.5 rounded">
+                    {showImageSelector
+                      ? `${editImages.length}/${allScrapedImages.length}장 선택`
+                      : `${editImages.length}장`}
+                  </span>
+                </div>
               </div>
-              {!editMode && editImages.length > 0 && (
+
+              {/* 선택형 그리드 (이미지 많을 때) */}
+              {showImageSelector ? (
+                <div className="grid grid-cols-4 gap-2 max-h-[280px] overflow-y-auto pr-1">
+                  {allScrapedImages.map((imgUrl, i) => {
+                    const isSelected = editImages.includes(imgUrl);
+                    return (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => toggleImageSelection(imgUrl)}
+                        className={`relative aspect-square rounded-sm overflow-hidden border-2 transition-all ${
+                          isSelected
+                            ? "border-accent ring-1 ring-accent/30"
+                            : "border-border opacity-60 hover:opacity-100"
+                        }`}
+                      >
+                        <img
+                          src={imgUrl}
+                          alt={`상품 이미지 ${i + 1}`}
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).closest("button")!.style.display = "none";
+                          }}
+                        />
+                        {/* 선택 체크마크 */}
+                        <div
+                          className={`absolute top-1 right-1 w-5 h-5 rounded-full flex items-center justify-center transition-all ${
+                            isSelected ? "bg-accent text-white" : "bg-black/40 text-white/60"
+                          }`}
+                        >
+                          {isSelected ? (
+                            <Check size={12} strokeWidth={3} />
+                          ) : (
+                            <span className="text-[9px]">{i + 1}</span>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                /* 기존 스타일 (이미지 적을 때) */
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  {editImages.map((imgUrl, i) => (
+                    <div key={i} className="relative shrink-0 group">
+                      <img
+                        src={imgUrl}
+                        alt={`상품 이미지 ${i + 1}`}
+                        className="w-24 h-24 rounded-sm object-cover border border-border"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = "none";
+                        }}
+                      />
+                      {i === 0 && (
+                        <span className="absolute top-0.5 left-0.5 text-[9px] bg-accent text-white px-1 py-0.5 rounded leading-none">
+                          대표
+                        </span>
+                      )}
+                      {editMode && (
+                        <button
+                          type="button"
+                          onClick={() => removeImage(i)}
+                          className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-error text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <X size={10} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {editImages.length > 0 && (
                 <p className="text-[10px] text-text-tertiary">
-                  이 이미지들이 상세페이지 생성 시 참조 이미지로 사용됩니다.
+                  {showImageSelector
+                    ? "선택한 이미지가 상세페이지 생성 시 참조 이미지로 사용됩니다."
+                    : "이 이미지들이 상세페이지 생성 시 참조 이미지로 사용됩니다."}
                 </p>
               )}
-              {editImages.length === 0 && !editMode && (
+              {editImages.length === 0 && (
                 <p className="text-[10px] text-warning">
-                  상품 이미지가 없습니다. 수정하기를 눌러 이미지를 추가하거나, 이미지 없이 생성할 수 있습니다.
+                  {showImageSelector
+                    ? "이미지를 선택해주세요. 선택 없이도 생성할 수 있습니다."
+                    : "상품 이미지가 없습니다. 수정하기를 눌러 이미지를 추가하거나, 이미지 없이 생성할 수 있습니다."}
                 </p>
               )}
             </div>
@@ -394,14 +501,38 @@ export function ProductInput({ onAnalysisComplete, onAnalysisFetched }: ProductI
           )}
         </div>
 
-        {/* Actions */}
-        <div className="flex gap-3">
-          <Button variant="secondary" onClick={handleReset} className="flex-1">
-            다시 검색
-          </Button>
-          <Button onClick={handleConfirm} className="flex-1">
-            다음 단계
-          </Button>
+        {/* Language & Generate */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-text-tertiary flex items-center gap-1 shrink-0">
+              <Globe size={12} />
+              생성 언어
+            </span>
+            <div className="flex gap-1.5">
+              {LANGUAGES.map((lang) => (
+                <button
+                  key={lang.code}
+                  type="button"
+                  onClick={() => onLanguageChange(lang.code)}
+                  className={`px-2.5 py-1 text-xs rounded-sm border transition-colors ${
+                    language === lang.code
+                      ? "border-accent bg-accent/10 text-accent font-medium"
+                      : "border-border text-text-tertiary hover:border-text-secondary"
+                  }`}
+                >
+                  {lang.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <Button variant="secondary" onClick={handleReset} disabled={generating}>
+              다시 검색
+            </Button>
+            <Button onClick={handleConfirm} loading={generating} className="flex-1">
+              {generating ? "생성 중..." : "AI 상세페이지 생성하기"}
+            </Button>
+          </div>
         </div>
       </div>
     );

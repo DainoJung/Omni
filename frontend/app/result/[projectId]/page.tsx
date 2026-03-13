@@ -246,8 +246,9 @@ export default function ResultPage() {
           setGenerationProgress(0);
 
           try {
-            const products = proj.products || [];
-            const pageType = proj.theme_id || "product_detail";
+            const inputData = (proj.input_data || {}) as Record<string, unknown>;
+            const templateStyle = (inputData.template_style as string) || proj.template_style || "clean_minimal";
+            const language = (inputData.language as string) || proj.language || "ko";
 
             // Step 1: 입력 분석
             updateGenerationStep(0, "running");
@@ -260,20 +261,14 @@ export default function ResultPage() {
             updateGenerationStep(1, "running");
             setGenerationProgress(20);
 
-            // Step 3: AI 생성
+            // Step 3: AI 생성 (v2 파이프라인)
             updateGenerationStep(2, "running");
             setGenerationProgress(30);
 
-            const inputData = (proj.input_data || {}) as Record<string, unknown>;
-
-            await generateApi.generate({
+            await generateApi.generateV2({
               project_id: projectId,
-              products,
-              page_type: pageType,
-              ...(proj.background_config ? { background: proj.background_config } : {}),
-              ...(proj.restaurants ? { restaurants: proj.restaurants } : {}),
-              ...(inputData.include_wine ? { include_wine: true } : {}),
-              ...(inputData.wines ? { wines: inputData.wines as Array<{ name: string }> } : {}),
+              template_style: templateStyle as TemplateStyle,
+              language,
             });
 
             updateGenerationStep(1, "done");

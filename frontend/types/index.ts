@@ -124,6 +124,7 @@ export interface ProjectUpdate {
   background_config?: BackgroundConfig;
   background_settings?: BackgroundSettings;
   input_data?: Record<string, unknown>;
+  analysis_result?: AnalysisResponse | ProductAnalysis | Record<string, unknown>;
 }
 
 // === Product ===

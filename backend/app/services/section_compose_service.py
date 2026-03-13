@@ -61,52 +61,44 @@ def compose_sections_for_style(
     template_style: str,
     product_count: int = 1,
 ) -> list[dict]:
-    """글로벌 템플릿 스타일 기반 섹션 구성 (v2).
+    """v2 섹션 구성: hero_banner → feature_badges → description → feature_point x N.
 
     Args:
-        template_style: 글로벌 템플릿 스타일 ID
-        product_count: 상품 수 (gallery 섹션 반복에 사용)
+        template_style: 템플릿 스타일 ID (현재 미사용, 향후 확장용)
+        product_count: 상품 수 (feature_point 반복 횟수, 최소 1, 최대 6)
 
     Returns:
         섹션 템플릿 딕셔너리 목록
     """
-    from app.constants.global_templates import get_template_style
+    feature_point_count = max(1, min(product_count, 6))
 
-    style = get_template_style(template_style)
-    section_types = list(style.get("section_composition", GLOBAL_SECTION_ORDER))
-
-    # product_showcase: 상품 수에 따라 반복 (최소 1, 최대 product_count)
-    expanded = []
-    for st in section_types:
-        if st == "global_product_showcase" and product_count > 1:
-            expanded.extend([st] * min(product_count, 6))
-        else:
-            expanded.append(st)
+    # 고정 3개 + feature_point x N
+    section_types = ["hero_banner", "feature_badges", "description"]
+    section_types += ["feature_point"] * feature_point_count
 
     db = get_supabase()
     result = (
         db.table("section_templates")
         .select("*")
-        .in_("section_type", list(set(expanded)))
+        .in_("section_type", list(set(section_types)))
         .eq("is_active", True)
         .execute()
     )
 
     if not result.data:
-        raise ValueError(f"글로벌 섹션 템플릿을 찾을 수 없습니다: {expanded}")
+        raise ValueError("섹션 템플릿을 찾을 수 없습니다.")
 
     section_map: dict[str, dict] = {}
     for s in result.data:
         section_map[s["section_type"]] = s
 
     sections = []
-    for i, section_type in enumerate(expanded):
+    for i, section_type in enumerate(section_types):
         template = section_map.get(section_type)
         if not template:
-            logger.warning(f"글로벌 섹션 템플릿 누락: {section_type}, 건너뜀")
-            continue
+            raise ValueError(f"섹션 템플릿을 찾을 수 없습니다: {section_type}")
         entry = {**template, "_order": i}
         sections.append(entry)
 
-    logger.info(f"글로벌 페이지 구성 완료: {len(sections)}개 ({template_style})")
+    logger.info(f"v2 페이지 구성 완료: {len(sections)}개 (hero_banner, feature_badges, description, feature_point x {feature_point_count})")
     return sections

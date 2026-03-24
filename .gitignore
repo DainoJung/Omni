@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# Environment
+.env
+.env.local
+
+# Next.js
+.next/
+out/
+
+# OS
+.DS_Store
+
+# OpenClaw local state
+.openclaw-local/
+
+# IDE
+.vscode/
+.idea/
+
+# Claude Code / OMC local state
+.claude/settings.local.json
+.omc/

@@ -1,0 +1,65 @@
+{
+  "gateway": {
+    "port": 18789
+  },
+
+  "ai": {
+    "provider": "openai",
+    "model": "gpt-5",
+    "fastModel": "gpt-5-mini"
+  },
+
+  "agents": {
+    "defaults": {},
+    "list": [
+      {
+        "id": "orchestrator",
+        "default": true,
+        "name": "Omni Orchestrator",
+        "workspace": "~/.openclaw/workspace-omni",
+        "agentDir": "~/.openclaw/agents/orchestrator/agent"
+      },
+      {
+        "id": "division-builder",
+        "name": "Division Builder",
+        "workspace": "~/.openclaw/workspace-omni/agents/division-builder",
+        "agentDir": "~/.openclaw/agents/division-builder/agent"
+      }
+    ]
+  },
+
+  "bindings": [
+    {
+      "agentId": "orchestrator",
+      "match": {
+        "channel": "discord",
+        "accountId": "omni-bot"
+      }
+    },
+    {
+      "agentId": "orchestrator",
+      "match": {
+        "channel": "webchat"
+      }
+    }
+  ],
+
+  "tools": {
+    "sessions": {
+      "enabled": true,
+      "allowedTools": [
+        "sessions_send",
+        "sessions_spawn",
+        "sessions_list",
+        "sessions_history",
+        "session_status"
+      ]
+    }
+  },
+
+  "skills": {
+    "load": {
+      "extraDirs": []
+    }
+  }
+}

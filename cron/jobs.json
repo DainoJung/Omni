@@ -1,0 +1,78 @@
+{
+  "version": 1,
+  "jobs": [
+    {
+      "id": "system-health-pulse",
+      "agentId": "orchestrator",
+      "name": "System Health Pulse",
+      "enabled": true,
+      "schedule": {
+        "kind": "cron",
+        "cron": "0 */1 * * *",
+        "tz": "Asia/Seoul"
+      },
+      "sessionTarget": "main",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "systemEvent",
+        "text": "[PULSE] Run system health check and report anomalies."
+      }
+    },
+    {
+      "id": "daily-report",
+      "agentId": "orchestrator",
+      "name": "Daily Division Report",
+      "enabled": true,
+      "schedule": {
+        "kind": "cron",
+        "cron": "0 9 * * *",
+        "tz": "Asia/Seoul"
+      },
+      "sessionTarget": "main",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "모든 Division의 어제 성과를 요약해서 보고해줘."
+      },
+      "delivery": {
+        "mode": "announce",
+        "channel": "discord",
+        "target": "omni-reports"
+      }
+    }
+    ,
+    {
+      "id": "division-b-pipeline",
+      "agentId": "orchestrator",
+      "name": "Division B — Pipeline Run",
+      "enabled": true,
+      "schedule": {
+        "kind": "every",
+        "everyMs": 7200000
+      },
+      "sessionTarget": "main",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Division B 파이프라인 실행해. sessions_send로 researcher-b → writer-b → publisher-b 순서대로 호출하고 결과를 체이닝해."
+      }
+    },
+    {
+      "id": "division-d-pipeline",
+      "agentId": "orchestrator",
+      "name": "Division D — Pipeline Run",
+      "enabled": true,
+      "schedule": {
+        "kind": "cron",
+        "cron": "0 9 * * *",
+        "tz": "Asia/Seoul"
+      },
+      "sessionTarget": "main",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Division D 파이프라인 실행해. sessions_send로 product-researcher-d → product-writer-d → product-publisher-d 순서대로 호출하고 결과를 체이닝해."
+      }
+    }
+  ]
+}

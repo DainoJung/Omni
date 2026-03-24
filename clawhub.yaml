@@ -1,0 +1,79 @@
+name: omni-agent-os
+version: 1.0.0
+description: Agent OS for Autonomous Business — 사업을 제안하면 Division이 만들어진다
+author: Daino
+license: MIT
+homepage: https://github.com/daino/omni
+
+category: automation
+tags:
+  - agent-os
+  - business-automation
+  - division-builder
+  - multi-agent
+  - institutional-memory
+
+requires:
+  openclaw: ">=2026.3.0"
+  env:
+    - OPENAI_API_KEY
+    - SUPABASE_URL
+    - SUPABASE_ANON_KEY
+  optional_env:
+    - SUPABASE_SERVICE_KEY
+    - GEMINI_API_KEY
+    - YOUTUBE_API_KEY
+
+agents:
+  - id: orchestrator
+    name: Omni Orchestrator
+    description: 메인 오케스트레이터. 사용자 대화 + Division 조율 + Critical Decision
+    model: openai/gpt-5.4
+    workspace: agents/orchestrator
+
+  - id: division-builder
+    name: Division Builder
+    description: Meta Layer 핵심. 사업 제안 → 역량 분석 → 설계 → 자동 구축
+    model: openai/gpt-5.4
+    workspace: agents/division-builder
+
+skills:
+  - name: rules-engine
+    path: agents/orchestrator/skills/rules-engine
+    description: Critical Decision 에스컬레이션 + 비용 상한 + 자동 차단
+
+  - name: capability-analyzer
+    path: agents/division-builder/skills/capability-analyzer
+    description: 사업 제안 → 기능 역량 분해 + 의존관계 매핑
+
+  - name: clawhub-searcher
+    path: agents/division-builder/skills/clawhub-searcher
+    description: ClawHub 스킬 레지스트리 검색 + capability 매칭
+
+  - name: skill-generator
+    path: agents/division-builder/skills/skill-generator
+    description: 매칭 안 된 역량 → 워크스페이스 스킬 자동 생성
+
+  - name: memory-manager
+    path: skills/memory-manager
+    description: Institutional Memory 저장/검색 (벡터 + 태그 + 신뢰도)
+
+  - name: supabase-client
+    path: skills/supabase-client
+    description: Supabase DB 조작 (query/insert/update/log)
+
+database:
+  provider: supabase
+  migrations:
+    - supabase/migrations/001_initial_schema.sql
+    - supabase/migrations/002_rpc_functions.sql
+    - supabase/migrations/003_cost_limits_and_security.sql
+    - supabase/migrations/004_memory_embedding_trigger.sql
+
+dashboard:
+  framework: next.js
+  path: dashboard
+  port: 3000
+
+setup:
+  script: scripts/setup.sh

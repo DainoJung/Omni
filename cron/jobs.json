@@ -61,7 +61,7 @@
       "id": "division-d-pipeline",
       "agentId": "orchestrator",
       "name": "Division D — Pipeline Run",
-      "enabled": true,
+      "enabled": false,
       "schedule": {
         "kind": "cron",
         "cron": "0 9 * * *",

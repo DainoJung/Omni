@@ -29,7 +29,7 @@ Division Builder는 OpenClaw 에이전트(`division-builder`)로 실행된다.
 ## 2. 전체 플로우
 
 ```
-사용자 ─── "블로그 사업 하고 싶어" ──→ 오케스트레이터
+사용자 ─── "[사업 아이디어]" ──→ 오케스트레이터
                                          │
                                     sessions_send
                                          │
@@ -49,7 +49,7 @@ Division Builder는 OpenClaw 에이전트(`division-builder`)로 실행된다.
                     │                                       │
                     ▼                                       ▼
               사람: 피드백                             사람: 승인
-              "쿠팡 제휴 넣어줘"                           │
+              "[피드백 예시]"                              │
                     │                                       ▼
                     └──→ Builder 반영                  Division 구축
                          └──→ 재제출                       │
@@ -72,10 +72,11 @@ Division Builder는 OpenClaw 에이전트(`division-builder`)로 실행된다.
 사용자의 자연어 텍스트. 구조화되지 않아도 됨.
 
 **예시:**
-- "블로그 + 제휴마케팅 사업을 해보고 싶어. 레시피 중심으로."
+- "유튜브 채널 운영"
+- "온라인 교육 사업"
+- "커머스 자동화"
 - "해외 상품 구매대행 사업"
-- "유튜브 쇼츠 채널 운영"
-- "디지털 상품 판매 (Gumroad)"
+- "디지털 상품 판매"
 
 ### 3.2 최소 정보
 
@@ -247,7 +248,7 @@ Builder가 분석 완료 후 생성하는 구조화된 설계안:
 interface DivisionDesign {
   // 기본 정보
   meta: {
-    name: string;                    // "Division B — 블로그"
+    name: string;                    // "Division X — [사업명]"
     slug: string;                    // "division-b"
     description: string;
     proposalText: string;            // 원본 제안
@@ -345,37 +346,33 @@ Builder는 설계안을 두 곳에 저장:
 ```
 📋 Division 설계안 v1
 
-사업: 블로그 + 제휴마케팅 (레시피 중심)
+사업: [사업명] ([핵심 도메인])
 
 ━━ 역량 분석 ━━
-✅ 트렌드 탐색      → youtube-trends (ClawHub)
-✅ 키워드 분석      → keyword-analyzer (ClawHub)
-🔨 레시피 검색      → recipe-search (자동 생성)
-✅ 콘텐츠 작성      → content-writer (ClawHub)
-🔨 이미지 생성      → gemini-image (자동 생성)
-✅ SEO 최적화       → seo-optimizer (ClawHub)
-🔨 블로그 발행      → blog-publisher (자동 생성)
-🔨 제휴 링크 삽입    → coupang-affiliate (자동 생성)
+✅ [역량 1]      → [스킬명] (ClawHub)
+✅ [역량 2]      → [스킬명] (ClawHub)
+🔨 [역량 3]      → [스킬명] (자동 생성)
+✅ [역량 4]      → [스킬명] (ClawHub)
+🔨 [역량 5]      → [스킬명] (자동 생성)
 
 ━━ 에이전트 구성 ━━
-A1. researcher-b (gpt-5-mini, 매 2시간)
-    → 트렌드 탐색 + 키워드 분석 + 레시피 검색
+A1. researcher (gpt-5-mini, 매 N시간)
+    → [담당 역량 목록]
 
-A2. writer-b (gpt-5, 이벤트 트리거)
-    → 콘텐츠 작성 + 이미지 생성 + SEO + 제휴 링크
+A2. writer (gpt-5, 이벤트 트리거)
+    → [담당 역량 목록]
 
-A3. publisher-b (gpt-5-mini, 이벤트 트리거)
-    → 블로그 발행 + 인덱싱 + 성과 추적
+A3. publisher (gpt-5-mini, 이벤트 트리거)
+    → [담당 역량 목록]
 
 ━━ 파이프라인 ━━
-researcher-b → topics+keywords → writer-b → draft+images → publisher-b → published
+researcher → [데이터] → writer → [결과물] → publisher → published
 
 ━━ 적용된 교훈 ━━
-📎 "이미지 생성은 rate limit → batch 처리" → writer-b에 동시성 제한 적용
-📎 "한국 제휴마케팅 고지 문구 필수" → publisher-b에 자동 삽입 규칙
+📎 [Memory에서 참조한 교훈] → [해당 에이전트에 반영 방식]
 
 ━━ 예상 비용 ━━
-$80-120/월 (OpenAI $60-90, Gemini $15-25, YouTube API free tier)
+$XX-XX/월 (API별 상세 내역)
 
 [승인] [피드백 보내기]
 ```
@@ -389,11 +386,11 @@ $80-120/월 (OpenAI $60-90, Gemini $15-25, YouTube API free tier)
 ```
 설계안 v1 제출
      ↓
-사람: "쿠팡파트너스 고지 문구 자동으로 넣어줘. Schema.org 마크업도."
+사람: "[사용자 피드백 예시]"
      ↓
 Builder: 피드백 분석
-  → publisher-b 스킬에 고지 문구 자동 삽입 추가
-  → writer-b 스킬에 Schema.org Recipe 마크업 생성 추가
+  → 관련 에이전트 스킬에 요청 사항 반영
+  → 설계안 업데이트
      ↓
 설계안  제출 (version 증가, 변경 사항 하이라이트)
      ↓
@@ -592,7 +589,7 @@ const relevantMemories = await supabase.rpc('search_memories', {
   ),
   match_threshold: 0.7,
   match_count: 10,
-  filter_tags: extractTags(proposal),  // ["블로그", "SEO", "레시피"] 등
+  filter_tags: extractTags(proposal),  // ["도메인", "키워드", "태그"] 등
 });
 ```
 
@@ -655,7 +652,7 @@ Phase 0에서 Builder가 갖춰야 할 최소 기능:
 
 ### Phase 0 Go 조건
 
-"블로그 사업 하고 싶어"라고 입력했을 때:
+임의의 사업 아이디어를 입력했을 때:
 1. Builder가 역량 분석 결과를 보여주는가? ✅
 2. ClawHub에서 관련 스킬을 찾아오는가? ✅
 3. 에이전트 구성안을 제안하는가? ✅

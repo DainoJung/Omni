@@ -21,6 +21,7 @@ cp .env.example .env
 ### 2. Supabase
 
 Apply migrations in order:
+
 ```bash
 # Via Supabase CLI
 supabase db push
@@ -57,7 +58,7 @@ Open http://localhost:3000
 openclaw health
 
 # Test Division Builder
-openclaw agent --agent division-builder -m "블로그 사업 하고 싶어"
+openclaw agent --agent division-builder -m "온라인 사업을 하고 싶어"
 ```
 
 ## Architecture

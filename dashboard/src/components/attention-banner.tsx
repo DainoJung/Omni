@@ -45,7 +45,7 @@ export function AttentionBanner({ initialCount }: AttentionBannerProps) {
   if (count === 0) return null
 
   return (
-    <div className="w-full bg-[var(--accent-yellow)]/10 border border-[var(--accent-yellow)]/30 rounded-lg px-4 py-3 flex items-center justify-between gap-3">
+    <div className="w-full bg-[var(--accent-yellow)]/10 backdrop-blur-md border border-[var(--accent-yellow)]/30 rounded-lg px-4 py-3 flex items-center justify-between gap-3 shadow-[0_8px_32px_rgba(210,153,34,0.15)]">
       <div className="flex items-center gap-3">
         <AlertTriangle className="w-5 h-5 text-[var(--accent-yellow)] flex-shrink-0" />
         <span className="text-sm font-medium text-[var(--accent-yellow)]">

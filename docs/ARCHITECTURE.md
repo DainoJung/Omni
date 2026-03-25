@@ -43,14 +43,14 @@ OpenClaw 레이어(Agent Runtime)는 교체 가능한 인프라.
 각 에이전트는 독립된 workspace, 메모리, 인증, 도구를 가짐.
 
 ```
-Division B (블로그)
-├── researcher_b (OpenClaw 인스턴스)
-│   └── Skills: youtube-trends, recipe-search, keyword-analysis
-├── writer_b (OpenClaw 인스턴스)
-│   └── Skills: content-generation, image-gen, seo-optimization, google-indexing
+Division X (예시)
+├── researcher (OpenClaw 인스턴스)
+│   └── Skills: trend-analysis, keyword-analysis, domain-search
+├── writer (OpenClaw 인스턴스)
+│   └── Skills: content-generation, image-gen, seo-optimization
 │
 에이전트 간 통신: sessions_send / sessions_spawn
-스케줄링: OpenClaw Cron (researcher_b: 매 1시간, writer_b: 이벤트 트리거)
+스케줄링: OpenClaw Cron (researcher: 매 1시간, writer: 이벤트 트리거)
 ```
 
 Orchestrator 패턴: Division마다 오케스트레이터 에이전트가 워커들을 조율.

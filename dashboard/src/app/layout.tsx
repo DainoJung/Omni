@@ -3,6 +3,7 @@ import { Fira_Sans, Fira_Code } from 'next/font/google'
 import './globals.css'
 import { Sidebar } from '@/components/sidebar'
 import { SystemStatusBar } from '@/components/system-status-bar'
+import { ChatPanel } from '@/components/chat-panel'
 import { createClient } from '@/lib/supabase/server'
 
 const firaSans = Fira_Sans({
@@ -64,6 +65,7 @@ export default async function RootLayout({
               {children}
             </main>
           </div>
+          <ChatPanel />
         </div>
       </body>
     </html>

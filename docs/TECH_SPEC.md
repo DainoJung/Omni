@@ -136,27 +136,27 @@ openclaw agents list --bindings
     // ClawHub 탐색, 스킬 생성, 에이전트 등록
   },
   {
-    "id": "researcher-b",
-    "name": "Division B Researcher",
-    "workspace": "~/.openclaw/workspace-omni/agents/division-b/researcher",
-    "agentDir": "~/.openclaw/agents/researcher-b/agent"
-    // Division B 워커: 트렌드/키워드/레시피 탐색
+    "id": "researcher-x",
+    "name": "Division X Researcher",
+    "workspace": "~/.openclaw/workspace-omni/agents/division-x/researcher",
+    "agentDir": "~/.openclaw/agents/researcher-x/agent"
+    // Division X 워커: 도메인 데이터 탐색
     // 모델: gpt-5-mini (빠른 실행)
   },
   {
-    "id": "writer-b",
-    "name": "Division B Writer",
-    "workspace": "~/.openclaw/workspace-omni/agents/division-b/writer",
-    "agentDir": "~/.openclaw/agents/writer-b/agent"
-    // Division B 워커: 콘텐츠/이미지/SEO 생성
+    "id": "writer-x",
+    "name": "Division X Writer",
+    "workspace": "~/.openclaw/workspace-omni/agents/division-x/writer",
+    "agentDir": "~/.openclaw/agents/writer-x/agent"
+    // Division X 워커: 콘텐츠/결과물 생성
     // 모델: gpt-5 (품질 중요)
   },
   {
-    "id": "publisher-b",
-    "name": "Division B Publisher",
-    "workspace": "~/.openclaw/workspace-omni/agents/division-b/publisher",
-    "agentDir": "~/.openclaw/agents/publisher-b/agent"
-    // Division B 워커: 블로그 발행 + 인덱싱 + 추적
+    "id": "publisher-x",
+    "name": "Division X Publisher",
+    "workspace": "~/.openclaw/workspace-omni/agents/division-x/publisher",
+    "agentDir": "~/.openclaw/agents/publisher-x/agent"
+    // Division X 워커: 결과물 발행 + 추적
     // 모델: gpt-5-mini
   }
 ]
@@ -196,7 +196,7 @@ sessions_send(
   → { status: "ok", reply: "12개 키워드 발견. 상위 3개: ..." }
 
 researcher-b → writer-b:
-  sessions_send("agent:writer-b:main", '{"type":"write_post","topic":"크림파스타","keywords":["크림파스타 레시피","원팬 파스타"]}', 300)
+  sessions_send("agent:writer-x:main", '{"type":"write_post","topic":"example-topic","keywords":["키워드1","키워드2"]}', 300)
   → { status: "ok", reply: '{"type":"post_ready","postId":"...","slug":"cream-pasta"}' }
 
 writer-b → publisher-b:
@@ -319,9 +319,9 @@ openclaw gateway restart
   "version": 1,
   "jobs": [
     {
-      "id": "researcher-b-trend-scan",
-      "agentId": "researcher-b",
-      "name": "Trend Scan (Division B)",
+      "id": "researcher-x-scan",
+      "agentId": "researcher-x",
+      "name": "Trend Scan (Division X)",
       "enabled": true,
       "schedule": {
         "kind": "every",
@@ -414,9 +414,9 @@ metadata:
     emoji: "🍳"
 ---
 
-# Recipe Search
+# Domain Search
 
-트렌드 키워드를 받아 레시피를 검색합니다.
+도메인별 데이터를 검색합니다.
 
 ## 입력
 - keyword: 검색 키워드 (한국어)
@@ -511,7 +511,7 @@ system_config (단일 행, Self-Awareness)
 -- ============================================
 CREATE TABLE divisions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT NOT NULL,                           -- "Division B — 블로그"
+  name TEXT NOT NULL,                           -- "Division X — [사업명]"
   slug TEXT UNIQUE NOT NULL,                    -- "division-b"
   description TEXT,                             -- 사업 설명
   status TEXT NOT NULL DEFAULT 'proposed',      -- proposed | designing | building | operating | paused | sunset
@@ -912,7 +912,7 @@ omni-/
 | Division ID (DB) | UUID | auto |
 | Division slug | kebab-case | `division-b` |
 | Agent ID (OpenClaw) | kebab-case | `researcher-b` |
-| Agent name (표시) | 자유 | "Division B Researcher" |
+| Agent name (표시) | 자유 | "Division X Researcher" |
 | 스킬 디렉토리 | kebab-case | `recipe-search/` |
 | 스킬 이름 (SKILL.md) | kebab-case | `recipe-search` |
 | DB 테이블 | snake_case | `agent_events` |

@@ -115,7 +115,7 @@ export default async function CommandCenter() {
                 <a
                   key={d.id}
                   href={`/division/${d.id}`}
-                  className="block p-4 bg-[var(--bg-secondary)] border border-[var(--border)] rounded-lg hover:border-[var(--accent-blue)] transition-colors"
+                  className="block p-4 bg-[var(--bg-secondary)] border border-[var(--border)] rounded-lg hover:border-[var(--accent-blue)] hover:-translate-y-[2px] hover:shadow-[0_8px_24px_rgba(88,166,255,0.12)] transition-all duration-300"
                 >
                   <div className="flex items-start gap-3 mb-3">
                     <span

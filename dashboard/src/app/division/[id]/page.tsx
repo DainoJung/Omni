@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { DivisionActions } from '@/components/division-actions'
 import { PipelineFlow } from '@/components/pipeline-flow'
 import { Building2, Bot, Activity, Clock, AlertCircle } from 'lucide-react'
+import { RealtimeActivity, RealtimeOutputs } from '@/components/realtime-division'
 
 interface Agent {
   id: string
@@ -38,6 +39,18 @@ interface Metric {
   period_start: string
 }
 
+interface PipelineOutput {
+  id: string
+  pipeline_run_id: string
+  step_name: string
+  step_order: number
+  output_type: string
+  output_data: Record<string, unknown>
+  status: string
+  created_at: string
+  agents: { name: string } | null
+}
+
 function getStatusColor(status: string): string {
   switch (status) {
     case 'operating': return 'var(--accent-green)'
@@ -64,12 +77,14 @@ export default async function DivisionPage({
     { data: events },
     { data: pipelines },
     { data: metrics },
+    { data: outputs },
   ] = await Promise.all([
     supabase.from('divisions').select('*').eq('id', id).single(),
     supabase.from('agents').select('*').eq('division_id', id).order('created_at'),
     supabase.from('agent_events').select('*, agents(name)').eq('division_id', id).order('created_at', { ascending: false }).limit(30),
     supabase.from('division_pipelines').select('*, from_agent:from_agent_id(name), to_agent:to_agent_id(name)').eq('division_id', id),
     supabase.from('division_metrics').select('*').eq('division_id', id).eq('period', 'daily').order('period_start', { ascending: false }).limit(5),
+    supabase.from('pipeline_outputs').select('*, agents(name)').eq('division_id', id).order('created_at', { ascending: false }).limit(10),
   ])
 
   if (!division) notFound()
@@ -173,33 +188,11 @@ export default async function DivisionPage({
             </div>
           </section>
 
-          {/* Recent Activity */}
-          <section>
-            <h3 className="text-sm font-medium text-[var(--text-secondary)] uppercase tracking-wider mb-3 flex items-center gap-2">
-              <Activity className="w-4 h-4" />
-              Recent Activity
-            </h3>
-            <div className="bg-[var(--bg-secondary)] border border-[var(--border)] rounded-lg divide-y divide-[var(--border)]">
-              {events && events.length > 0 ? (
-                events.map((e: AgentEvent) => (
-                  <div key={e.id} className="px-4 py-3 flex items-center gap-3 text-sm">
-                    <span className="text-[var(--text-secondary)] font-mono text-xs w-24 shrink-0">
-                      {e.agents?.name ?? 'system'}
-                    </span>
-                    <span className="flex-1">{e.event_type}</span>
-                    <span className="flex items-center gap-1 text-[var(--text-muted)] text-xs shrink-0">
-                      <Clock className="w-3 h-3" />
-                      {new Date(e.created_at).toLocaleString('ko-KR')}
-                    </span>
-                  </div>
-                ))
-              ) : (
-                <div className="px-4 py-8 text-center text-[var(--text-secondary)]">
-                  아직 활동 기록이 없습니다
-                </div>
-              )}
-            </div>
-          </section>
+          {/* Pipeline Outputs (Realtime) */}
+          <RealtimeOutputs divisionId={id} initialOutputs={outputs ?? []} />
+
+          {/* Recent Activity (Realtime) */}
+          <RealtimeActivity divisionId={id} initialEvents={events ?? []} />
 
           {/* Design Doc */}
           {division.design_doc && (

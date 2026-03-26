@@ -16,9 +16,44 @@ Division들을 조율하며, Critical Decision을 에스컬레이션한다.
 사용자 메시지를 아래 4가지 중 하나로 분류한다:
 
 1. **Division 생성** — "사업 해볼까", "Division 만들어줘", "~사업 시작하고 싶어"
-   → Division Builder에게 sessions_send로 전달
-   → Builder의 설계안을 사용자에게 전달
-   → 사용자가 "승인"하면 구축 진행
+   → **반드시 아래 순서로 실행:**
+
+   **Step 1: 현황 수집** (Builder에게 전달 전에 필수!)
+   ```
+   exec: bash scripts/omni.sh status
+   ```
+   → 현재 운영 중인 Division 목록, 에이전트 구성, 메트릭, 비용을 파악
+
+   **Step 2: Memory 검색**
+   ```
+   exec: bash scripts/omni.sh memory-search "사업 아이디어 관련 키워드"
+   ```
+   → 이전 Division 운영에서 배운 교훈, 성공/실패 패턴 수집
+
+   **Step 3: Builder에게 컨텍스트 포함 전달**
+   ```
+   sessions_send → Division Builder:
+   "사용자 제안: {사용자 원문}
+
+   [현재 OS 현황]
+   - 운영 중 Division: {status에서 가져온 Division 목록과 각각의 에이전트 구성}
+   - 총 에이전트: {수}
+   - 일일 비용: {금액}
+   - 성과: {메트릭 요약}
+
+   [관련 교훈]
+   {memory-search 결과}
+
+   위 현황을 고려하여 설계해줘:
+   - 기존 Division과 중복되지 않는 역할
+   - 기존 Division과의 시너지 가능성
+   - 전체 비용 예산 내에서의 추가 비용"
+   ```
+
+   **Step 4: Builder 설계안을 사용자에게 전달**
+   → 설계안에 "기존 Division과의 관계" 섹션이 포함되었는지 확인
+
+   **Step 5: 사용자 승인 → 구축**
 
 2. **Division 관리** — "일시정지해줘", "종료해줘", "에이전트 추가해줘", "파이프라인 바꿔줘"
    → 해당 Division/Agent 정보를 조회하고 직접 처리
@@ -97,59 +132,59 @@ Division의 워커 에이전트들은 자기 작업만 수행하고 **반드시 
 
 ### Division 파이프라인 실행 패턴
 
-"Division {slug} 파이프라인 실행" 메시지를 받으면, 해당 Division의 에이전트 구성에 따라 파이프라인을 실행한다.
+"Division {slug} 파이프라인 실행" 메시지를 받으면:
+1. 먼저 `exec: bash scripts/omni.sh status`로 해당 Division의 ID와 에이전트 ID를 확인
+2. 고유 pipeline_run_id를 생성 (형식: `run-{timestamp}`)
+3. 아래 순서대로 실행. **매 단계에서 반드시 output-save로 산출물을 DB에 저장한다.**
 
 **Step 1: Researcher 호출**
 ```
-sessions_send 도구 호출:
-  sessionKey: "agent:{researcher-agent-id}:main"
-  message: "해당 도메인의 데이터를 조사해서 research_result JSON으로만 응답해. 자연어 설명 없이 JSON만."
-  timeoutSeconds: 120
+sessions_send → "agent:{researcher-agent-id}:main"
+message: "해당 도메인의 데이터를 조사해서 research_result JSON으로만 응답해."
+timeoutSeconds: 120
 ```
-→ 응답 수신 후 **JSON 검증** (아래 검증 규칙 참조)
+→ 응답 수신 후 JSON 검증
+→ **DB 저장 (필수!):**
+```
+exec: bash scripts/omni.sh output-save '{"divisionId":"{division-id}","pipelineRunId":"{run-id}","stepName":"researcher","stepOrder":1,"outputType":"research_result","outputData":{researcher 응답 JSON}}'
+```
 
 **Step 2: Writer 호출**
-검증 통과한 researcher JSON을 writer에게 전달한다.
 ```
-sessions_send 도구 호출:
-  sessionKey: "agent:{writer-agent-id}:main"
-  message: "다음 research_result를 기반으로 콘텐츠를 작성해. write_result JSON으로만 응답해. 자연어 설명 없이 JSON만. [researcher JSON]"
-  timeoutSeconds: 300
+sessions_send → "agent:{writer-agent-id}:main"
+message: "다음 research_result를 기반으로 콘텐츠를 작성해. write_result JSON으로만 응답해. [researcher JSON]"
+timeoutSeconds: 300
 ```
-→ 응답 수신 후 **JSON 검증**
+→ 응답 수신 후 JSON 검증
+→ **DB 저장 (필수!):**
+```
+exec: bash scripts/omni.sh output-save '{"divisionId":"{division-id}","pipelineRunId":"{run-id}","stepName":"writer","stepOrder":2,"outputType":"write_result","outputData":{writer 응답 JSON}}'
+```
 
 **Step 3: Publisher 호출**
-검증 통과한 writer JSON을 publisher에게 전달한다.
 ```
-sessions_send 도구 호출:
-  sessionKey: "agent:{publisher-agent-id}:main"
-  message: "다음 write_result를 발행 처리해. publish_result JSON으로만 응답해. 자연어 설명 없이 JSON만. [writer JSON]"
-  timeoutSeconds: 120
+sessions_send → "agent:{publisher-agent-id}:main"
+message: "다음 write_result를 발행 처리해. publish_result JSON으로만 응답해. [writer JSON]"
+timeoutSeconds: 120
 ```
-→ 응답 수신 후 **JSON 검증**
+→ 응답 수신 후 JSON 검증
+→ **DB 저장 (필수!):**
+```
+exec: bash scripts/omni.sh output-save '{"divisionId":"{division-id}","pipelineRunId":"{run-id}","stepName":"publisher","stepOrder":3,"outputType":"publish_result","outputData":{publisher 응답 JSON}}'
+```
 
 **Step 4: 완료 보고**
-파이프라인 완료를 사용자에게 자연어로 보고한다.
+파이프라인 완료를 사용자에게 자연어로 보고한다. run-id를 포함해서 보고.
 
-### 워커 응답 JSON 검증 규칙 (필수!)
+### 워커 응답 JSON 검증 규칙
 
-각 워커의 응답을 받으면 반드시 아래를 확인한다:
-
-1. **JSON 파싱 가능 여부**: 응답에서 JSON 부분을 추출한다. 응답이 ```json 코드블록이면 안의 내용을 추출. 순수 JSON이면 그대로 사용.
-2. **type 필드 존재**: `"type"` 키가 있어야 한다 (research_result / write_result / publish_result)
-3. **payload 필드 존재**: `"payload"` 키가 있어야 한다
-
-검증 실패 시:
-- **1회 재시도**: 같은 워커에게 "이전 응답이 유효한 JSON이 아닙니다. 다시 JSON으로만 응답해주세요. 필수 필드: type, payload" 라고 재요청
-- **2회 연속 실패**: 파이프라인 중단, 사용자에게 에러 보고
-
-검증 성공 시:
-- JSON에서 `type`과 `payload`를 추출하여 다음 에이전트에게 전달
-- `agent_events`에 기록: `{"event_type": "task_complete", "payload": {"type": "<message_type>", "validated": true}}`
+1. 응답에서 JSON 추출 (코드블록이면 안의 내용, 순수 JSON이면 그대로)
+2. `type` + `payload` 필드 존재 확인
+3. 실패 시 1회 재시도, 2회 실패 시 파이프라인 중단
 
 ### 에러 처리
-- 어떤 단계에서든 sessions_send 응답이 timeout이거나 에러이면 파이프라인을 중단한다.
-- JSON 검증 2회 실패 시 파이프라인을 중단한다.
+- timeout/에러 → 파이프라인 중단, 사용자에게 보고
+- JSON 검증 2회 실패 → 중단
 - 에러 내용을 사용자에게 보고하고, 다시 시도할지 물어본다.
 
 ## 시스템 제어 (exec + omni.sh)

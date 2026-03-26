@@ -49,7 +49,7 @@ export function RealtimeEvents({ initialEvents }: { initialEvents: AgentEvent[] 
       {events.length > 0 ? (
         events.map((e) => (
           <div key={e.id} className="px-4 py-3 flex items-center gap-3 text-sm">
-            <EventIcon type={e.event_type} />
+            <EventIcon type={e.event_type} payload={e.payload} />
             <span className="flex-1 truncate">{formatEventDescription(e)}</span>
             <span className="text-[var(--text-muted)] text-xs flex-shrink-0">
               {new Date(e.created_at).toLocaleTimeString('ko-KR')}
@@ -83,7 +83,7 @@ function formatEventDescription(event: AgentEvent): string {
   }
 }
 
-function EventIcon({ type }: { type: string }) {
+function EventIcon({ type, payload }: { type: string; payload?: Record<string, unknown> }) {
   switch (type) {
     case 'task_start':
       return <Play className="w-4 h-4 text-[var(--accent-green)] flex-shrink-0" />
@@ -97,8 +97,11 @@ function EventIcon({ type }: { type: string }) {
       return <ArrowRight className="w-4 h-4 text-[var(--accent-blue)] flex-shrink-0" />
     case 'message_received':
       return <ArrowLeft className="w-4 h-4 text-[var(--accent-blue)] flex-shrink-0" />
-    case 'build_progress':
-      return <Settings className="w-4 h-4 text-[var(--text-muted)] flex-shrink-0 animate-spin" />
+    case 'build_progress': {
+      const progress = Number(payload?.progress ?? 0)
+      if (progress >= 100) return <CheckCircle2 className="w-4 h-4 text-[var(--accent-green)] flex-shrink-0" />
+      return <Settings className="w-4 h-4 text-[var(--accent-blue)] flex-shrink-0 animate-spin" />
+    }
     default:
       return <Circle className="w-4 h-4 text-[var(--text-muted)] flex-shrink-0" />
   }

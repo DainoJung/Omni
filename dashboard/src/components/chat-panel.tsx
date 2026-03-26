@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { MessageSquare, Send, X, Loader2, Bot, User, ChevronRight, ChevronDown, ChevronUp, GripVertical, CheckCircle2, Globe, Clock, Zap, Settings, Brain } from 'lucide-react'
+import { MessageSquare, Send, X, Loader2, Bot, User, ChevronRight, ChevronDown, ChevronUp, GripVertical, CheckCircle2, Globe, Clock, Zap, Settings, Brain, Slash, BarChart3, Play, Pause, PlusCircle, Search, RotateCcw } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 
 // --- Types ---
@@ -19,6 +19,7 @@ interface Message {
   role: 'user' | 'assistant' | 'system'
   content: string
   steps: Step[]
+  actions: InlineAction[]
   isDone: boolean
   timestamp: number
 }
@@ -31,6 +32,47 @@ const WIDTH_KEY = 'omni-chat-width'
 const MIN_WIDTH = 320
 const MAX_WIDTH = 800
 const DEFAULT_WIDTH = 420
+
+// --- Slash Commands ---
+
+interface SlashCommand {
+  command: string
+  label: string
+  description: string
+  icon: React.ReactNode
+  template: string
+}
+
+const SLASH_COMMANDS: SlashCommand[] = [
+  { command: '/status', label: '현황', description: '전체 시스템 현황 조회', icon: <BarChart3 className="w-3.5 h-3.5" />, template: '전체 현황 알려줘' },
+  { command: '/create', label: '생성', description: '새 Division 대화 시작', icon: <PlusCircle className="w-3.5 h-3.5" />, template: '새로운 Division을 만들고 싶어.' },
+  { command: '/pipeline', label: '파이프라인', description: 'Division 파이프라인 실행', icon: <Play className="w-3.5 h-3.5" />, template: 'Division 파이프라인 실행해' },
+  { command: '/pause', label: '일시정지', description: 'Division 일시정지', icon: <Pause className="w-3.5 h-3.5" />, template: 'Division 일시정지해줘' },
+  { command: '/resume', label: '재개', description: 'Division 재개', icon: <RotateCcw className="w-3.5 h-3.5" />, template: 'Division 재개해줘' },
+  { command: '/memory', label: '메모리', description: 'Institutional Memory 검색', icon: <Search className="w-3.5 h-3.5" />, template: '관련 교훈 검색해줘: ' },
+]
+
+// --- Inline Action Parser ---
+// Detects [ACTION:type:label:data] patterns in assistant responses
+
+interface InlineAction {
+  id: string
+  type: string
+  label: string
+  data: string
+}
+
+const ACTION_REGEX = /\[ACTION:([^:\]]+):([^:\]]+)(?::([^\]]+))?\]/g
+
+function extractActions(text: string): { cleanText: string; actions: InlineAction[] } {
+  const actions: InlineAction[] = []
+  let counter = 0
+  const cleanText = text.replace(ACTION_REGEX, (_, type, label, data) => {
+    actions.push({ id: `action-${counter++}`, type, label, data: data || '' })
+    return ''
+  })
+  return { cleanText: cleanText.trim(), actions }
+}
 
 // --- Step Marker Parser ---
 
@@ -210,6 +252,8 @@ export function ChatPanel() {
   const [width, setWidth] = useState(DEFAULT_WIDTH)
   const [dragging, setDragging] = useState(false)
   const [streamText, setStreamText] = useState('')
+  const [showSlashMenu, setShowSlashMenu] = useState(false)
+  const [slashFilter, setSlashFilter] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
@@ -233,7 +277,7 @@ export function ChatPanel() {
   const sendMessage = useCallback(async () => {
     const text = input.trim()
     if (!text || loading) return
-    setMessages(prev => [...prev, { id: `u-${Date.now()}`, role: 'user', content: text, steps: [], isDone: true, timestamp: Date.now() }])
+    setMessages(prev => [...prev, { id: `u-${Date.now()}`, role: 'user', content: text, steps: [], actions: [], isDone: true, timestamp: Date.now() }])
     setInput('')
     setLoading(true)
     setStreamText('')
@@ -242,7 +286,7 @@ export function ChatPanel() {
       const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: text, sessionId }) })
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: res.status }))
-        setMessages(prev => [...prev, { id: `e-${Date.now()}`, role: 'system', content: `오류: ${err.error}`, steps: [], isDone: true, timestamp: Date.now() }])
+        setMessages(prev => [...prev, { id: `e-${Date.now()}`, role: 'system', content: `오류: ${err.error}`, steps: [], actions: [], isDone: true, timestamp: Date.now() }])
         setLoading(false); return
       }
 
@@ -269,20 +313,55 @@ export function ChatPanel() {
 
         if (newResponseId) setSessionId(newResponseId)
         const { steps, body, isDone } = parseAssistantContent(fullText)
-        setMessages(prev => [...prev, { id: `a-${Date.now()}`, role: 'assistant', content: body, steps, isDone, timestamp: Date.now() }])
+        const { cleanText, actions } = extractActions(body)
+        setMessages(prev => [...prev, { id: `a-${Date.now()}`, role: 'assistant', content: cleanText, steps, actions, isDone, timestamp: Date.now() }])
       } else {
         const data = await res.json()
         if (data.responseId) setSessionId(data.responseId)
         const raw = data.reply || data.error || ''
         const { steps, body, isDone } = parseAssistantContent(raw)
-        setMessages(prev => [...prev, { id: `a-${Date.now()}`, role: 'assistant', content: body, steps, isDone, timestamp: Date.now() }])
+        const { cleanText: ct2, actions: ac2 } = extractActions(body)
+        setMessages(prev => [...prev, { id: `a-${Date.now()}`, role: 'assistant', content: ct2, steps, actions: ac2, isDone, timestamp: Date.now() }])
       }
     } catch (err) {
-      setMessages(prev => [...prev, { id: `e-${Date.now()}`, role: 'system', content: `연결 오류: ${String(err)}`, steps: [], isDone: true, timestamp: Date.now() }])
+      setMessages(prev => [...prev, { id: `e-${Date.now()}`, role: 'system', content: `연결 오류: ${String(err)}`, steps: [], actions: [], isDone: true, timestamp: Date.now() }])
     } finally { setLoading(false); setStreamText('') }
   }, [input, loading, sessionId])
 
-  const handleKeyDown = (e: React.KeyboardEvent) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() } }
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (showSlashMenu) {
+      if (e.key === 'Escape') { setShowSlashMenu(false); e.preventDefault(); return }
+    }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); setShowSlashMenu(false); sendMessage() }
+  }
+
+  const handleInputChange = (val: string) => {
+    setInput(val)
+    if (val.startsWith('/')) {
+      setShowSlashMenu(true)
+      setSlashFilter(val.slice(1).toLowerCase())
+    } else {
+      setShowSlashMenu(false)
+    }
+  }
+
+  const selectSlashCommand = (cmd: SlashCommand) => {
+    setInput(cmd.template)
+    setShowSlashMenu(false)
+    inputRef.current?.focus()
+  }
+
+  const handleAction = (action: InlineAction) => {
+    // Send action as a user message to the Orchestrator
+    const actionMsg = `[사용자 액션: ${action.type}] ${action.label}${action.data ? ` (${action.data})` : ''}`
+    setInput(actionMsg)
+    setTimeout(() => sendMessage(), 0)
+  }
+
+  const filteredCommands = SLASH_COMMANDS.filter(c =>
+    !slashFilter || c.command.slice(1).includes(slashFilter) || c.label.includes(slashFilter) || c.description.includes(slashFilter)
+  )
+
   const clearChat = () => { setMessages([]); setSessionId(null); localStorage.removeItem(STORAGE_KEY); localStorage.removeItem(SESSION_KEY) }
 
   if (collapsed) {
@@ -342,6 +421,28 @@ export function ChatPanel() {
                     <div className="min-w-0 flex-1"><MarkdownContent content={msg.content} /></div>
                   </div>
 
+                  {/* Inline action buttons */}
+                  {msg.actions && msg.actions.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-3 pt-2 border-t border-[var(--border)]">
+                      {msg.actions.map(action => (
+                        <button
+                          key={action.id}
+                          onClick={() => handleAction(action)}
+                          disabled={loading}
+                          className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors disabled:opacity-50 ${
+                            action.type === 'approve' || action.type === 'confirm'
+                              ? 'border-[var(--accent-green)] text-[var(--accent-green)] hover:bg-[var(--accent-green)]/10'
+                              : action.type === 'reject' || action.type === 'cancel' || action.type === 'sunset'
+                              ? 'border-[var(--accent-red)] text-[var(--accent-red)] hover:bg-[var(--accent-red)]/10'
+                              : 'border-[var(--accent-blue)] text-[var(--accent-blue)] hover:bg-[var(--accent-blue)]/10'
+                          }`}
+                        >
+                          {action.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
                   {/* Done indicator */}
                   {msg.isDone && (
                     <div className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] mt-3 pt-2 border-t border-[var(--border)]">
@@ -375,10 +476,32 @@ export function ChatPanel() {
           <div ref={messagesEndRef} />
         </div>
 
+        {/* Slash Command Menu */}
+        {showSlashMenu && filteredCommands.length > 0 && (
+          <div className="border-t border-[var(--border)] bg-[var(--bg-secondary)] px-2 py-1.5 max-h-48 overflow-y-auto">
+            {filteredCommands.map(cmd => (
+              <button
+                key={cmd.command}
+                onClick={() => selectSlashCommand(cmd)}
+                className="flex items-center gap-2.5 w-full px-2.5 py-2 text-left rounded-md hover:bg-[var(--bg-tertiary)] transition-colors"
+              >
+                <span className="text-[var(--accent-blue)]">{cmd.icon}</span>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-[var(--text-primary)]">{cmd.command}</span>
+                    <span className="text-[10px] text-[var(--text-muted)]">{cmd.label}</span>
+                  </div>
+                  <p className="text-[10px] text-[var(--text-muted)] truncate">{cmd.description}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Input */}
         <div className="p-3 border-t border-[var(--border)] bg-[var(--bg-secondary)]">
           <div className="flex gap-2">
-            <textarea ref={inputRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown} placeholder="메시지 입력..." rows={1}
+            <textarea ref={inputRef} value={input} onChange={e => handleInputChange(e.target.value)} onKeyDown={handleKeyDown} placeholder="메시지 입력... ( / 로 커맨드)" rows={1}
               className="flex-1 px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border)] rounded-lg text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] resize-none focus:outline-none focus:border-[var(--accent-blue)] transition-colors" style={{ maxHeight: '80px' }} />
             <button onClick={sendMessage} disabled={!input.trim() || loading}
               className="px-3 py-2 bg-[var(--accent-blue)] text-white rounded-lg hover:opacity-90 transition-opacity disabled:opacity-30 disabled:cursor-not-allowed shrink-0">

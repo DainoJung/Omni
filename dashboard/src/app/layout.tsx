@@ -53,7 +53,7 @@ export default async function RootLayout({
 
   return (
     <html lang="ko" className={`${firaSans.variable} ${firaCode.variable}`}>
-      <body className="h-screen overflow-hidden font-[family-name:var(--font-sans)]">
+      <body className="h-screen overflow-hidden font-[family-name:var(--font-sans)]" suppressHydrationWarning>
         <div className="flex h-screen">
           <Sidebar
             divisions={divisions ?? []}

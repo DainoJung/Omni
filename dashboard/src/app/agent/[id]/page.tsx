@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
-import { Bot, Package, Activity, Clock, AlertCircle, Globe, Folder } from 'lucide-react'
+import { Bot, Package, Activity, Clock, AlertCircle, Globe, Folder, ChevronRight, Cpu, Zap } from 'lucide-react'
 
 interface Skill {
   id: string
@@ -15,6 +15,13 @@ interface AgentEvent {
   event_type: string
   payload: Record<string, unknown>
   created_at: string
+}
+
+const statusBadge: Record<string, { bg: string; text: string; label: string }> = {
+  active: { bg: 'bg-emerald-100', text: 'text-emerald-700', label: 'Active' },
+  inactive: { bg: 'bg-slate-100', text: 'text-slate-600', label: 'Inactive' },
+  error: { bg: 'bg-red-100', text: 'text-red-700', label: 'Error' },
+  paused: { bg: 'bg-yellow-100', text: 'text-yellow-700', label: 'Paused' },
 }
 
 export default async function AgentPage({
@@ -37,159 +44,198 @@ export default async function AgentPage({
 
   if (!agent) notFound()
 
-  const statusConfig: Record<string, { color: string; label: string }> = {
-    active: { color: 'bg-[var(--accent-green)]', label: 'Active' },
-    inactive: { color: 'bg-[var(--text-muted)]', label: 'Inactive' },
-    error: { color: 'bg-[var(--accent-red)]', label: 'Error' },
-    paused: { color: 'bg-[var(--accent-yellow)]', label: 'Paused' },
-  }
-
-  const st = statusConfig[agent.status] ?? statusConfig.inactive
+  const st = statusBadge[agent.status] ?? statusBadge.inactive
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      {/* Header */}
-      <header>
-        <div className="flex items-center gap-2 text-sm text-[var(--text-muted)] mb-3">
-          <a href={`/division/${agent.division_id}`} className="hover:text-[var(--text-secondary)]">
+    <div className="p-4 space-y-4">
+      {/* Header Card */}
+      <div className="blueprint-card">
+        <div className="blueprint-header flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <Cpu size={14} />
+            <span>Agent Detail</span>
+          </div>
+          <a
+            href={`/division/${agent.division_id}`}
+            className="!opacity-100 flex items-center gap-1 text-[10px] font-[family-name:var(--font-mono)] text-[var(--accent-blue)] hover:underline uppercase"
+          >
             ← {agent.divisions?.name ?? 'Division'}
           </a>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border)] flex items-center justify-center">
-            <Bot className="w-5 h-5 text-[var(--text-secondary)]" />
+        <div className="p-5 flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-emerald-50 border-2 border-emerald-200 flex items-center justify-center">
+            <Bot size={24} className="text-emerald-600" />
           </div>
           <div>
             <div className="flex items-center gap-3">
-              <h2 className="text-2xl font-bold">{agent.name}</h2>
-              <span className="flex items-center gap-1.5 text-sm">
-                <span className={`inline-block w-2 h-2 rounded-full ${st.color}`} />
+              <h2 className="text-xl font-bold">{agent.name}</h2>
+              <span className={`text-[10px] font-[family-name:var(--font-mono)] uppercase px-2.5 py-1 rounded-full ${st.bg} ${st.text}`}>
                 {st.label}
               </span>
             </div>
-            <p className="text-[var(--text-secondary)] text-sm">{agent.role}</p>
+            <p className="text-sm text-[var(--text-secondary)] mt-0.5">{agent.role}</p>
           </div>
         </div>
-      </header>
+      </div>
 
       {/* Info Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <InfoCard label="Model" value={agent.model} />
-        <InfoCard label="OpenClaw ID" value={agent.openclaw_agent_id} />
-        <InfoCard label="Errors" value={String(agent.error_count)} highlight={agent.error_count > 0} />
+      <div className="grid grid-cols-4 gap-4">
+        <InfoCard label="Model" value={agent.model} icon={<Cpu size={14} />} />
+        <InfoCard label="OpenClaw ID" value={agent.openclaw_agent_id || '—'} icon={<Zap size={14} />} />
+        <InfoCard
+          label="Errors"
+          value={String(agent.error_count)}
+          icon={<AlertCircle size={14} />}
+          highlight={agent.error_count > 0}
+        />
         <InfoCard
           label="Last Active"
           value={agent.last_active_at ? new Date(agent.last_active_at).toLocaleString('ko-KR') : 'Never'}
+          icon={<Clock size={14} />}
         />
       </div>
 
-      {/* Schedule */}
-      {agent.schedule && (
-        <section>
-          <h3 className="text-sm font-medium text-[var(--text-secondary)] uppercase tracking-wider mb-3 flex items-center gap-2">
-            <Clock className="w-4 h-4" />
-            Schedule
-          </h3>
-          <div className="p-3 bg-[var(--bg-secondary)] border border-[var(--border)] rounded-lg text-sm font-mono">
-            {JSON.stringify(agent.schedule)}
-          </div>
-        </section>
-      )}
-
-      {/* Skills */}
-      <section>
-        <h3 className="text-sm font-medium text-[var(--text-secondary)] uppercase tracking-wider mb-3 flex items-center gap-2">
-          <Package className="w-4 h-4" />
-          Skills ({skills?.length ?? 0})
-        </h3>
-        {skills && skills.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {skills.map((s: Skill) => (
-              <div
-                key={s.id}
-                className="p-3 bg-[var(--bg-secondary)] border border-[var(--border)] rounded-lg flex items-center justify-between"
-              >
-                <div className="flex items-center gap-2">
-                  <Package className="w-4 h-4 text-[var(--text-muted)]" />
-                  <div>
-                    <span className="text-sm font-medium">{s.skill_name}</span>
-                    {s.version && (
-                      <span className="ml-2 text-xs text-[var(--text-muted)]">v{s.version}</span>
-                    )}
-                  </div>
-                </div>
-                <span className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded ${
-                  s.source === 'clawhub'
-                    ? 'bg-[var(--accent-blue)]/20 text-[var(--accent-blue)]'
-                    : 'bg-[var(--accent-purple)]/20 text-[var(--accent-purple)]'
-                }`}>
-                  {s.source === 'clawhub' ? (
-                    <Globe className="w-3 h-3" />
-                  ) : (
-                    <Folder className="w-3 h-3" />
-                  )}
-                  {s.source}
-                </span>
+      <div className="grid grid-cols-12 gap-4">
+        {/* Left: Skills + Schedule */}
+        <div className="col-span-5 space-y-4">
+          {/* Schedule */}
+          {agent.schedule && (
+            <div className="blueprint-card">
+              <div className="blueprint-header flex items-center gap-2">
+                <Clock size={12} />
+                <span>Schedule</span>
               </div>
-            ))}
-          </div>
-        ) : (
-          <div className="p-4 bg-[var(--bg-secondary)] border border-[var(--border)] rounded-lg text-sm text-[var(--text-secondary)]">
-            설치된 스킬이 없습니다
-          </div>
-        )}
-      </section>
-
-      {/* Events */}
-      <section>
-        <h3 className="text-sm font-medium text-[var(--text-secondary)] uppercase tracking-wider mb-3 flex items-center gap-2">
-          <Activity className="w-4 h-4" />
-          Event Log
-        </h3>
-        <div className="bg-[var(--bg-secondary)] border border-[var(--border)] rounded-lg divide-y divide-[var(--border)]">
-          {events && events.length > 0 ? (
-            events.map((e: AgentEvent) => (
-              <div key={e.id} className="px-4 py-3 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium">{e.event_type}</span>
-                  <span className="flex items-center gap-1 text-xs text-[var(--text-muted)]">
-                    <Clock className="w-3 h-3" />
-                    {new Date(e.created_at).toLocaleString('ko-KR')}
-                  </span>
-                </div>
-                {e.payload && Object.keys(e.payload).length > 0 && (
-                  <pre className="mt-1 text-xs text-[var(--text-muted)] font-mono truncate">
-                    {JSON.stringify(e.payload)}
-                  </pre>
-                )}
+              <div className="p-4">
+                <pre className="text-xs font-[family-name:var(--font-mono)] text-[var(--text-secondary)]">
+                  {JSON.stringify(agent.schedule, null, 2)}
+                </pre>
               </div>
-            ))
-          ) : (
-            <div className="px-4 py-8 text-center text-[var(--text-secondary)]">
-              이벤트 기록이 없습니다
             </div>
           )}
-        </div>
-      </section>
 
-      {/* Error count callout if relevant */}
+          {/* Skills Card */}
+          <div className="blueprint-card">
+            <div className="blueprint-header flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <Package size={12} />
+                <span>Skills ({skills?.length ?? 0})</span>
+              </div>
+              <ChevronRight size={12} className="opacity-40" />
+            </div>
+            <div className="p-4 space-y-2">
+              {skills && skills.length > 0 ? (
+                skills.map((s: Skill) => (
+                  <div
+                    key={s.id}
+                    className="flex items-center justify-between py-2 border-b border-[var(--border)] last:border-b-0"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Package size={12} className="text-[var(--text-muted)]" />
+                      <span className="text-[10px] font-[family-name:var(--font-mono)] font-medium uppercase">
+                        {s.skill_name}
+                      </span>
+                      {s.version && (
+                        <span className="text-[9px] font-[family-name:var(--font-mono)] text-[var(--text-muted)]">
+                          v{s.version}
+                        </span>
+                      )}
+                    </div>
+                    <span
+                      className={`flex items-center gap-1 text-[9px] font-[family-name:var(--font-mono)] px-2 py-0.5 rounded-full ${
+                        s.source === 'clawhub'
+                          ? 'bg-blue-100 text-blue-700'
+                          : 'bg-purple-100 text-purple-700'
+                      }`}
+                    >
+                      {s.source === 'clawhub' ? <Globe size={10} /> : <Folder size={10} />}
+                      {s.source}
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-4 text-[var(--text-muted)] text-[10px] font-[family-name:var(--font-mono)] uppercase">
+                  No skills installed
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Right: Event Log */}
+        <div className="col-span-7">
+          <div className="blueprint-card">
+            <div className="blueprint-header flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <Activity size={12} />
+                <span>Event Log ({events?.length ?? 0})</span>
+              </div>
+              <ChevronRight size={12} className="opacity-40" />
+            </div>
+            <div className="divide-y divide-[var(--border)] max-h-[600px] overflow-y-auto">
+              {events && events.length > 0 ? (
+                events.map((e: AgentEvent) => (
+                  <div key={e.id} className="px-4 py-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-[family-name:var(--font-mono)] font-bold uppercase">
+                        {e.event_type}
+                      </span>
+                      <span className="flex items-center gap-1 text-[9px] font-[family-name:var(--font-mono)] text-[var(--text-muted)]">
+                        <Clock size={10} />
+                        {new Date(e.created_at).toLocaleString('ko-KR')}
+                      </span>
+                    </div>
+                    {e.payload && Object.keys(e.payload).length > 0 && (
+                      <pre className="mt-1.5 text-[9px] font-[family-name:var(--font-mono)] text-[var(--text-muted)] truncate">
+                        {JSON.stringify(e.payload)}
+                      </pre>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <div className="px-4 py-8 text-center text-[var(--text-muted)] text-[10px] font-[family-name:var(--font-mono)] uppercase">
+                  No events recorded
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Error Banner */}
       {agent.error_count > 0 && (
-        <div className="flex items-center gap-2 p-3 bg-[var(--accent-red)]/10 border border-[var(--accent-red)]/30 rounded-lg text-sm text-[var(--accent-red)]">
-          <AlertCircle className="w-4 h-4 shrink-0" />
-          이 에이전트에 {agent.error_count}개의 오류가 기록되어 있습니다
+        <div className="blueprint-card border-red-200 bg-red-50">
+          <div className="p-3 flex items-center gap-2 text-sm text-red-700">
+            <AlertCircle size={16} />
+            이 에이전트에 {agent.error_count}개의 오류가 기록되어 있습니다
+          </div>
         </div>
       )}
     </div>
   )
 }
 
-function InfoCard({ label, value, highlight = false }: { label: string; value: string; highlight?: boolean }) {
+function InfoCard({
+  label,
+  value,
+  icon,
+  highlight = false,
+}: {
+  label: string
+  value: string
+  icon: React.ReactNode
+  highlight?: boolean
+}) {
   return (
-    <div className="p-3 bg-[var(--bg-secondary)] border border-[var(--border)] rounded-lg">
-      <p className="text-xs text-[var(--text-muted)] mb-1">{label}</p>
-      <p className={`text-sm font-medium ${highlight ? 'text-[var(--accent-red)]' : ''}`}>
-        {value}
-      </p>
+    <div className="blueprint-card">
+      <div className="p-3 flex flex-col items-center gap-1">
+        <div className="flex items-center gap-1.5">
+          <span className="text-[var(--text-muted)]">{icon}</span>
+          <span className="text-[9px] font-[family-name:var(--font-mono)] uppercase opacity-50">{label}</span>
+        </div>
+        <span className={`text-sm font-[family-name:var(--font-mono)] font-bold ${highlight ? 'text-red-600' : ''}`}>
+          {value}
+        </span>
+      </div>
     </div>
   )
 }

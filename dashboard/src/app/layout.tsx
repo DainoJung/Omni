@@ -1,27 +1,27 @@
 import type { Metadata } from 'next'
 import { Fira_Sans, Fira_Code } from 'next/font/google'
 import './globals.css'
-import { Sidebar } from '@/components/sidebar'
-import { SystemStatusBar } from '@/components/system-status-bar'
+import { TopNav } from '@/components/top-nav'
+import { FooterBar } from '@/components/footer-bar'
 import { ChatPanel } from '@/components/chat-panel'
 import { createClient } from '@/lib/supabase/server'
 
 const firaSans = Fira_Sans({
   subsets: ['latin'],
   weight: ['300', '400', '500', '600', '700'],
-  variable: '--font-sans',
+  variable: '--font-fira-sans',
   display: 'swap',
 })
 
 const firaCode = Fira_Code({
   subsets: ['latin'],
   weight: ['400', '500', '600'],
-  variable: '--font-mono',
+  variable: '--font-fira-code',
   display: 'swap',
 })
 
 export const metadata: Metadata = {
-  title: 'Omni OS — Command Center',
+  title: 'OMNI Agent OS — Command Center',
   description: 'Agent OS for Autonomous Business',
 }
 
@@ -32,10 +32,7 @@ export default async function RootLayout({
 }) {
   const supabase = await createClient()
 
-  const [
-    { data: divisions },
-    { count: pendingCount },
-  ] = await Promise.all([
+  const [{ data: divisions }, { count: pendingCount }] = await Promise.all([
     supabase
       .from('divisions')
       .select('id, name, slug, status')
@@ -53,20 +50,21 @@ export default async function RootLayout({
 
   return (
     <html lang="ko" className={`${firaSans.variable} ${firaCode.variable}`}>
-      <body className="h-screen overflow-hidden font-[family-name:var(--font-sans)]" suppressHydrationWarning>
-        <div className="flex h-screen">
-          <Sidebar
-            divisions={divisions ?? []}
+      <body
+        className="h-screen overflow-hidden font-[family-name:var(--font-sans)]"
+        suppressHydrationWarning
+      >
+        <div className="h-screen flex flex-col">
+          <TopNav
             pendingDecisionCount={pendingCount ?? 0}
+            divisionMap={divisionMap}
           />
-          <div className="flex-1 flex flex-col min-w-0">
-            <SystemStatusBar divisionMap={divisionMap} />
-            <main className="flex-1 overflow-y-auto p-6">
-              {children}
-            </main>
-          </div>
-          <ChatPanel />
+          <main className="flex-1 flex flex-col min-h-0 overflow-y-auto technical-grid">
+            {children}
+          </main>
+          <FooterBar />
         </div>
+        <ChatPanel />
       </body>
     </html>
   )

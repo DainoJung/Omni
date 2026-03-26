@@ -365,19 +365,19 @@ export function ChatPanel() {
   const clearChat = () => { setMessages([]); setSessionId(null); localStorage.removeItem(STORAGE_KEY); localStorage.removeItem(SESSION_KEY) }
 
   if (collapsed) {
-    return <button onClick={() => setCollapsed(false)} className="fixed bottom-6 right-6 w-12 h-12 rounded-full bg-[var(--accent-blue)] text-white flex items-center justify-center shadow-lg hover:opacity-90 transition-opacity z-50" title="Omni 컨트롤타워"><MessageSquare className="w-5 h-5" /></button>
+    return <button onClick={() => setCollapsed(false)} className="fixed bottom-12 right-6 w-12 h-12 rounded-full bg-[var(--accent-blue)] text-white flex items-center justify-center shadow-lg hover:opacity-90 transition-opacity z-50" title="Omni 컨트롤타워"><MessageSquare className="w-5 h-5" /></button>
   }
 
   // Parse streaming text for live steps
   const liveData = streamText ? parseAssistantContent(streamText) : null
 
   return (
-    <div ref={panelRef} className="h-full border-l border-[var(--border)] bg-[var(--bg-primary)] flex shrink-0 relative" style={{ width: `${width}px` }}>
+    <div ref={panelRef} className="fixed top-14 right-0 bottom-8 border-l border-[var(--border)] bg-white/95 backdrop-blur-md flex shrink-0 z-40 shadow-2xl" style={{ width: `${width}px` }}>
       <div onMouseDown={() => setDragging(true)} className={`absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize z-10 hover:bg-[var(--accent-blue)]/20 transition-colors ${dragging ? 'bg-[var(--accent-blue)]/30' : ''}`} />
 
       <div className="flex flex-col flex-1 min-w-0">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)] bg-[var(--bg-secondary)]">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)] bg-[var(--bg-primary)]">
           <div className="flex items-center gap-2"><Bot className="w-4 h-4 text-[var(--accent-blue)]" /><span className="text-sm font-medium">Omni 컨트롤타워</span></div>
           <div className="flex items-center gap-1">
             <button onClick={clearChat} className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded" title="초기화"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>

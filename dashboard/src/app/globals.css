@@ -1,29 +1,64 @@
 @import "tailwindcss";
 
+@theme {
+  --font-mono: var(--font-fira-code, "JetBrains Mono", "Roboto Mono", monospace);
+  --font-sans: var(--font-fira-sans, "Inter", system-ui, sans-serif);
+
+  --color-blueprint-bg: #F0F2F5;
+  --color-blueprint-ink: #1A1C1E;
+  --color-blueprint-line: rgba(26, 28, 30, 0.15);
+  --color-blueprint-accent: #3B82F6;
+}
+
 :root {
-  /* Palantir Foundry-inspired dark theme */
-  --bg-primary: #0d1117;
-  --bg-secondary: #161b22;
-  --bg-tertiary: #21262d;
-  --border: #30363d;
-  --text-primary: #e6edf3;
-  --text-secondary: #8b949e;
-  --text-muted: #484f58;
-  --accent-blue: #58a6ff;
-  --accent-green: #3fb950;
-  --accent-yellow: #d29922;
-  --accent-red: #f85149;
-  --accent-purple: #bc8cff;
+  /* Blueprint light theme */
+  --bg-primary: #F0F2F5;
+  --bg-secondary: #FFFFFF;
+  --bg-tertiary: #E8EAED;
+  --border: rgba(26, 28, 30, 0.15);
+  --text-primary: #1A1C1E;
+  --text-secondary: #5F6368;
+  --text-muted: #9AA0A6;
+  --accent-blue: #3B82F6;
+  --accent-green: #10B981;
+  --accent-yellow: #F59E0B;
+  --accent-red: #EF4444;
+  --accent-purple: #8B5CF6;
+  --accent-amber: #D97706;
 
   /* Layout */
-  --sidebar-width: 240px;
-  --sidebar-collapsed: 64px;
-  --topbar-height: 48px;
+  --topbar-height: 56px;
+  --footer-height: 32px;
 }
 
 body {
   background: var(--bg-primary);
   color: var(--text-primary);
+}
+
+/* Technical grid background */
+.technical-grid {
+  background-image:
+    linear-gradient(var(--color-blueprint-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--color-blueprint-line) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* Blueprint card */
+.blueprint-card {
+  border: 1px solid var(--border);
+  background: white;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.blueprint-header {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--border);
+  padding: 8px 12px;
+  opacity: 0.6;
 }
 
 /* Scrollbar */
@@ -35,11 +70,11 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--border);
+  background: var(--text-muted);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--text-muted);
+  background: var(--text-secondary);
 }
 
 /* Status dot pulse */
@@ -50,4 +85,23 @@ body {
 
 .animate-pulse-status {
   animation: pulse-status 2s ease-in-out infinite;
+}
+
+/* React Flow overrides */
+.react-flow__controls {
+  background: white !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 12px !important;
+  overflow: hidden !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08) !important;
+}
+
+.react-flow__controls-button {
+  background: white !important;
+  border-bottom: 1px solid var(--border) !important;
+  fill: var(--text-secondary) !important;
+}
+
+.react-flow__controls-button:hover {
+  background: var(--bg-primary) !important;
 }

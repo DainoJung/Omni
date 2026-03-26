@@ -1,14 +1,16 @@
 'use client'
 
 import { usePathname } from 'next/navigation'
-import { Layers, ShieldAlert, Brain, TrendingUp, Plus, ChevronRight } from 'lucide-react'
+import { Layers, ShieldAlert, Brain, TrendingUp, CircleDollarSign, MessageSquare, ChevronRight } from 'lucide-react'
 
 const routeLabels: Record<string, string> = {
   '/': 'Command Center',
-  '/proposal': 'New Division',
+  '/control-tower': 'Control Tower',
+  '/proposal': 'Proposals',
   '/decisions': 'Decisions',
   '/memory': 'Memory',
   '/strategy': 'Strategy',
+  '/finance': 'Finance',
 }
 
 export function TopNav({
@@ -57,6 +59,8 @@ export function TopNav({
       {/* Right: Nav + Status */}
       <div className="flex items-center gap-3">
         <nav className="flex items-center gap-1">
+          <NavLink href="/control-tower" icon={<MessageSquare size={14} />} label="Control Tower" />
+          <NavLink href="/finance" icon={<CircleDollarSign size={14} />} label="Finance" />
           <NavLink href="/decisions" icon={<ShieldAlert size={14} />} label="Decisions" badge={pendingDecisionCount} />
           <NavLink href="/memory" icon={<Brain size={14} />} label="Memory" />
           <NavLink href="/strategy" icon={<TrendingUp size={14} />} label="Strategy" />
@@ -68,14 +72,6 @@ export function TopNav({
           <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
           <span className="text-[10px] font-[family-name:var(--font-mono)] opacity-60 uppercase">Operational</span>
         </div>
-
-        <a
-          href="/proposal"
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--accent-blue)] text-white text-xs font-medium rounded-lg hover:opacity-90 transition-opacity"
-        >
-          <Plus size={14} />
-          <span>New Division</span>
-        </a>
 
         <div className="w-8 h-8 rounded-full bg-[var(--accent-blue)]/10 border border-[var(--accent-blue)]/20 flex items-center justify-center text-[var(--accent-blue)]">
           <span className="text-[10px] font-bold">JD</span>

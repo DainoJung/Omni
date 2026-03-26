@@ -17,6 +17,15 @@ interface Capability {
   status: string
 }
 
+interface AgentRequirement {
+  type: string
+  service: string
+  env: string
+  required?: boolean
+  description?: string
+  setupUrl?: string
+}
+
 interface AgentSpec {
   id: string
   name: string
@@ -24,6 +33,7 @@ interface AgentSpec {
   model: string
   skills: string[]
   schedule: { type: string; expression?: string }
+  requirements?: AgentRequirement[]
 }
 
 interface PipelineStep {
@@ -70,9 +80,11 @@ interface DesignReviewProps {
 
 export function DesignReview({ divisionId, divisionName, proposalText, designDoc, onUpdate }: DesignReviewProps) {
   const [feedbackMode, setFeedbackMode] = useState(false)
+  const [setupMode, setSetupMode] = useState(false)
   const [feedback, setFeedback] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [credentialValues, setCredentialValues] = useState<Record<string, string>>({})
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     capabilities: true,
     agents: true,
@@ -81,6 +93,21 @@ export function DesignReview({ divisionId, divisionName, proposalText, designDoc
     lessons: false,
     cost: true,
   })
+
+  // 모든 에이전트의 requirements를 수집
+  const allRequirements: Array<AgentRequirement & { agentName: string }> = []
+  if (designDoc.agents) {
+    for (const agent of designDoc.agents) {
+      for (const req of (agent.requirements || [])) {
+        if (req.type !== 'none' && !allRequirements.find(r => r.env === req.env)) {
+          allRequirements.push({ ...req, agentName: agent.name })
+        }
+      }
+    }
+  }
+  const requiredCount = allRequirements.filter(r => r.required !== false).length
+  const filledCount = allRequirements.filter(r => r.required !== false && credentialValues[r.env]?.trim()).length
+  const allRequiredFilled = requiredCount === 0 || filledCount >= requiredCount
 
   const toggleSection = (key: string) => {
     setExpandedSections(prev => ({ ...prev, [key]: !prev[key] }))
@@ -100,10 +127,44 @@ export function DesignReview({ divisionId, divisionName, proposalText, designDoc
     )
   }
 
-  const handleApprove = async () => {
+  const handleApprove = () => {
+    if (allRequirements.length > 0) {
+      // requirements가 있으면 셋업 위자드로 진입
+      setSetupMode(true)
+      setFeedbackMode(false)
+      setError(null)
+    } else {
+      // requirements가 없으면 바로 빌드
+      handleBuild()
+    }
+  }
+
+  const handleBuild = async () => {
     setLoading(true)
     setError(null)
     try {
+      // 1. credentials 저장
+      for (const req of allRequirements) {
+        const value = credentialValues[req.env]?.trim()
+        if (value) {
+          await fetch('/api/agent/credentials', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              divisionId,
+              service: req.service,
+              type: req.type,
+              envKey: req.env,
+              envValue: value,
+              setupUrl: req.setupUrl,
+              description: req.description,
+              required: req.required,
+            }),
+          })
+        }
+      }
+
+      // 2. approve → 빌드 트리거
       const res = await fetch('/api/proposal/approve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -111,6 +172,7 @@ export function DesignReview({ divisionId, divisionName, proposalText, designDoc
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || '승인 실패')
+      setSetupMode(false)
       onUpdate?.()
     } catch (err) {
       setError(String(err))
@@ -285,12 +347,12 @@ export function DesignReview({ divisionId, divisionName, proposalText, designDoc
             {expandedSections.cost && (
               <div className="p-2.5 bg-[var(--bg-primary)] rounded-md mb-3">
                 <div className="text-sm font-medium">
-                  월 ₩{designDoc.costEstimate.monthly?.toLocaleString()}
+                  Monthly ${designDoc.costEstimate.monthly?.toFixed(2)}
                 </div>
                 {designDoc.costEstimate.breakdown && (
                   <div className="flex flex-wrap gap-3 mt-1.5 text-xs text-[var(--text-muted)]">
                     {Object.entries(designDoc.costEstimate.breakdown).map(([k, v]) => (
-                      <span key={k}>{k}: ₩{Number(v).toLocaleString()}</span>
+                      <span key={k}>{k}: ${Number(v).toFixed(2)}</span>
                     ))}
                   </div>
                 )}
@@ -307,8 +369,79 @@ export function DesignReview({ divisionId, divisionName, proposalText, designDoc
         </div>
       )}
 
+      {/* Setup Wizard */}
+      {setupMode && allRequirements.length > 0 && (
+        <div className="px-4 pb-3 space-y-3">
+          <div className="flex items-center justify-between">
+            <h4 className="text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">
+              외부 서비스 설정 ({filledCount}/{requiredCount})
+            </h4>
+            <button
+              onClick={() => { setSetupMode(false); setError(null) }}
+              className="text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+            >
+              닫기
+            </button>
+          </div>
+          <p className="text-xs text-[var(--text-muted)]">
+            이 Division을 운영하려면 아래 서비스 연동이 필요합니다. API 키를 입력해주세요.
+          </p>
+
+          <div className="space-y-2.5">
+            {allRequirements.map((req, i) => (
+              <div key={i} className="p-3 bg-[var(--bg-primary)] rounded-md border border-[var(--border)]">
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className={`w-2 h-2 rounded-full ${credentialValues[req.env]?.trim() ? 'bg-[var(--accent-green)]' : req.required !== false ? 'bg-[var(--accent-red)]' : 'bg-[var(--text-muted)]'}`} />
+                    <span className="text-xs font-medium">{req.service}</span>
+                    {req.required === false && <span className="text-[9px] text-[var(--text-muted)]">(선택)</span>}
+                  </div>
+                  <span className="text-[10px] text-[var(--text-muted)]">{req.agentName}</span>
+                </div>
+                {req.description && (
+                  <p className="text-[10px] text-[var(--text-muted)] mb-1.5">{req.description}</p>
+                )}
+                <div className="flex gap-2">
+                  <input
+                    type="password"
+                    value={credentialValues[req.env] || ''}
+                    onChange={e => setCredentialValues(prev => ({ ...prev, [req.env]: e.target.value }))}
+                    placeholder={`${req.env} 입력`}
+                    className="flex-1 px-2.5 py-1.5 bg-[var(--bg-secondary)] border border-[var(--border)] rounded text-xs font-mono focus:outline-none focus:border-[var(--accent-blue)] transition-colors"
+                  />
+                  {req.setupUrl && (
+                    <a
+                      href={req.setupUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-2.5 py-1.5 text-[10px] text-[var(--accent-blue)] border border-[var(--accent-blue)]/30 rounded hover:bg-[var(--accent-blue)]/10 transition-colors shrink-0"
+                    >
+                      발급받기
+                    </a>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Build Button */}
+          <button
+            onClick={handleBuild}
+            disabled={loading || !allRequiredFilled}
+            className={`w-full flex items-center justify-center gap-1.5 px-4 py-2.5 text-sm font-medium rounded-md transition-colors ${
+              allRequiredFilled
+                ? 'bg-[var(--accent-green)] text-white hover:opacity-90'
+                : 'bg-[var(--bg-tertiary)] text-[var(--text-muted)] cursor-not-allowed'
+            } disabled:opacity-30`}
+          >
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+            {loading ? '구축 중...' : allRequiredFilled ? '구축 시작' : `필수 항목 ${requiredCount - filledCount}개 남음`}
+          </button>
+        </div>
+      )}
+
       {/* Feedback Input */}
-      {feedbackMode && (
+      {feedbackMode && !setupMode && (
         <div className="px-4 pb-3">
           <textarea
             value={feedback}
@@ -337,24 +470,26 @@ export function DesignReview({ divisionId, divisionName, proposalText, designDoc
       )}
 
       {/* Action Buttons */}
-      <div className="px-4 py-3 border-t border-[var(--border)] flex gap-2">
-        <button
-          onClick={handleApprove}
-          disabled={loading}
-          className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium bg-[var(--accent-green)]/10 text-[var(--accent-green)] border border-[var(--accent-green)]/30 rounded-md hover:bg-[var(--accent-green)]/20 disabled:opacity-30 transition-colors"
-        >
-          {loading && !feedbackMode ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
-          승인 → 구축
-        </button>
-        <button
-          onClick={() => { setFeedbackMode(!feedbackMode); setError(null) }}
-          disabled={loading}
-          className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] border border-[var(--accent-blue)]/30 rounded-md hover:bg-[var(--accent-blue)]/20 disabled:opacity-30 transition-colors"
-        >
-          <MessageSquare className="w-3.5 h-3.5" />
-          피드백
-        </button>
-      </div>
+      {!setupMode && (
+        <div className="px-4 py-3 border-t border-[var(--border)] flex gap-2">
+          <button
+            onClick={handleApprove}
+            disabled={loading}
+            className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium bg-[var(--accent-green)]/10 text-[var(--accent-green)] border border-[var(--accent-green)]/30 rounded-md hover:bg-[var(--accent-green)]/20 disabled:opacity-30 transition-colors"
+          >
+            {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+            {allRequirements.length > 0 ? '승인 + 설정' : '승인 → 구축'}
+          </button>
+          <button
+            onClick={() => { setFeedbackMode(!feedbackMode); setSetupMode(false); setError(null) }}
+            disabled={loading}
+            className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] border border-[var(--accent-blue)]/30 rounded-md hover:bg-[var(--accent-blue)]/20 disabled:opacity-30 transition-colors"
+          >
+            <MessageSquare className="w-3.5 h-3.5" />
+            피드백
+          </button>
+        </div>
+      )}
     </div>
   )
 }

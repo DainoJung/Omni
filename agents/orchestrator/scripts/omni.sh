@@ -29,6 +29,12 @@ case "$1" in
     ID="${2:?division-id 필요}"
     curl -s -X POST "$API/division/update" -H "Content-Type: application/json" -d "{\"divisionId\":\"$ID\",\"action\":\"sunset\"}" 2>/dev/null
     ;;
+  division-delete)
+    # Usage: bash scripts/omni.sh division-delete <division-id>
+    # 주의: 완전 삭제 (에이전트, 이벤트, 파이프라인, 메트릭 등 전부 CASCADE 삭제)
+    ID="${2:?division-id 필요}"
+    curl -s -X POST "$API/division/update" -H "Content-Type: application/json" -d "{\"divisionId\":\"$ID\",\"action\":\"delete\"}" 2>/dev/null
+    ;;
   division-build)
     # Usage: bash scripts/omni.sh division-build '<json-body>'
     BODY="${2:?JSON body 필요}"
@@ -78,8 +84,46 @@ case "$1" in
     BODY="${2:?JSON body 필요}"
     curl -s -X POST "$API/proposal/approve" -H "Content-Type: application/json" -d "$BODY" 2>/dev/null
     ;;
+  decision-create)
+    # Usage: bash scripts/omni.sh decision-create '<json-body>'
+    # JSON: {"divisionId":"...","priority":"high","title":"...","description":"...","options":[...],"recommendation":0}
+    BODY="${2:?JSON body 필요}"
+    curl -s -X POST "$API/decisions" -H "Content-Type: application/json" -d "$BODY" 2>/dev/null
+    ;;
+  decision-list)
+    # Usage: bash scripts/omni.sh decision-list [status]
+    STATUS="${2:-pending}"
+    curl -s "$API/decisions?status=$STATUS" 2>/dev/null
+    ;;
+  decision-resolve)
+    # Usage: bash scripts/omni.sh decision-resolve '<json-body>'
+    # JSON: {"id":"...","decidedOption":0,"decidedNote":"승인 사유"}
+    BODY="${2:?JSON body 필요}"
+    curl -s -X PATCH "$API/decisions" -H "Content-Type: application/json" -d "$BODY" 2>/dev/null
+    ;;
+  metric-list)
+    # Usage: bash scripts/omni.sh metric-list <division-id> [period] [limit]
+    ID="${2:?division-id 필요}"
+    PERIOD="${3:-daily}"
+    LIMIT="${4:-7}"
+    curl -s "$API/metrics?divisionId=$ID&period=$PERIOD&limit=$LIMIT" 2>/dev/null
+    ;;
+  cost-record)
+    # Usage: bash scripts/omni.sh cost-record '<json-body>'
+    # JSON: {"divisionId":"...","agentId":"...","model":"gpt-5-mini","inputTokens":500,"outputTokens":200,"caller":"pipeline","metadata":{}}
+    BODY="${2:?JSON body 필요}"
+    curl -s -X POST "$API/llm-usage" -H "Content-Type: application/json" -d "$BODY" 2>/dev/null
+    ;;
+  cost-summary)
+    # Usage: bash scripts/omni.sh cost-summary [division-id] [days]
+    ID="${2:-}"
+    DAYS="${3:-7}"
+    URL="$API/llm-usage?days=$DAYS"
+    [ -n "$ID" ] && URL="$URL&divisionId=$ID"
+    curl -s "$URL" 2>/dev/null
+    ;;
   *)
-    echo '{"error":"Unknown command","usage":"status | memory-search <query> | division-pause <id> | division-resume <id> | division-sunset <id> | division-build <json> | memory-save <json> | metric-record <json> | output-save <json> | output-list <id> | proposal-create <json> | proposal-list | proposal-feedback <json> | proposal-approve <json>"}'
+    echo '{"error":"Unknown command","usage":"status | memory-search <query> | division-pause <id> | division-resume <id> | division-sunset <id> | division-build <json> | memory-save <json> | metric-record <json> | output-save <json> | output-list <id> | proposal-create <json> | proposal-list | proposal-feedback <json> | proposal-approve <json> | cost-record <json> | cost-summary [id] [days]"}'
     exit 1
     ;;
 esac

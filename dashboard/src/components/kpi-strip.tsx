@@ -42,7 +42,7 @@ export function KpiStrip({
       <MetricCard
         icon={<CircleDollarSign className="w-4 h-4" />}
         label="Daily Cost"
-        value={`₩${dailyCost.toLocaleString()}`}
+        value={`$${dailyCost.toFixed(2)}`}
       />
     </div>
   )

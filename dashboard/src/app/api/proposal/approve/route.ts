@@ -67,7 +67,9 @@ export async function POST(request: NextRequest) {
 
     // design_doc에서 BuildRequest 변환
     const designAgents = designDoc.agents as Array<{
-      id: string; name: string; role: string; model: string; schedule?: Record<string, unknown>
+      id: string; name: string; role: string; model: string; skills?: string[]; schedule?: Record<string, unknown>
+      requirements?: Array<{ type: string; service: string; env: string; required?: boolean; description?: string; setupUrl?: string }>
+      outputs?: Array<{ type: string; format: string; destination: string; description?: string }>
     }>
     const designPipeline = designDoc.pipeline as Array<{
       from: string; to: string; triggerType: string; messageType: string
@@ -84,7 +86,10 @@ export async function POST(request: NextRequest) {
         name: a.name,
         role: a.role,
         model: a.model || 'gpt-5-mini',
+        skills: a.skills || [],
         schedule: a.schedule || {},
+        requirements: a.requirements || [],
+        outputs: a.outputs || [],
       })),
       pipeline: designPipeline.map(p => ({
         fromAgentId: `${division.slug}_${p.from}`,
@@ -92,36 +97,45 @@ export async function POST(request: NextRequest) {
         triggerType: p.triggerType,
         messageType: p.messageType,
       })),
-      workspacePath: `${process.env.OPENCLAW_WORKSPACE_BASE || '~/.openclaw/workspaces'}/${division.slug}`,
+      executionScripts: (designDoc.executionScripts || []) as Array<{
+        name: string; language: string; purpose: string; agentId: string;
+        requirements: string[]; inputFormat: string; outputFormat: string;
+        externalService: string; apiDocs?: string
+      }>,
+      workspacePath: `${process.env.OPENCLAW_WORKSPACE_BASE || `${process.env.HOME}/.openclaw/workspaces`}/${division.slug}`,
     }
 
-    // /api/division/build 내부 호출
-    const buildUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://127.0.0.1:3000'}/api/division/build`
-    const buildResponse = await fetch(buildUrl, {
+    // 빌드를 비동기로 트리거 (self-call 데드락 방지)
+    // approve는 즉시 응답하고, 빌드는 백그라운드에서 진행
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://127.0.0.1:3000'
+
+    // fire-and-forget: 빌드 요청을 보내고 응답을 기다리지 않음
+    fetch(`${appUrl}/api/division/build`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(buildRequest),
-    })
-
-    const buildResult = await buildResponse.json()
-
-    if (!buildResponse.ok) {
-      // 빌드 실패 → status를 designing으로 롤백
-      await supabase
+    }).then(async (res) => {
+      if (!res.ok) {
+        // 빌드 실패 → status를 designing으로 롤백
+        const supabaseRollback = getSupabase()
+        await supabaseRollback
+          .from('divisions')
+          .update({ status: 'designing', updated_at: new Date().toISOString() })
+          .eq('id', divisionId)
+      }
+    }).catch(() => {
+      // 네트워크 에러 시 롤백
+      const supabaseRollback = getSupabase()
+      supabaseRollback
         .from('divisions')
         .update({ status: 'designing', updated_at: new Date().toISOString() })
         .eq('id', divisionId)
-
-      return NextResponse.json({
-        error: '구축 실패 — 설계안 상태로 롤백되었습니다',
-        buildError: buildResult,
-      }, { status: 500 })
-    }
+    })
 
     return NextResponse.json({
       success: true,
       divisionId,
-      buildResult,
+      message: '승인 완료. 구축이 백그라운드에서 진행됩니다. Dashboard에서 진행 상태를 확인하세요.',
     })
 
   } catch (err) {

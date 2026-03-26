@@ -1,11 +1,22 @@
 // OpenClaw Gateway 호출 공통 유틸리티
 
+import { extractUsageFromResponse, recordLLMUsage, resolveModelName, type TokenUsage } from './cost-tracker'
+
 const GATEWAY_URL = process.env.OPENCLAW_GATEWAY_URL || 'http://127.0.0.1:18789'
 const GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN || ''
 
 interface GatewayOptions {
   stream?: boolean
   timeoutMs?: number
+}
+
+/** 비용 추적을 위한 컨텍스트 */
+export interface CostContext {
+  caller: string              // 어디서 호출했는지 (proposal, build, pipeline 등)
+  divisionId?: string | null
+  agentId?: string | null
+  agentModel?: string         // 에이전트에 설정된 실제 LLM 모델명
+  metadata?: Record<string, unknown>
 }
 
 /**
@@ -15,10 +26,11 @@ interface GatewayOptions {
  * @param options - stream, timeout 등
  * @returns stream=true면 Response, false면 텍스트
  */
-export async function callAgent(agentId: string, message: string, options?: GatewayOptions & { stream: true }): Promise<Response>
-export async function callAgent(agentId: string, message: string, options?: GatewayOptions & { stream?: false }): Promise<string>
-export async function callAgent(agentId: string, message: string, options: GatewayOptions = {}): Promise<Response | string> {
+export async function callAgent(agentId: string, message: string, options?: GatewayOptions & { stream: true }, costCtx?: CostContext): Promise<Response>
+export async function callAgent(agentId: string, message: string, options?: GatewayOptions & { stream?: false }, costCtx?: CostContext): Promise<string>
+export async function callAgent(agentId: string, message: string, options: GatewayOptions = {}, costCtx?: CostContext): Promise<Response | string> {
   const { stream = false, timeoutMs = 120_000 } = options
+  const startTime = Date.now()
 
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), timeoutMs)
@@ -46,7 +58,24 @@ export async function callAgent(agentId: string, message: string, options: Gatew
     if (stream) return response
 
     const data = await response.json()
-    return extractTextFromResponse(data)
+    const text = extractTextFromResponse(data)
+
+    // 비용 추적: usage 데이터가 있으면 기록 (fire-and-forget)
+    const usage = extractUsageFromResponse(data)
+    if (usage) {
+      const model = resolveModelName(`openclaw:${agentId}`, costCtx?.agentModel)
+      recordLLMUsage({
+        divisionId: costCtx?.divisionId,
+        agentId: costCtx?.agentId,
+        model,
+        usage,
+        caller: costCtx?.caller || 'gateway',
+        latencyMs: Date.now() - startTime,
+        metadata: { ...costCtx?.metadata, openclaw_agent: agentId },
+      }).catch(() => {}) // fire-and-forget
+    }
+
+    return text
   } finally {
     clearTimeout(timeout)
   }

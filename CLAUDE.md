@@ -63,21 +63,14 @@ Omni  (Agent OS)
 
 ## 현재 Phase
 
-Phase 0: OS 기반 (1~2주)
-OpenClaw 위에서 "사업을 제안받고 Division을 만들어주는" 최소 구조를 세운다.
+Phase 0 ✅ 완료 | Phase 1 ~80% | Phase 2 ~70%
 
-- [ ] OpenClaw 로컬 설치 및 Gateway 구성
-- [ ] 멀티 에이전트 환경 셋업 (Orchestrator + Worker 패턴 검증)
-- [ ] Supabase 프로젝트 세팅 (Division/Agent/Event/Memory 스키마)
-- [ ] Division Builder 에이전트 — MVP
-  - 사업 목표를 입력받으면 필요한 역량을 분석
-  - ClawHub에서 관련 스킬 탐색
-  - 에이전트 구성안 + 파이프라인 초안 생성
-  - 사람에게 제출 → 피드백 → 구축
-- [ ] Rules Engine 최소 버전 (Critical Decision 에스컬레이션)
-- [ ] Self-Awareness 최소 버전 (연결된 스킬/API 목록 인식)
+- Phase 0 Go 조건 달성 (2026-03-26): "사업 아이디어 → 에이전트 구성안 제안" E2E 검증 완료
+- Phase 1 Go 조건 달성: "코드 없이 Division 생성 + 자율 운영" 검증 완료 (유튜브 요리 채널)
+- 운영 중 Division 4개 (B-블로그, D-디지털상품, 구매대행, 유튜브요리)
+- 잔여 과제: Cron 스케줄링, Critical Decision 자동 생성, 메트릭 자동 기록, Strategy Layer
 
-**Go 조건**: 임의의 사업 아이디어를 입력하면, 시스템이 에이전트 구성안을 제안하는가?
+상세: `docs/ROADMAP.md` 참조
 
 ## 참고 문서
 

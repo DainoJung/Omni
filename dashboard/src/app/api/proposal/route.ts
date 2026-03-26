@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
-import { callAgent, extractJsonFromText } from '@/lib/gateway'
+import { callAgent, extractJsonFromText, type CostContext } from '@/lib/gateway'
 
 function getSupabase() {
   return createServerClient(
@@ -17,8 +17,9 @@ const DESIGN_SCHEMA_PROMPT = `
 \`\`\`json
 {
   "version": 1,
+  "shortName": "짧은 Division 이름 (3~5단어, 예: AI 교육 플랫폼, 유튜브 요리채널, 디지털 상품 판매)",
   "business": {
-    "description": "사업 설명",
+    "description": "사업 설명 (1~2문장)",
     "targetMarket": "타겟 시장",
     "revenueModel": "수익 모델"
   },
@@ -38,7 +39,25 @@ const DESIGN_SCHEMA_PROMPT = `
       "role": "역할 설명",
       "model": "gpt-5-mini",
       "skills": ["skill1", "skill2"],
-      "schedule": { "type": "cron | interval | manual", "expression": "cron표현식 or null" }
+      "schedule": { "type": "cron | interval | manual", "expression": "cron표현식 or null" },
+      "requirements": [
+        {
+          "type": "api_key | oauth | credential | account | none",
+          "service": "서비스명 (예: YouTube Data API v3)",
+          "env": "환경변수명 (예: YOUTUBE_API_KEY)",
+          "required": true,
+          "description": "왜 필요한지",
+          "setupUrl": "설정 URL or null"
+        }
+      ],
+      "outputs": [
+        {
+          "type": "data | content | file | action",
+          "format": "json | markdown | image | pdf | notion_template 등",
+          "destination": "next_agent | storage | external | report",
+          "description": "산출물 설명"
+        }
+      ]
     }
   ],
   "pipeline": [
@@ -63,12 +82,32 @@ const DESIGN_SCHEMA_PROMPT = `
       "application": "어떻게 반영했는지"
     }
   ],
+  "executionScripts": [
+    {
+      "name": "스크립트명 (예: create-notion-template)",
+      "language": "python",
+      "purpose": "이 스크립트가 하는 실제 작업",
+      "agentId": "이 스크립트를 사용할 agent-id",
+      "requirements": ["필요한 환경변수명"],
+      "inputFormat": "입력 JSON 설명",
+      "outputFormat": "출력 JSON 설명",
+      "externalService": "Notion API | Gumroad API | Gemini API | WordPress API 등",
+      "apiDocs": "공식 API 문서 URL"
+    }
+  ],
   "costEstimate": {
     "monthly": 50000,
     "breakdown": { "api_calls": 30000, "infrastructure": 20000 }
   }
 }
 \`\`\`
+
+중요: executionScripts는 에이전트가 실제로 실행할 자동화 코드다.
+- 에이전트가 "설명"만 하면 안 된다. 실제로 API를 호출하고 파일을 만드는 스크립트를 설계해야 한다.
+- 예: 노션 템플릿 Division이면 → create-notion-template.py (Notion API로 실제 템플릿 생성)
+- 예: 블로그 Division이면 → publish-to-wordpress.py (WordPress API로 실제 글 발행)
+- 예: 이미지가 필요하면 → generate-thumbnail.py (Gemini API로 실제 이미지 생성)
+- 스크립트가 필요 없는 에이전트 (리서치만 하는 에이전트)는 빈 배열 가능
 `
 
 /**
@@ -151,7 +190,7 @@ ${budget ? `월 예산: ${budget}` : ''}
 운영 중 Division ${operatingDivisions.length}개:
 ${statusSummary || '(없음)'}
 총 에이전트: ${allAgents.length}개
-일일 비용: ₩${totalDailyCost.toLocaleString()}
+일일 비용: $${totalDailyCost.toFixed(2)}
 
 ━━ 관련 교훈 (Institutional Memory) ━━
 ${memorySummary}
@@ -180,7 +219,12 @@ ${memorySummary}
 
 ${DESIGN_SCHEMA_PROMPT}`
 
-    const builderResponse = await callAgent('division-builder', builderPrompt, { timeoutMs: 180_000 })
+    const costCtx: CostContext = {
+      caller: 'proposal',
+      agentModel: 'gpt-5', // division-builder는 전략 모델 사용
+      metadata: { action: 'design_division', proposal: proposal.slice(0, 100) },
+    }
+    const builderResponse = await callAgent('division-builder', builderPrompt, { timeoutMs: 180_000 }, costCtx)
 
     // ──────────────────────────────────────
     // Step 4: 구조화된 JSON 파싱
@@ -216,9 +260,13 @@ ${DESIGN_SCHEMA_PROMPT}`
     // ──────────────────────────────────────
     // Step 5: DB 저장 (status='designing')
     // ──────────────────────────────────────
-    const designName = (designDoc.business as Record<string, string>)?.description
-      ? `${(designDoc.business as Record<string, string>).description.slice(0, 50)}`
-      : proposal.slice(0, 50)
+    const business = designDoc.business as Record<string, string> | undefined
+    // shortName이 있으면 사용, 없으면 description에서 핵심만 추출 (20자 이내)
+    const designName = (designDoc.shortName as string)
+      || business?.shortName
+      || (business?.description ? business.description.replace(/[을를이가은는에서의로]+ .+$/, '').slice(0, 25) : null)
+      || proposal.slice(0, 25)
+    const designDescription = business?.description || proposal
 
     const slug = `div-${Date.now()}`
 
@@ -227,7 +275,7 @@ ${DESIGN_SCHEMA_PROMPT}`
       .insert({
         name: designName,
         slug,
-        description: proposal,
+        description: designDescription,
         status: 'designing',
         proposal_text: proposal,
         design_doc: { ...designDoc, version: designDoc.version || 1 },

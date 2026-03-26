@@ -3,7 +3,7 @@ import { Fira_Sans, Fira_Code } from 'next/font/google'
 import './globals.css'
 import { TopNav } from '@/components/top-nav'
 import { FooterBar } from '@/components/footer-bar'
-import { ChatPanel } from '@/components/chat-panel'
+// ChatPanel은 /control-tower 전용 페이지에서 사용
 import { createClient } from '@/lib/supabase/server'
 
 const firaSans = Fira_Sans({
@@ -64,7 +64,6 @@ export default async function RootLayout({
           </main>
           <FooterBar />
         </div>
-        <ChatPanel />
       </body>
     </html>
   )

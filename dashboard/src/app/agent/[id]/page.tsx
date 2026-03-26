@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import { Bot, Package, Activity, Clock, AlertCircle, Globe, Folder, ChevronRight, Cpu, Zap } from 'lucide-react'
+import { AgentActions } from '@/components/agent-actions'
+import { EventLog } from '@/components/event-log'
 
 interface Skill {
   id: string
@@ -163,41 +165,18 @@ export default async function AgentPage({
 
         {/* Right: Event Log */}
         <div className="col-span-7">
-          <div className="blueprint-card">
-            <div className="blueprint-header flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <Activity size={12} />
-                <span>Event Log ({events?.length ?? 0})</span>
-              </div>
-              <ChevronRight size={12} className="opacity-40" />
-            </div>
-            <div className="divide-y divide-[var(--border)] max-h-[600px] overflow-y-auto">
-              {events && events.length > 0 ? (
-                events.map((e: AgentEvent) => (
-                  <div key={e.id} className="px-4 py-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-[family-name:var(--font-mono)] font-bold uppercase">
-                        {e.event_type}
-                      </span>
-                      <span className="flex items-center gap-1 text-[9px] font-[family-name:var(--font-mono)] text-[var(--text-muted)]">
-                        <Clock size={10} />
-                        {new Date(e.created_at).toLocaleString('ko-KR')}
-                      </span>
-                    </div>
-                    {e.payload && Object.keys(e.payload).length > 0 && (
-                      <pre className="mt-1.5 text-[9px] font-[family-name:var(--font-mono)] text-[var(--text-muted)] truncate">
-                        {JSON.stringify(e.payload)}
-                      </pre>
-                    )}
-                  </div>
-                ))
-              ) : (
-                <div className="px-4 py-8 text-center text-[var(--text-muted)] text-[10px] font-[family-name:var(--font-mono)] uppercase">
-                  No events recorded
-                </div>
-              )}
-            </div>
-          </div>
+          <EventLog events={events ?? []} />
+        </div>
+      </div>
+
+      {/* Agent Actions: Sync + Setup Skills */}
+      <div className="blueprint-card">
+        <div className="blueprint-header flex items-center gap-2">
+          <Package size={12} />
+          <span>Skill Management</span>
+        </div>
+        <div className="p-4">
+          <AgentActions agentId={agent.id} agentName={agent.name} />
         </div>
       </div>
 

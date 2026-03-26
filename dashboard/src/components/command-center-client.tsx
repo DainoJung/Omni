@@ -504,14 +504,14 @@ export function CommandCenterClient({
                     <span className="text-[9px] font-[family-name:var(--font-mono)] uppercase opacity-50">
                       MAR
                     </span>
-                    <span className="text-xs font-[family-name:var(--font-mono)] font-bold">₩0</span>
+                    <span className="text-xs font-[family-name:var(--font-mono)] font-bold">$0.00</span>
                   </div>
                   <div className="flex flex-col items-center">
                     <span className="text-[9px] font-[family-name:var(--font-mono)] uppercase opacity-50">
                       Daily Cost
                     </span>
                     <span className="text-xs font-[family-name:var(--font-mono)] font-bold">
-                      ₩{dailyCost.toLocaleString()}
+                      ${dailyCost.toFixed(2)}
                     </span>
                   </div>
                   <div className="flex flex-col items-end">

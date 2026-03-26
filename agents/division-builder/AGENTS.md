@@ -86,6 +86,104 @@ exec: openclaw skills search "seo keyword"
 - 최소 역량당 2회 이상 검색 (다른 키워드로)
 - 총 검색 횟수 제한 없음 — 정확한 매칭이 우선
 
+## 에이전트 Requirements + Outputs 설계 (필수!)
+
+에이전트를 설계할 때 **스킬만 정하면 안 된다.** 각 에이전트가 실제로 일하려면 뭐가 필요하고, 뭘 만들어내는지를 반드시 정의해야 한다.
+
+### Requirements (필요 자원)
+각 에이전트가 작업을 수행하기 위해 필요한 외부 자원을 명시한다.
+
+| type | 의미 | 예시 |
+|------|------|------|
+| `api_key` | 외부 API 키 | YouTube Data API, OpenAI, Gemini |
+| `oauth` | OAuth 인증 | Notion, Google, Twitter |
+| `credential` | 접속 정보 | DB, SSH, SMTP |
+| `account` | 외부 플랫폼 계정 | Gumroad 판매자, WordPress 관리자 |
+| `none` | 필요 없음 | 웹 검색, 텍스트 생성 |
+
+```json
+"requirements": [
+  {
+    "type": "api_key",
+    "service": "YouTube Data API v3",
+    "env": "YOUTUBE_API_KEY",
+    "required": true,
+    "description": "트렌드 검색에 필요",
+    "setupUrl": "https://console.cloud.google.com/apis"
+  }
+]
+```
+
+**규칙:**
+- 에이전트가 외부 서비스를 사용하면 반드시 requirement로 명시
+- `env` 필드는 환경변수 이름 (시스템이 설정 여부를 자동 체크)
+- `setupUrl`이 있으면 사용자가 직접 설정할 수 있도록 안내
+- 웹 검색, 텍스트 생성 등 LLM 자체 기능은 requirement 불필요
+
+### Outputs (산출물 정의)
+각 에이전트가 만들어내는 결과물의 유형과 처리 방식을 명시한다.
+
+| type | 의미 | 처리 방식 |
+|------|------|-----------|
+| `data` | 구조화된 데이터 (JSON) | 다음 에이전트에게 전달 |
+| `content` | 텍스트 콘텐츠 (글, 스크립트, 카피) | 저장 + 미리보기 |
+| `file` | 파일 (이미지, PDF, 템플릿) | Supabase Storage 저장 + 다운로드 |
+| `action` | 외부 액션 (발행, 전송, 등록) | 실행 + 결과 기록 |
+
+```json
+"outputs": [
+  { "type": "data", "format": "json", "destination": "next_agent", "description": "상품 아이디어 목록" },
+  { "type": "file", "format": "notion_template", "destination": "storage", "description": "노션 템플릿 파일" },
+  { "type": "action", "format": "gumroad_listing", "destination": "external", "description": "Gumroad에 상품 등록" }
+]
+```
+
+**규칙:**
+- 모든 에이전트는 최소 1개 이상의 output을 명시
+- `file` 타입이 있으면 시스템이 자동으로 Storage 버킷 생성
+- `action` 타입이 있으면 해당 외부 서비스가 requirements에도 있어야 함
+- 발행 채널이 필요 없는 Division은 `action` output이 없을 뿐 — 강제하지 않음
+
+### Execution Scripts (실행 스크립트 설계 — 핵심!)
+
+**에이전트가 "설명"만 하면 안 된다. 실제로 일을 해야 한다.**
+
+에이전트가 외부 서비스를 통해 실제 결과물을 만들어야 할 때, 해당 작업을 자동화하는 Python 스크립트를 설계한다. 이 스크립트는 Build 시 자동 생성되어 에이전트 워크스페이스에 배치된다.
+
+```json
+"executionScripts": [
+  {
+    "name": "create-notion-template",
+    "language": "python",
+    "purpose": "Notion API로 실제 템플릿 페이지를 생성하고 공유 링크를 반환",
+    "agentId": "creator",
+    "requirements": ["NOTION_TOKEN"],
+    "inputFormat": "{ productName, features, structure }",
+    "outputFormat": "{ templateUrl, templateId, shareLink }",
+    "externalService": "Notion API",
+    "apiDocs": "https://developers.notion.com"
+  }
+]
+```
+
+**설계 원칙:**
+1. **모든 `action` 또는 `file` output에는 대응하는 executionScript가 있어야 한다**
+2. 에이전트는 `exec: python scripts/{name}.py '{input_json}'`으로 스크립트를 실행한다
+3. 스크립트는 stdin으로 JSON을 받고, stdout으로 결과 JSON을 출력한다
+4. 반복 작업(게시물 발행, 상품 등록, 이미지 생성)은 반드시 스크립트로 자동화한다
+5. 리서치/분석처럼 LLM 자체 능력으로 가능한 작업은 스크립트 불필요
+
+**Division 유형별 필수 스크립트 예시:**
+- 블로그: `publish-to-wordpress.py`, `generate-thumbnail.py`
+- 디지털 상품: `create-notion-template.py`, `publish-to-gumroad.py`, `generate-thumbnail.py`
+- 유튜브: `upload-youtube-metadata.py`, `generate-thumbnail.py`
+- 이메일 마케팅: `send-newsletter.py`, `manage-subscribers.py`
+- 커머스: `create-product-listing.py`, `track-inventory.py`
+
+**스크립트가 필요 없는 에이전트:**
+- Researcher (웹 검색 + LLM 분석만 사용)
+- Analyst (데이터 분석 + LLM 추론만 사용)
+
 ## 입력 처리
 
 사용자의 자연어 제안을 받는다. 구조화되지 않아도 됨.

@@ -76,19 +76,22 @@ function extractActions(text: string): { cleanText: string; actions: InlineActio
 
 // --- Step Marker Parser ---
 
-const STEP_REGEX = /^\[STEP:(tool|agent|think|done)(?::(시작|완료))?(?::([^:\]]+))?(?::([^\]]+))?\]$/
+const STEP_GLOBAL_REGEX = /\[STEP:(tool|agent|think|done)(?::(시작|완료))?(?::([^:\]]+))?(?::([^\]]+))?\]/g
 
-function parseStepMarker(line: string): { type: 'tool' | 'agent' | 'think' | 'done'; status: 'running' | 'done'; name: string; description: string } | null {
-  const match = line.trim().match(STEP_REGEX)
-  if (!match) return null
-  const [, type, statusKr, name, desc] = match
-  if (type === 'done') return { type: 'done', status: 'done', name: '', description: '' }
-  return {
-    type: type as 'tool' | 'agent' | 'think',
-    status: statusKr === '완료' ? 'done' : 'running',
-    name: name || '',
-    description: desc || '',
+function extractStepMarkers(line: string): Array<{ type: 'tool' | 'agent' | 'think' | 'done'; status: 'running' | 'done'; name: string; description: string }> {
+  const markers: Array<{ type: 'tool' | 'agent' | 'think' | 'done'; status: 'running' | 'done'; name: string; description: string }> = []
+  let match: RegExpExecArray | null
+  const regex = new RegExp(STEP_GLOBAL_REGEX.source, 'g')
+  while ((match = regex.exec(line)) !== null) {
+    const [, type, statusKr, name, desc] = match
+    markers.push({
+      type: type as 'tool' | 'agent' | 'think' | 'done',
+      status: statusKr === '완료' ? 'done' : type === 'done' ? 'done' : 'running',
+      name: name || '',
+      description: desc || '',
+    })
   }
+  return markers
 }
 
 function parseAssistantContent(text: string): { steps: Step[]; body: string; isDone: boolean } {
@@ -99,25 +102,30 @@ function parseAssistantContent(text: string): { steps: Step[]; body: string; isD
   let stepCounter = 0
 
   for (const line of lines) {
-    const parsed = parseStepMarker(line)
-    if (parsed) {
-      if (parsed.type === 'done') {
-        isDone = true
-        continue
-      }
-      // Update existing step or add new
-      const existing = steps.find(s => s.name === parsed.name && s.type === parsed.type)
-      if (existing) {
-        existing.status = parsed.status
-        existing.description = parsed.description || existing.description
-      } else {
-        steps.push({
-          id: `step-${stepCounter++}`,
-          type: parsed.type,
-          status: parsed.status,
-          name: parsed.name,
-          description: parsed.description,
-        })
+    const markers = extractStepMarkers(line)
+    if (markers.length > 0) {
+      // 줄에서 STEP 마커를 제거한 나머지 텍스트
+      const remaining = line.replace(STEP_GLOBAL_REGEX, '').trim()
+      if (remaining) bodyLines.push(remaining)
+
+      for (const parsed of markers) {
+        if (parsed.type === 'done') {
+          isDone = true
+          continue
+        }
+        const existing = steps.find(s => s.name === parsed.name && s.type === parsed.type)
+        if (existing) {
+          existing.status = parsed.status
+          existing.description = parsed.description || existing.description
+        } else {
+          steps.push({
+            id: `step-${stepCounter++}`,
+            type: parsed.type,
+            status: parsed.status,
+            name: parsed.name,
+            description: parsed.description,
+          })
+        }
       }
     } else {
       bodyLines.push(line)

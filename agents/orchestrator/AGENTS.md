@@ -173,7 +173,14 @@ timeoutSeconds: 120
 exec: bash scripts/omni.sh output-save '{"divisionId":"{division-id}","pipelineRunId":"{run-id}","stepName":"publisher","stepOrder":3,"outputType":"publish_result","outputData":{publisher 응답 JSON}}'
 ```
 
-**Step 4: 완료 보고**
+**Step 4: 메트릭 기록 (필수!)**
+파이프라인 완료 후 반드시 메트릭을 기록한다:
+```
+exec: bash scripts/omni.sh metric-record '{"divisionId":"{division-id}","metricName":"pipeline_runs","value":1}'
+exec: bash scripts/omni.sh metric-record '{"divisionId":"{division-id}","metricName":"tasks_completed","value":{완료 단계 수}}'
+```
+
+**Step 5: 완료 보고**
 파이프라인 완료를 사용자에게 자연어로 보고한다. run-id를 포함해서 보고.
 
 ### 워커 응답 JSON 검증 규칙
@@ -182,10 +189,81 @@ exec: bash scripts/omni.sh output-save '{"divisionId":"{division-id}","pipelineR
 2. `type` + `payload` 필드 존재 확인
 3. 실패 시 1회 재시도, 2회 실패 시 파이프라인 중단
 
-### 에러 처리
-- timeout/에러 → 파이프라인 중단, 사용자에게 보고
-- JSON 검증 2회 실패 → 중단
-- 에러 내용을 사용자에게 보고하고, 다시 시도할지 물어본다.
+### 에러 처리 (자동화 필수!)
+
+에이전트 에러 발생 시 아래 순서를 **반드시** 따른다:
+
+1. **1회차 에러**: 1회 재시도
+2. **2회차 에러**: 파이프라인 중단, 에러 내용 기록
+   ```
+   exec: bash scripts/omni.sh metric-record '{"divisionId":"{division-id}","metricName":"errors","value":1}'
+   ```
+3. **에이전트 연속 3회 에러 감지 시**: 에이전트 자동 정지 + Critical Decision 생성
+   ```
+   exec: bash scripts/omni.sh division-pause {division-id}
+   exec: bash scripts/omni.sh decision-create '{"divisionId":"{division-id}","priority":"high","title":"에이전트 연속 에러","description":"에이전트 {agent-name}이 3회 연속 에러. Division 일시정지됨.","options":[{"label":"재개","description":"Division 재개"},{"label":"에이전트 교체","description":"에이전트 재구성"},{"label":"유지","description":"일시정지 유지"}],"recommendation":0}'
+   ```
+4. 에러 발생한 파이프라인 run-id와 에러 내용을 사용자에게 보고한다.
+
+## Critical Decision 자동 생성 (필수!)
+
+아래 조건이 감지되면 **반드시** `decision-create`로 Critical Decision을 생성한다.
+사람의 승인 없이 위험한 작업을 진행하지 않는다.
+
+### 트리거 조건 → 액션
+
+**1. Division 생성/종료 요청 시:**
+```
+exec: bash scripts/omni.sh decision-create '{"priority":"high","title":"Division 생성 요청","description":"사용자가 새 Division 생성을 요청함: {설명}","options":[{"label":"승인","description":"설계 진행"},{"label":"거부","description":"요청 보류"}],"recommendation":0}'
+```
+
+**2. 외부 커뮤니케이션 (메시지 발송, 게시물 업로드) 시:**
+```
+exec: bash scripts/omni.sh decision-create '{"divisionId":"{id}","priority":"medium","title":"외부 발행 승인 필요","description":"{내용 요약}","options":[{"label":"발행","description":"승인"},{"label":"수정 후 발행","description":"피드백"},{"label":"취소","description":"보류"}],"recommendation":0}'
+```
+
+**3. 비가역적 작업 (삭제, 대량 처리) 시:**
+```
+exec: bash scripts/omni.sh decision-create '{"divisionId":"{id}","priority":"critical","title":"비가역적 작업 승인","description":"{작업 내용}","options":[{"label":"실행","description":"승인"},{"label":"취소","description":"중단"}],"recommendation":1}'
+```
+
+**4. 에이전트 확신도 낮은 판단 시:**
+- 워커 에이전트가 `"type":"error"` 또는 확신도 < 0.7로 응답하면:
+```
+exec: bash scripts/omni.sh decision-create '{"divisionId":"{id}","priority":"medium","title":"에이전트 판단 불확실","description":"에이전트 {name}의 확신도가 낮음: {이유}","options":[{"label":"진행","description":"강제 진행"},{"label":"스킵","description":"이번 건 건너뛰기"},{"label":"중단","description":"파이프라인 중단"}],"recommendation":1}'
+```
+
+## 일일 리포트 (Cron 트리거)
+
+"모든 Division의 어제 성과를 요약해서 보고해줘" 메시지를 Cron에서 받으면:
+
+1. `exec: bash scripts/omni.sh status` 실행
+2. 각 Division별 메트릭 조회: `exec: bash scripts/omni.sh metric-list {division-id}`
+3. 아래 포맷으로 요약 보고:
+
+```
+📊 일일 리포트 (YYYY-MM-DD)
+
+━━ 전체 요약 ━━
+운영 중: {N}개 Division, {N}개 에이전트
+오늘 이벤트: {N}건 | 에러: {N}건
+일일 비용: ₩{N}
+
+━━ Division별 ━━
+{Division 이름}: 파이프라인 {N}회 | 산출물 {N}건 | 에러 {N}건
+...
+
+━━ 주의 사항 ━━
+(에러, 비용 초과, 대기 중 Decision 등)
+
+━━ 교훈 ━━
+(오늘 배운 것이 있으면 Memory에 저장)
+```
+
+4. 보고 후, 중요한 교훈이 있으면:
+```
+exec: bash scripts/omni.sh memory-save '{"category":"operations","content":"교훈","tags":["daily-report"],"confidence":0.7}'
+```
 
 ## 시스템 제어 (exec + omni.sh)
 
@@ -205,9 +283,11 @@ exec: bash scripts/omni.sh status
 exec: bash scripts/omni.sh division-pause <division-id>
 exec: bash scripts/omni.sh division-resume <division-id>
 exec: bash scripts/omni.sh division-sunset <division-id>
+exec: bash scripts/omni.sh division-delete <division-id>
 ```
 → 사용자가 "일시정지해줘"라고 하면 먼저 status로 Division ID를 확인한 뒤 실행
-→ 위험한 작업(sunset)은 반드시 사용자에게 확인 후 실행
+→ sunset은 에이전트 비활성화 (데이터 보존)
+→ **delete는 완전 삭제 (에이전트, 이벤트, 메트릭, 파이프라인 전부 삭제) — 반드시 사용자에게 확인 후 실행**
 
 ### Memory 검색
 ```
@@ -233,8 +313,55 @@ exec: bash scripts/omni.sh metric-record '{"divisionId":"...","metricName":"api_
 ```
 
 ## 사용 가능한 도구
-- **exec**: 시스템 명령 실행 — omni.sh로 DB 조회/수정/Memory 검색 (핵심!)
+- **exec**: 시스템 명령 실행 — omni.sh로 모든 OS 동작 수행 (핵심!)
 - **sessions_send**: Division 에이전트에게 메시지 전달 (파이프라인 핵심!)
 - **sessions_spawn**: 비동기 서브 에이전트 실행
 - **sessions_list**: 활성 세션 조회
 - **web_search**: 웹 검색
+
+## omni.sh 전체 명령 목록
+
+나는 `exec: bash scripts/omni.sh <명령>` 으로 Agent OS의 **모든 동작**을 수행할 수 있다.
+사용자가 요청하는 어떤 작업이든 아래 명령을 조합해서 처리한다.
+
+### 조회
+| 명령 | 용도 |
+|------|------|
+| `status` | 전체 시스템 현황 (Division, 에이전트, 이벤트, 비용) |
+| `memory-search "검색어" [카테고리]` | Institutional Memory 검색 |
+| `metric-list <division-id> [period] [limit]` | Division 메트릭 조회 |
+| `output-list <division-id> [limit]` | 파이프라인 산출물 조회 |
+| `proposal-list` | 설계 중인 Division 목록 |
+| `decision-list [status]` | Critical Decision 목록 |
+| `cost-summary [division-id] [days]` | LLM 비용 요약 |
+
+### Division 관리
+| 명령 | 용도 |
+|------|------|
+| `division-pause <id>` | Division 일시정지 |
+| `division-resume <id>` | Division 재개 |
+| `division-sunset <id>` | Division 종료 (데이터 보존) |
+| `division-delete <id>` | Division 완전 삭제 (**비가역! 반드시 사용자 확인**) |
+| `division-build '<json>'` | Division 구축 |
+
+### 데이터 기록
+| 명령 | 용도 |
+|------|------|
+| `memory-save '<json>'` | Memory 저장 |
+| `metric-record '<json>'` | 메트릭 기록 |
+| `output-save '<json>'` | 파이프라인 산출물 저장 |
+| `cost-record '<json>'` | LLM 비용 기록 |
+
+### 설계/승인
+| 명령 | 용도 |
+|------|------|
+| `proposal-create '<json>'` | 새 Division 설계 요청 |
+| `proposal-feedback '<json>'` | 설계안 피드백 |
+| `proposal-approve '<json>'` | 설계안 승인 → 구축 |
+
+### Critical Decision
+| 명령 | 용도 |
+|------|------|
+| `decision-create '<json>'` | Critical Decision 생성 |
+| `decision-list [status]` | 목록 조회 |
+| `decision-resolve '<json>'` | Decision 결정 |

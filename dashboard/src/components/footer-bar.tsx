@@ -1,9 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { usePathname } from 'next/navigation'
 import { Activity } from 'lucide-react'
 
 export function FooterBar() {
+  const pathname = usePathname()
+  const isHome = pathname === '/'
   const [timeStr, setTimeStr] = useState('')
 
   useEffect(() => {
@@ -11,6 +14,8 @@ export function FooterBar() {
     const timer = setInterval(() => setTimeStr(new Date().toLocaleTimeString()), 1000)
     return () => clearInterval(timer)
   }, [])
+
+  if (!isHome) return null
 
   return (
     <footer className="h-8 border-t border-[var(--border)] bg-white flex items-center justify-between px-6 shrink-0 z-50">

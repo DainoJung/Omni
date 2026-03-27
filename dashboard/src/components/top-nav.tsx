@@ -28,11 +28,9 @@ export function TopNav({
       {/* Left: Logo */}
       <div className="flex items-center gap-4">
         <a href="/" className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-[var(--text-primary)] rounded flex items-center justify-center text-white">
-            <Layers size={18} />
-          </div>
+          <img src="/logo.png" alt="Omni" className="w-8 h-8" />
           <h1 className="font-[family-name:var(--font-mono)] text-sm font-bold tracking-tighter uppercase">
-            OMNI Agent OS
+            OMNI OS
           </h1>
         </a>
       </div>
@@ -88,11 +86,10 @@ function NavLink({ href, icon, label, badge }: { href: string; icon: React.React
   return (
     <a
       href={href}
-      className={`flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-[family-name:var(--font-mono)] uppercase rounded-md transition-all relative ${
-        active
-          ? 'bg-[var(--bg-primary)] text-[var(--accent-blue)] font-bold'
-          : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-      }`}
+      className={`flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-[family-name:var(--font-mono)] uppercase rounded-md transition-all relative ${active
+        ? 'bg-[var(--bg-primary)] text-[var(--accent-blue)] font-bold'
+        : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+        }`}
     >
       {icon}
       <span>{label}</span>

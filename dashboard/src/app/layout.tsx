@@ -21,7 +21,7 @@ const firaCode = Fira_Code({
 })
 
 export const metadata: Metadata = {
-  title: 'OMNI Agent OS — Command Center',
+  title: 'OMNI OS — Command Center',
   description: 'Agent OS for Autonomous Business',
 }
 
